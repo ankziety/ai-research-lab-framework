@@ -1,4 +1,4 @@
-# Experimental Study on Neural Network Architecture Optimization Optimize
+# Experimental Study on Neural Network Architecture Optimization
 
 ## Abstract
 
