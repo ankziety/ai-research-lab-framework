@@ -1,3 +1,12 @@
 matplotlib>=3.5.0
 numpy>=1.21.0
 pytest>=6.0.0
+
+# Multi-agent system dependencies
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+
+# Optional: For better embedding models and GPU support
+# openai>=1.0.0  # For OpenAI embeddings API (optional)
+# faiss-gpu>=1.7.0  # For GPU-accelerated FAISS (optional)
+# torch>=1.11.0  # Required by sentence-transformers

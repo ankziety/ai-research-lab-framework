@@ -2,9 +2,15 @@
 """
 AI-Powered Research Framework
 
-A comprehensive framework for AI-powered research workflows that integrates experiment 
-execution, literature retrieval, manuscript drafting, result visualization, 
-and research critique capabilities across any research domain.
+A comprehensive multi-agent framework for AI-powered research workflows that coordinates
+teams of AI expert agents to collaborate on research problems across any domain.
+
+This framework includes:
+- Multi-agent coordination with Principal Investigator and domain experts
+- Vector database for memory management and context retrieval
+- Knowledge repository for validated findings
+- Scientific critique and quality control
+- Legacy support for original atomic components
 """
 
 import os
@@ -13,7 +19,10 @@ from typing import Dict, List, Any, Optional, Union
 from pathlib import Path
 import logging
 
-# Import all the atomic components
+# Import the new multi-agent framework
+from multi_agent_framework import MultiAgentResearchFramework
+
+# Import legacy components for backward compatibility
 from manuscript_drafter import draft as draft_manuscript
 from literature_retriever import LiteratureRetriever
 from critic import Critic
@@ -26,13 +35,21 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class AIPoweredResearchFramework:
+class AIPoweredResearchFramework(MultiAgentResearchFramework):
     """
-    Main framework class that orchestrates all AI-powered research components.
+    AI-Powered Research Framework that inherits from MultiAgentResearchFramework.
     
-    This class provides a unified interface for conducting research workflows
-    across any domain, leveraging AI to assist with experimentation, literature
-    review, manuscript generation, and research critique.
+    This class provides backward compatibility while leveraging the new multi-agent
+    architecture with vector database integration and intelligent agent coordination.
+    
+    The framework now operates as a virtual lab of AI "scientists" that collaborate
+    on interdisciplinary research problems, with:
+    
+    - Principal Investigator (PI) Agent coordinating research
+    - Agent Marketplace with domain experts (Ophthalmology, Psychology, Neuroscience, etc.)
+    - Scientific Critic Agent for quality control
+    - Vector Database for memory management and context retrieval
+    - Knowledge Repository for validated findings
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -42,30 +59,20 @@ class AIPoweredResearchFramework:
         Args:
             config: Optional configuration dictionary. If None, loads default config.
         """
-        self.config = self._load_config(config)
+        # Load legacy configuration format
+        legacy_config = self._load_legacy_config(config)
         
-        # Initialize all components
-        self.experiment_runner = ExperimentRunner(
-            db_path=self.config.get('experiment_db_path')
-        )
-        self.literature_retriever = LiteratureRetriever(
-            api_base_url=self.config.get('literature_api_url'),
-            api_key=self.config.get('literature_api_key')
-        )
-        self.critic = Critic()
-        self.specialist_registry = SpecialistRegistry()
+        # Initialize the multi-agent framework
+        super().__init__(legacy_config)
         
-        # Setup output directories
-        self._setup_directories()
+        # Initialize legacy components for backward compatibility
+        self._init_legacy_compatibility()
         
-        # Register default specialists
-        self._register_default_specialists()
-        
-        logger.info("AI-Powered Research Framework initialized successfully")
+        logger.info("AI-Powered Research Framework (Multi-Agent) initialized successfully")
     
-    def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-        """Load configuration from provided config or defaults."""
-        default_config = {
+    def _load_legacy_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Convert legacy config format to new multi-agent config."""
+        legacy_defaults = {
             'experiment_db_path': 'experiments/experiments.db',
             'output_dir': 'output',
             'manuscript_dir': 'manuscripts',
@@ -78,104 +85,28 @@ class AIPoweredResearchFramework:
         }
         
         if config:
-            default_config.update(config)
+            legacy_defaults.update(config)
             
-        return default_config
+        return legacy_defaults
     
-    def _setup_directories(self) -> None:
-        """Create necessary output directories."""
-        dirs_to_create = [
-            self.config['output_dir'],
-            self.config['manuscript_dir'],
-            self.config['visualization_dir']
-        ]
+    def _init_legacy_compatibility(self):
+        """Initialize legacy components for backward compatibility."""
+        # These are already initialized in the parent class, just expose them
+        # for backward compatibility
         
-        for dir_path in dirs_to_create:
-            Path(dir_path).mkdir(parents=True, exist_ok=True)
-    
-    def _register_default_specialists(self) -> None:
-        """Register default specialist handlers."""
+        # Register legacy specialists in the specialist registry
+        self.specialist_registry = SpecialistRegistry()
         self.specialist_registry.register('experiment_runner', self.run_experiment)
         self.specialist_registry.register('literature_retriever', self.retrieve_literature)
         self.specialist_registry.register('manuscript_drafter', self.draft_manuscript)
         self.specialist_registry.register('critic', self.critique_output)
         self.specialist_registry.register('visualizer', self.visualize_results)
-    
-    def run_experiment(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Run an experiment and optionally auto-generate visualizations.
         
-        Args:
-            params: Experiment parameters
-            
-        Returns:
-            Dictionary containing experiment results and metadata
-        """
-        logger.info(f"Running experiment with parameters: {params}")
-        
-        # Run the actual experiment
-        results = self.experiment_runner.run_experiment(params)
-        
-        # Auto-visualize results if enabled
-        if self.config.get('auto_visualize') and 'computed_results' in results:
-            try:
-                viz_path = self._generate_visualization_path(results['experiment_id'])
-                self.visualize_results([results], viz_path)
-                results['visualization_path'] = viz_path
-                logger.info(f"Auto-generated visualization: {viz_path}")
-            except Exception as e:
-                logger.warning(f"Auto-visualization failed: {e}")
-        
-        return results
-    
-    def retrieve_literature(self, query: str, max_results: Optional[int] = None) -> List[Dict]:
-        """
-        Retrieve relevant literature for a research topic.
-        
-        Args:
-            query: Search query string
-            max_results: Maximum number of results (uses config default if None)
-            
-        Returns:
-            List of literature records
-        """
-        if max_results is None:
-            max_results = self.config.get('max_literature_results', 10)
-            
-        logger.info(f"Retrieving literature for query: '{query}'")
-        
-        return self.literature_retriever.search(query, max_results)
-    
-    def draft_manuscript(self, results: List[Dict[str, Any]], 
-                        context: Dict[str, Any]) -> str:
-        """
-        Draft a scientific manuscript from experimental results.
-        
-        Args:
-            results: List of experimental results
-            context: Contextual information for the manuscript
-            
-        Returns:
-            Formatted manuscript string
-        """
-        logger.info("Drafting manuscript from experimental results")
-        
-        manuscript = draft_manuscript(results, context)
-        
-        # Auto-critique if enabled
-        if self.config.get('auto_critique'):
-            try:
-                critique = self.critique_output(manuscript)
-                # Add critique as metadata (could be used for revision)
-                logger.info(f"Auto-critique score: {critique['overall_score']}/100")
-            except Exception as e:
-                logger.warning(f"Auto-critique failed: {e}")
-        
-        return manuscript
+        logger.info("Legacy compatibility components initialized")
     
     def critique_output(self, output: str) -> Dict[str, Union[str, List[str], int]]:
         """
-        Critique a research output.
+        Legacy critique method using both traditional and multi-agent critics.
         
         Args:
             output: Text output to critique
@@ -183,25 +114,25 @@ class AIPoweredResearchFramework:
         Returns:
             Dictionary containing critique results
         """
-        logger.info("Critiquing research output")
-        return self.critic.review(output)
-    
-    def visualize_results(self, results: List[Dict], out_path: str) -> None:
-        """
-        Generate visualizations from experimental results.
+        # Use the new scientific critic agent for more comprehensive analysis
+        multi_agent_critique = self.scientific_critic.critique_research_output(
+            output_content=output,
+            output_type="general"
+        )
         
-        Args:
-            results: List of result dictionaries
-            out_path: Output path for visualization
-        """
-        logger.info(f"Generating visualization: {out_path}")
-        visualize_results(results, out_path)
+        # Convert to legacy format for backward compatibility
+        return {
+            'overall_score': multi_agent_critique['overall_score'],
+            'recommendations': multi_agent_critique['recommendations'],
+            'critical_issues': multi_agent_critique['critical_issues'],
+            'detailed_analysis': multi_agent_critique
+        }
     
     def run_complete_workflow(self, experiment_params: Dict[str, Any],
                             manuscript_context: Dict[str, Any],
                             literature_query: Optional[str] = None) -> Dict[str, Any]:
         """
-        Run a complete research workflow from experiment to manuscript.
+        Legacy method: Run a complete research workflow using multi-agent system.
         
         Args:
             experiment_params: Parameters for the experiment
@@ -211,19 +142,46 @@ class AIPoweredResearchFramework:
         Returns:
             Dictionary containing all workflow outputs
         """
-        logger.info("Starting complete research workflow")
+        logger.info("Starting legacy workflow using multi-agent system")
         
+        # Construct research question from experiment and manuscript context
+        research_question = f"""
+        Research Objective: {manuscript_context.get('objective', 'Conduct research experiment')}
+        
+        Experimental Setup:
+        {json.dumps(experiment_params, indent=2)}
+        
+        Research Context:
+        Methods: {manuscript_context.get('methods', 'Not specified')}
+        Expected Conclusion: {manuscript_context.get('conclusion', 'To be determined')}
+        """
+        
+        if literature_query:
+            research_question += f"\n\nLiterature Focus: {literature_query}"
+        
+        # Use multi-agent research coordination
+        research_session = self.conduct_research(
+            research_question=research_question,
+            context={
+                'experiment_params': experiment_params,
+                'manuscript_context': manuscript_context,
+                'literature_query': literature_query,
+                'workflow_type': 'legacy_complete_workflow'
+            }
+        )
+        
+        # Convert to legacy format
         workflow_results = {
-            'workflow_id': f"workflow_{self._generate_id()}",
-            'status': 'running'
+            'workflow_id': research_session['session_id'],
+            'status': research_session['status']
         }
         
-        try:
-            # Step 1: Run experiment
+        if research_session['status'] == 'completed':
+            # Run the actual experiment
             experiment_results = self.run_experiment(experiment_params)
             workflow_results['experiment'] = experiment_results
             
-            # Step 2: Retrieve literature (if query provided)
+            # Get literature if requested
             if literature_query:
                 literature = self.retrieve_literature(literature_query)
                 workflow_results['literature'] = literature
@@ -234,7 +192,7 @@ class AIPoweredResearchFramework:
                         [self._format_literature_reference(lit) for lit in literature[:3]]
                     )
             
-            # Step 3: Generate manuscript
+            # Generate manuscript
             manuscript = self.draft_manuscript([experiment_results], manuscript_context)
             manuscript_path = self._save_manuscript(manuscript, workflow_results['workflow_id'])
             workflow_results['manuscript'] = {
@@ -242,17 +200,16 @@ class AIPoweredResearchFramework:
                 'path': manuscript_path
             }
             
-            # Step 4: Critique manuscript
+            # Critique manuscript
             critique = self.critique_output(manuscript)
             workflow_results['critique'] = critique
             
-            workflow_results['status'] = 'completed'
-            logger.info(f"Workflow completed successfully: {workflow_results['workflow_id']}")
+            # Add multi-agent research insights
+            workflow_results['multi_agent_research'] = research_session['synthesis']
+            workflow_results['agent_collaboration'] = research_session['collaboration_results']
             
-        except Exception as e:
-            workflow_results['status'] = 'failed'
-            workflow_results['error'] = str(e)
-            logger.error(f"Workflow failed: {e}")
+        else:
+            workflow_results['error'] = research_session.get('error', 'Unknown error')
             
         return workflow_results
     
@@ -354,28 +311,43 @@ if __name__ == "__main__":
     # Create framework instance
     framework = create_framework()
     
-    # Example workflow
+    # Example: Multi-agent research on binocular vision and anxiety
+    research_question = """
+    Investigate the relationship between binocular vision dysfunction and anxiety disorders.
+    Consider ophthalmological, psychological, and neurological factors.
+    """
+    
+    # Conduct multi-agent research
+    research_results = framework.conduct_research(research_question)
+    print(f"Research session completed: {research_results['session_id']}")
+    print(f"Status: {research_results['status']}")
+    
+    if research_results['status'] == 'completed':
+        print(f"Synthesis: {research_results['synthesis']['synthesis_text'][:200]}...")
+        print(f"Validated findings: {len(research_results['validated_findings'])}")
+    
+    # Example: Legacy workflow for backward compatibility
     experiment_params = {
-        'algorithm': 'neural_network',
-        'learning_rate': 0.001,
-        'epochs': 100,
-        'batch_size': 32
+        'study_type': 'binocular_vision_assessment',
+        'participants': 50,
+        'measures': ['visual_acuity', 'convergence', 'anxiety_scale'],
+        'duration_weeks': 12
     }
     
     manuscript_context = {
-        'objective': 'Evaluate neural network performance',
-        'methods': 'Deep learning with backpropagation',
-        'conclusion': 'Neural network achieved high accuracy'
+        'objective': 'Evaluate relationship between binocular vision and anxiety',
+        'methods': 'Cross-sectional study with standardized assessments',
+        'conclusion': 'To be determined from data analysis'
     }
     
-    # Run complete workflow
-    results = framework.run_complete_workflow(
+    # Run legacy workflow enhanced with multi-agent capabilities
+    legacy_results = framework.run_complete_workflow(
         experiment_params=experiment_params,
         manuscript_context=manuscript_context,
-        literature_query='neural networks machine learning'
+        literature_query='binocular vision dysfunction anxiety mental health'
     )
     
-    print(f"Workflow completed: {results['workflow_id']}")
-    print(f"Experiment ID: {results['experiment']['experiment_id']}")
-    print(f"Manuscript saved to: {results['manuscript']['path']}")
-    print(f"Critique score: {results['critique']['overall_score']}/100")
+    print(f"Legacy workflow completed: {legacy_results['workflow_id']}")
+    print(f"Experiment ID: {legacy_results['experiment']['experiment_id']}")
+    print(f"Manuscript saved to: {legacy_results['manuscript']['path']}")
+    print(f"Critique score: {legacy_results['critique']['overall_score']}/100")
