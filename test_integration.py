@@ -13,11 +13,11 @@ import shutil
 from pathlib import Path
 import unittest
 
-from ai_research_lab import AIResearchLabFramework, create_framework
+from ai_research_lab import AIPoweredResearchFramework, create_framework
 
 
-class TestAIResearchLabFramework(unittest.TestCase):
-    """Test cases for the integrated AI Research Lab Framework."""
+class TestAIPoweredResearchFramework(unittest.TestCase):
+    """Test cases for the integrated AI-Powered Research Framework."""
     
     def setUp(self):
         """Set up test environment with temporary directories."""
@@ -30,7 +30,7 @@ class TestAIResearchLabFramework(unittest.TestCase):
             'auto_visualize': False,  # Disable to avoid matplotlib issues in tests
             'auto_critique': True
         }
-        self.framework = AIResearchLabFramework(self.config)
+        self.framework = AIPoweredResearchFramework(self.config)
     
     def tearDown(self):
         """Clean up test environment."""
@@ -38,7 +38,7 @@ class TestAIResearchLabFramework(unittest.TestCase):
     
     def test_framework_initialization(self):
         """Test framework initializes correctly."""
-        self.assertIsInstance(self.framework, AIResearchLabFramework)
+        self.assertIsInstance(self.framework, AIPoweredResearchFramework)
         self.assertEqual(self.framework.config['output_dir'], self.config['output_dir'])
         
         # Check directories were created
@@ -49,7 +49,7 @@ class TestAIResearchLabFramework(unittest.TestCase):
     def test_create_framework_factory(self):
         """Test framework factory function."""
         framework = create_framework(self.config)
-        self.assertIsInstance(framework, AIResearchLabFramework)
+        self.assertIsInstance(framework, AIPoweredResearchFramework)
     
     def test_experiment_runner_integration(self):
         """Test experiment runner integration."""
@@ -139,18 +139,18 @@ class TestAIResearchLabFramework(unittest.TestCase):
     def test_complete_workflow(self):
         """Test complete workflow integration."""
         experiment_params = {
-            'algorithm': 'neural_network',
-            'learning_rate': 0.001,
-            'epochs': 50
+            'treatment': 'antioxidant_supplement',
+            'dosage_mg': 500,
+            'duration_weeks': 8
         }
         
         manuscript_context = {
-            'objective': 'Evaluate neural network performance',
-            'methods': 'Deep learning with backpropagation',
-            'conclusion': 'Neural network achieved high accuracy'
+            'objective': 'Evaluate antioxidant supplement effects on oxidative stress',
+            'methods': 'Randomized controlled trial with biomarker analysis',
+            'conclusion': 'Antioxidant supplementation significantly reduced oxidative stress markers'
         }
         
-        literature_query = 'neural networks machine learning'
+        literature_query = 'antioxidant supplements oxidative stress'
         
         results = self.framework.run_complete_workflow(
             experiment_params=experiment_params,
@@ -312,7 +312,7 @@ def run_integration_tests():
     suite = unittest.TestSuite()
     
     # Add test cases
-    suite.addTest(unittest.makeSuite(TestAIResearchLabFramework))
+    suite.addTest(unittest.makeSuite(TestAIPoweredResearchFramework))
     suite.addTest(unittest.makeSuite(TestFrameworkComponents))
     
     # Run tests

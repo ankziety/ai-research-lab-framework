@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Comprehensive Demo for AI Research Lab Framework
+Comprehensive Demo for AI-Powered Research Framework
 
-This script demonstrates the complete functionality of the integrated AI research 
-lab framework, showing how all components work together in research workflows.
+This script demonstrates the complete functionality of the integrated AI-powered  
+research framework, showing how AI assists research workflows across any domain.
 """
 
 import os
@@ -16,7 +16,7 @@ from ai_research_lab import create_framework
 
 def demo_individual_components():
     """Demonstrate individual component functionality."""
-    print("🔬 AI Research Lab Framework - Component Demo")
+    print("🔬 AI-Powered Research Framework - Component Demo")
     print("=" * 60)
     
     # Create framework with demo configuration
@@ -33,13 +33,13 @@ def demo_individual_components():
     print("\n1. 🧪 Testing Experiment Runner")
     print("-" * 30)
     
-    # Run a sample experiment
+    # Run a sample biology experiment
     experiment_params = {
-        'algorithm': 'random_forest',
-        'n_estimators': 100,
-        'max_depth': 10,
-        'learning_rate': 0.01,
-        'dataset_size': 1000
+        'treatment': 'enzyme_inhibitor_A',
+        'concentration_uM': 50,
+        'incubation_time_hours': 24,
+        'cell_line': 'HeLa',
+        'sample_size': 100
     }
     
     print(f"Running experiment with parameters: {experiment_params}")
@@ -132,52 +132,51 @@ def demo_complete_workflow():
         'auto_critique': True
     })
     
-    # Define workflow parameters
+    # Define workflow parameters for a chemistry research study
     experiment_params = {
-        'model_type': 'neural_network',
-        'architecture': 'feedforward',
-        'hidden_layers': 3,
-        'neurons_per_layer': 128,
-        'activation': 'relu',
-        'learning_rate': 0.001,
-        'batch_size': 32,
-        'epochs': 100,
-        'dropout_rate': 0.2,
-        'dataset': 'synthetic_classification'
+        'reaction_type': 'catalytic_hydrogenation',
+        'catalyst': 'palladium_on_carbon',
+        'substrate': 'benzene_derivative',
+        'temperature_C': 25,
+        'pressure_atm': 1.5,
+        'reaction_time_hours': 4,
+        'solvent': 'ethanol',
+        'yield_target': 0.85,
+        'selectivity_target': 0.95
     }
     
     manuscript_context = {
         'study_type': 'Experimental Study',
-        'subject': 'Neural Network Architecture Optimization',
-        'objective': 'Optimize neural network architecture for classification tasks',
-        'background': 'Deep learning architectures require careful tuning for optimal performance',
-        'significance': 'Architecture optimization is critical for model efficiency and accuracy',
-        'methods': 'Systematic architecture search with performance evaluation',
-        'conclusion': 'Optimized architecture achieves superior classification performance',
-        'materials': ['TensorFlow', 'Keras', 'NumPy', 'Matplotlib'],
+        'subject': 'Catalytic Hydrogenation Optimization',
+        'objective': 'Optimize palladium-catalyzed hydrogenation for improved yield and selectivity',
+        'background': 'Catalytic hydrogenation is essential for pharmaceutical synthesis but requires optimization',
+        'significance': 'Improved catalytic processes reduce waste and enhance sustainability',
+        'methods': 'Systematic catalyst screening with reaction condition optimization',
+        'conclusion': 'Optimized conditions achieved high yield and excellent selectivity',
+        'materials': ['Palladium on carbon', 'Ethanol', 'Hydrogen gas', 'Benzene derivative'],
         'procedures': [
-            'Generate synthetic classification dataset',
-            'Design neural network architecture',
-            'Train model with early stopping',
-            'Evaluate on validation set',
-            'Analyze convergence patterns'
+            'Prepare catalyst suspension in solvent',
+            'Add substrate and purge with hydrogen',
+            'Monitor reaction progress by GC-MS',
+            'Analyze product yield and selectivity',
+            'Characterize reaction kinetics'
         ],
         'limitations': [
-            'Limited to synthetic data',
-            'Single optimization run',
-            'Architecture space not exhaustively explored'
+            'Limited to single substrate class',
+            'Ambient pressure conditions only',
+            'Short reaction time optimization'
         ],
         'future_work': [
-            'Test on real-world datasets',
+            'Expand substrate scope',
             'Implement automated architecture search',
             'Compare with state-of-the-art models'
         ]
     }
     
-    literature_query = 'neural network architecture optimization deep learning'
+    literature_query = 'palladium catalyzed hydrogenation reaction optimization'
     
     print("Starting complete workflow...")
-    print(f"📊 Experiment: {experiment_params['model_type']} with {experiment_params['hidden_layers']} hidden layers")
+    print(f"📊 Experiment: {experiment_params['reaction_type']} using {experiment_params['catalyst']}")
     print(f"📚 Literature query: '{literature_query}'")
     print(f"📝 Manuscript topic: {manuscript_context['subject']}")
     

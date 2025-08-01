@@ -1,12 +1,12 @@
 """
-AI Research Lab Framework
+AI-Powered Research Framework
 
-A comprehensive framework for AI research workflows that integrates experiment 
+A comprehensive framework for AI-powered research workflows that integrates experiment 
 execution, literature retrieval, manuscript drafting, result visualization, 
-and research critique capabilities.
+and research critique capabilities across any research domain.
 """
 
-from .ai_research_lab import AIResearchLabFramework, create_framework
+from .ai_research_lab import AIPoweredResearchFramework, create_framework
 
 # Import individual components for direct access if needed
 from .manuscript_drafter import draft as draft_manuscript
@@ -17,11 +17,11 @@ from .specialist_registry import SpecialistRegistry
 from .experiments.experiment import ExperimentRunner
 
 __version__ = "1.0.0"
-__author__ = "AI Research Lab Framework Team"
+__author__ = "AI-Powered Research Framework Team"
 
 # Main framework exports
 __all__ = [
-    'AIResearchLabFramework',
+    'AIPoweredResearchFramework',
     'create_framework',
     'LiteratureRetriever',
     'Critic',
@@ -34,13 +34,13 @@ __all__ = [
 # Convenience function for quick framework creation
 def framework(config=None):
     """
-    Create an AI Research Lab Framework instance.
+    Create an AI-Powered Research Framework instance.
     
     Args:
         config: Optional configuration dictionary
         
     Returns:
-        Configured AIResearchLabFramework instance
+        Configured AIPoweredResearchFramework instance
     """
     return create_framework(config)
 

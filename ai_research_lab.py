@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-AI Research Lab Framework
+AI-Powered Research Framework
 
-A comprehensive framework for AI research workflows that integrates experiment 
+A comprehensive framework for AI-powered research workflows that integrates experiment 
 execution, literature retrieval, manuscript drafting, result visualization, 
-and research critique capabilities.
+and research critique capabilities across any research domain.
 """
 
 import os
@@ -26,17 +26,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class AIResearchLabFramework:
+class AIPoweredResearchFramework:
     """
-    Main framework class that orchestrates all AI research lab components.
+    Main framework class that orchestrates all AI-powered research components.
     
-    This class provides a unified interface for conducting AI research workflows,
-    from running experiments to generating final manuscript drafts with critique.
+    This class provides a unified interface for conducting research workflows
+    across any domain, leveraging AI to assist with experimentation, literature
+    review, manuscript generation, and research critique.
     """
     
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
-        Initialize the AI Research Lab Framework.
+        Initialize the AI-Powered Research Framework.
         
         Args:
             config: Optional configuration dictionary. If None, loads default config.
@@ -60,7 +61,7 @@ class AIResearchLabFramework:
         # Register default specialists
         self._register_default_specialists()
         
-        logger.info("AI Research Lab Framework initialized successfully")
+        logger.info("AI-Powered Research Framework initialized successfully")
     
     def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Load configuration from provided config or defaults."""
@@ -335,17 +336,17 @@ class AIResearchLabFramework:
         return str(int(time.time()))
 
 
-def create_framework(config: Optional[Dict[str, Any]] = None) -> AIResearchLabFramework:
+def create_framework(config: Optional[Dict[str, Any]] = None) -> AIPoweredResearchFramework:
     """
-    Factory function to create an AI Research Lab Framework instance.
+    Factory function to create an AI-Powered Research Framework instance.
     
     Args:
         config: Optional configuration dictionary
         
     Returns:
-        Configured AIResearchLabFramework instance
+        Configured AIPoweredResearchFramework instance
     """
-    return AIResearchLabFramework(config)
+    return AIPoweredResearchFramework(config)
 
 
 # Example usage

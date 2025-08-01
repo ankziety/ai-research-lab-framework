@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-AI Research Lab Framework CLI
+AI-Powered Research Framework CLI
 
-Command-line interface for the AI research lab framework, providing easy access
-to all framework functionality.
+Command-line interface for the AI-powered research framework, providing easy access
+to all framework functionality across any research domain.
 """
 
 import argparse
