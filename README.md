@@ -1,191 +1,330 @@
-# Scientific Manuscript Drafter
+# AI Research Lab Framework
 
-A Python module for generating structured Markdown drafts from experimental results and contextual information.
+A comprehensive framework for AI research workflows that integrates experiment execution, literature retrieval, manuscript drafting, result visualization, and research critique capabilities.
 
 ## Overview
 
-The `manuscript_drafter.py` module provides a function to automatically generate scientific manuscript drafts in Markdown format. It takes experimental results and contextual information as input and produces a well-structured document with all standard scientific manuscript sections.
+The AI Research Lab Framework provides a unified platform for conducting end-to-end AI research workflows. It combines multiple specialized components into a cohesive system that can run experiments, analyze results, retrieve relevant literature, draft manuscripts, and provide automated critique - all through a simple, unified API.
 
 ## Features
 
-- **Structured Output**: Generates complete manuscripts with title, abstract, introduction, methods, results, discussion, conclusion, and references
-- **Flexible Input**: Accepts various formats of experimental results and contextual information
-- **Markdown Format**: Outputs clean, editable Markdown text
-- **No Dependencies**: Pure Python implementation with no external package requirements
-- **Error Handling**: Robust input validation and error handling
-- **Comprehensive Testing**: Full test suite covering all functionality
+### 🧪 Experiment Management
+- **Automated Execution**: Run computational experiments with parameter tracking
+- **Result Persistence**: SQLite-based storage for experiment results and metadata
+- **Status Tracking**: Monitor experiment progress and completion status
 
-## Usage
+### 📚 Literature Integration
+- **Smart Retrieval**: Search and retrieve relevant scientific literature
+- **Context Integration**: Automatically incorporate literature into research workflows
+- **Reference Management**: Format and manage literature references
+
+### 📝 Manuscript Generation
+- **Structured Output**: Generate complete manuscripts with all standard sections
+- **Context-Aware**: Incorporate experiment results and literature seamlessly
+- **Markdown Format**: Clean, editable output format
+- **Auto-Integration**: Combine multiple experiment results into cohesive narratives
+
+### 🔍 Intelligent Critique
+- **Automated Review**: Rule-based critique of research outputs
+- **Structured Feedback**: Organized strengths, weaknesses, and suggestions
+- **Quality Scoring**: Numerical quality assessment (0-100 scale)
+- **Improvement Guidance**: Actionable recommendations for enhancement
+
+### 📊 Result Visualization
+- **Multi-Format Support**: Generate publication-ready visualizations
+- **Automated Plotting**: Smart chart selection based on data types
+- **Trend Analysis**: Time-series and comparative visualizations
+- **Export Options**: PNG, PDF, and other standard formats
+
+### 🔄 Workflow Orchestration
+- **End-to-End Pipelines**: Complete research workflows from experiment to manuscript
+- **Component Integration**: Seamless interaction between all framework components
+- **Configuration Management**: Save and reuse workflow configurations
+- **Error Handling**: Robust error management and recovery
+
+### 👥 Specialist Registry
+- **Modular Architecture**: Register and manage specialized processing components
+- **Custom Extensions**: Easy integration of domain-specific tools
+- **Role-Based Access**: Organize functionality by research roles and tasks
+
+## Quick Start
+
+### Installation
+
+The framework requires Python 3.6+ and has minimal dependencies:
+
+```bash
+pip install matplotlib numpy pytest
+```
 
 ### Basic Usage
 
 ```python
-from manuscript_drafter import draft
+from ai_research_lab import create_framework
 
-# Define experimental results
-results = [
-    {
-        "description": "Temperature effect on enzyme activity",
-        "data": {"temperature_20C": 0.45, "temperature_30C": 0.78},
-        "implication": "Optimal activity at 30°C"
-    }
-]
+# Create framework instance
+framework = create_framework()
 
-# Define contextual information
-context = {
-    "objective": "Study enzyme temperature dependence",
-    "methods": "Standard spectrophotometric assays",
-    "conclusion": "Temperature significantly affects enzyme activity"
+# Run a complete research workflow
+experiment_params = {
+    'algorithm': 'neural_network',
+    'learning_rate': 0.001,
+    'epochs': 100
 }
 
-# Generate manuscript
-manuscript = draft(results, context)
-print(manuscript)
-```
-
-### Input Format
-
-#### Results (List of Dictionaries)
-
-Each result dictionary can contain:
-
-- `description`: Text description of the result
-- `outcome`: Alternative to description
-- `finding`: Alternative to description
-- `data`: Quantitative data (dict, int, or float)
-- `implication`: What the result means
-- `significance`: Why the result is important
-- `id`: Optional identifier
-- `metadata`: Optional metadata
-
-#### Context (Dictionary)
-
-The context dictionary can contain:
-
-- `study_type`: Type of study (e.g., "Longitudinal", "Comparative")
-- `subject`: Subject of study
-- `objective`: Main objective
-- `background`: Background information
-- `significance`: Why the study is important
-- `objectives`: List of specific objectives
-- `methods`: Methods description
-- `materials`: List of materials used
-- `procedures`: List of procedures
-- `conclusion`: Main conclusion
-- `interpretation`: Interpretation of results
-- `limitations`: List of study limitations
-- `future_work`: List of future research directions
-- `references`: List of references (dict or string format)
-
-## Output Structure
-
-The generated manuscript includes:
-
-1. **Title**: Generated from context information
-2. **Abstract**: Summary with background, methods, results, and conclusion
-3. **Introduction**: Background, significance, and objectives
-4. **Methods**: Materials, procedures, and experimental approach
-5. **Results**: Detailed presentation of experimental findings
-6. **Discussion**: Interpretation, implications, and limitations
-7. **Conclusion**: Main findings and future directions
-8. **References**: Formatted reference list (if provided)
-
-## Examples
-
-### Minimal Input
-
-```python
-results = [{"outcome": "Positive result"}]
-context = {"objective": "Test hypothesis"}
-manuscript = draft(results, context)
-```
-
-### Rich Context
-
-```python
-results = [
-    {
-        "description": "Temperature measurement",
-        "data": {"temperature": 25.5, "humidity": 60},
-        "implication": "Optimal conditions identified"
-    }
-]
-
-context = {
-    "study_type": "Experimental",
-    "subject": "Environmental Control",
-    "objective": "Optimize environmental parameters",
-    "background": "Previous studies show temperature affects growth",
-    "methods": "Controlled environment experiments",
-    "materials": ["Sensors", "Growth chambers"],
-    "procedures": ["Setup chambers", "Monitor conditions"],
-    "conclusion": "Optimal temperature identified",
-    "references": [
-        {"authors": "Smith et al.", "year": "2020", "title": "Environmental Studies"}
-    ]
+manuscript_context = {
+    'objective': 'Evaluate neural network performance',
+    'methods': 'Deep learning with backpropagation',
+    'conclusion': 'Neural network achieved high accuracy'
 }
 
-manuscript = draft(results, context)
+# Execute complete workflow
+results = framework.run_complete_workflow(
+    experiment_params=experiment_params,
+    manuscript_context=manuscript_context,
+    literature_query='neural networks machine learning'
+)
+
+print(f"Workflow completed: {results['workflow_id']}")
+print(f"Manuscript saved to: {results['manuscript']['path']}")
 ```
 
-## Error Handling
+### Command Line Interface
 
-The module validates input types and provides clear error messages:
+The framework includes a comprehensive CLI for all operations:
+
+```bash
+# Run a single experiment
+python cli.py run-experiment --params algorithm=svm kernel=rbf C=1.0
+
+# Draft a manuscript from results
+python cli.py draft-manuscript --results-file results.json --objective "Study SVM performance"
+
+# Run complete workflow
+python cli.py run-workflow --config-file workflow.json
+
+# Generate visualizations
+python cli.py visualize --results-file results.json --output plot.png
+
+# Critique research text
+python cli.py critique --file manuscript.md
+```
+
+## Individual Component Usage
+
+### Experiment Runner
 
 ```python
-# This will raise ValueError
-draft("not a list", {})  # Error: results must be a list
-draft([], "not a dict")  # Error: context must be a dictionary
+# Run individual experiments
+experiment_params = {
+    'algorithm': 'random_forest',
+    'n_estimators': 100,
+    'max_depth': 10
+}
+
+results = framework.run_experiment(experiment_params)
+print(f"Experiment ID: {results['experiment_id']}")
 ```
+
+### Literature Retrieval
+
+```python
+# Search for relevant literature
+literature = framework.retrieve_literature(
+    query="machine learning classification",
+    max_results=10
+)
+
+for paper in literature:
+    print(f"{paper['title']} ({paper['publication_year']})")
+```
+
+### Manuscript Drafting
+
+```python
+# Generate manuscript from results
+results = [{"description": "Experiment results", "data": {...}}]
+context = {"objective": "Research goal", "methods": "Methodology"}
+
+manuscript = framework.draft_manuscript(results, context)
+```
+
+### Research Critique
+
+```python
+# Critique research content
+critique = framework.critique_output(manuscript_text)
+print(f"Quality score: {critique['overall_score']}/100")
+print(f"Suggestions: {critique['suggestions']}")
+```
+
+### Result Visualization
+
+```python
+# Generate visualizations
+framework.visualize_results(
+    results=experiment_results,
+    out_path="results_plot.png"
+)
+```
+
+## Configuration
+
+The framework supports flexible configuration:
+
+```python
+config = {
+    'experiment_db_path': 'custom/experiments.db',
+    'output_dir': 'research_output',
+    'manuscript_dir': 'papers',
+    'visualization_dir': 'plots',
+    'max_literature_results': 15,
+    'auto_visualize': True,
+    'auto_critique': True
+}
+
+framework = create_framework(config)
+```
+
+### Configuration Options
+
+- `experiment_db_path`: Path to SQLite database for experiments
+- `output_dir`: Base directory for all outputs
+- `manuscript_dir`: Directory for generated manuscripts
+- `visualization_dir`: Directory for plots and visualizations
+- `literature_api_url`: API endpoint for literature retrieval
+- `literature_api_key`: API key for literature services
+- `max_literature_results`: Maximum papers to retrieve per query
+- `auto_visualize`: Automatically generate plots after experiments
+- `auto_critique`: Automatically critique generated manuscripts
 
 ## Testing
 
-Run the comprehensive test suite:
+### Run All Tests
 
 ```bash
-python3 test_simple.py
+# Run integration tests
+python test_integration.py
+
+# Run individual component tests  
+python test_simple.py
+python test_manuscript_drafter.py
+python test_literature_retriever.py
+python test_critic.py
+python test_results_visualizer.py
+python test_specialist_registry.py
+
+# Using pytest (if available)
+python -m pytest test_*.py -v
 ```
 
-Or run the pytest tests (if pytest is available):
+### Demo and Examples
 
 ```bash
-python3 -m pytest test_manuscript_drafter.py -v
+# Run comprehensive framework demo
+python demo_integrated.py
+
+# Run individual component demos
+python demo.py                # Original manuscript drafter demo
+python demo_critic.py         # Critic component demo
+python example_usage.py       # Results visualizer examples
 ```
 
-## Demonstration
+## Architecture
 
-Run the demonstration script to see a complete example:
+The framework follows a modular architecture with the following components:
 
-```bash
-python3 demo.py
-```
+### Core Components
+- **AIResearchLabFramework**: Main orchestration class
+- **ExperimentRunner**: Experiment execution and tracking
+- **LiteratureRetriever**: Scientific literature search and retrieval
+- **ManuscriptDrafter**: Scientific manuscript generation
+- **Critic**: Research output critique and feedback
+- **ResultsVisualizer**: Data visualization and plotting
+- **SpecialistRegistry**: Component management and extensibility
+
+### Integration Points
+- **Workflow Orchestration**: End-to-end research pipelines
+- **Configuration Management**: Centralized settings and preferences
+- **Error Handling**: Consistent error management across components
+- **Logging**: Unified logging and monitoring
+- **CLI Interface**: Command-line access to all functionality
 
 ## Requirements
 
 - Python 3.6+
-- No external dependencies
+- matplotlib>=3.5.0
+- numpy>=1.21.0
+- pytest>=6.0.0 (for testing)
 
 ## File Structure
 
 ```
-.
-├── manuscript_drafter.py      # Main module
-├── test_manuscript_drafter.py # Comprehensive pytest tests
-├── test_simple.py            # Simple test script
-├── demo.py                   # Demonstration script
-└── README.md                 # This documentation
+ai-research-lab-framework/
+├── ai_research_lab.py          # Main framework integration class
+├── cli.py                      # Command-line interface
+├── __init__.py                 # Package initialization
+├── demo_integrated.py          # Comprehensive framework demo
+├── test_integration.py         # Integration tests
+├── README.md                   # This documentation
+├── requirements.txt            # Package dependencies
+│
+├── Individual Components/
+├── manuscript_drafter.py       # Scientific manuscript generation
+├── literature_retriever.py     # Literature search and retrieval
+├── critic.py                   # Research output critique
+├── results_visualizer.py       # Data visualization
+├── specialist_registry.py      # Component registry
+├── experiments/
+│   ├── __init__.py
+│   ├── experiment.py           # Experiment execution and tracking
+│   └── README.md
+│
+├── Original Demos & Tests/
+├── demo.py                     # Original manuscript drafter demo
+├── demo_critic.py              # Critic demo
+├── example_usage.py            # Visualizer examples
+├── test_*.py                   # Individual component tests
+│
+└── Generated Outputs/
+    ├── manuscripts/            # Generated manuscript files
+    ├── visualizations/         # Generated plots and charts
+    ├── output/                 # General output directory
+    └── sessions/               # Session data and logs
 ```
 
 ## Contributing
 
-The module is designed to be easily extensible. Key areas for enhancement:
+The framework is designed to be easily extensible. Key areas for enhancement:
 
-- Additional output formats (LaTeX, HTML)
-- More sophisticated title generation
-- Enhanced reference formatting
-- Custom section templates
-- Integration with data analysis libraries
+### Component Extensions
+- **Additional Literature Sources**: Integration with more academic databases
+- **Advanced Critique Models**: LLM-based critique and feedback
+- **Enhanced Visualizations**: Interactive plots and dashboards
+- **Export Formats**: LaTeX, HTML, and other output formats
+
+### Workflow Enhancements  
+- **Parallel Processing**: Concurrent experiment execution
+- **Real-time Monitoring**: Live experiment tracking and alerts
+- **Version Control**: Experiment versioning and reproducibility
+- **Collaboration**: Multi-user workflows and shared resources
+
+### Integration Opportunities
+- **Cloud Platforms**: AWS, GCP, Azure integration
+- **Jupyter Notebooks**: Native notebook support
+- **Web Interface**: Browser-based research dashboard
+- **API Services**: RESTful API for remote access
+
+### Custom Specialists
+```python
+# Example: Register custom specialist
+def custom_analyzer(data):
+    # Custom analysis logic
+    return analysis_results
+
+framework.specialist_registry.register('custom_analyzer', custom_analyzer)
+```
 
 ## License
 
-This module is provided as-is for educational and research purposes.
+This framework is provided as-is for educational and research purposes. See LICENSE file for details.

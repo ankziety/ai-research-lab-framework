@@ -1,0 +1,15 @@
+{
+  "experiment_params": {
+    "algorithm": "support_vector_machine",
+    "kernel": "rbf",
+    "C": 1.0,
+    "gamma": "scale",
+    "dataset": "iris"
+  },
+  "manuscript_context": {
+    "objective": "Evaluate SVM performance on iris dataset",
+    "methods": "Support Vector Machine with RBF kernel",
+    "conclusion": "SVM achieves high accuracy on iris classification"
+  },
+  "literature_query": "support vector machine classification iris dataset"
+}
