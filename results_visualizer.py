@@ -160,8 +160,15 @@ def _create_line_plot(ax, results: List[Dict], numeric_fields: List[str]) -> Non
         ax.set_title('Trends Over Experiments')
         return
     
-    # Plot each numeric field as a line
-    for field in numeric_fields[:3]:  # Limit to first 3 fields to avoid clutter
+    # Select fields with highest variance if max_fields is not None
+    if max_fields is not None:
+        field_variances = {field: np.var([r.get(field) for r in results if isinstance(r.get(field), (int, float))]) for field in numeric_fields}
+        selected_fields = sorted(field_variances, key=field_variances.get, reverse=True)[:max_fields]
+    else:
+        selected_fields = numeric_fields
+    
+    # Plot each selected numeric field as a line
+    for field in selected_fields:
         values = []
         for r in results:
             value = r.get(field)
