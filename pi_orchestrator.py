@@ -121,17 +121,24 @@ class PIOrchestrator:
             
             # Assign subtasks to specialists and collect results
             specialist_results = {}
+            missing_specialists = [
+                subtask['assigned_role'] for subtask in subtasks
+                if subtask['assigned_role'] not in self._specialists
+            ]
+            
+            if missing_specialists:
+                self._logger.error(f"Missing specialists for roles: {', '.join(missing_specialists)}")
+                return {
+                    'task_id': task_id,
+                    'status': 'error',
+                    'error': f"Missing specialists for roles: {', '.join(missing_specialists)}",
+                    'request': request
+                }
+            
             for subtask in subtasks:
                 role = subtask['assigned_role']
-                if role in self._specialists:
-                    result = self._execute_subtask(subtask, task_id)
-                    specialist_results[role] = result
-                else:
-                    self._logger.warning(f"No specialist registered for role: {role}")
-                    specialist_results[role] = {
-                        'error': f"No specialist available for role: {role}",
-                        'subtask': subtask
-                    }
+                result = self._execute_subtask(subtask, task_id)
+                specialist_results[role] = result
             
             # Aggregate results
             aggregated_result = self._aggregate_results(specialist_results, request, task_id)
