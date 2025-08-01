@@ -141,7 +141,7 @@ def _create_bar_chart(ax, results: List[Dict], numeric_fields: List[str]) -> Non
     
     # Add value labels on bars
     for bar, value in zip(bars, values):
-        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.01,
+        ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.05,
                 f'{value:.2f}', ha='center', va='bottom')
 
 
