@@ -31,7 +31,7 @@ class VectorMemory:
             'id': str(self._next_id),
             'text': text,
             'metadata': metadata or {},
-            'timestamp': None  # Could add timestamp in real implementation
+            'timestamp': datetime.now().isoformat()  # Store the current timestamp
         }
         self._storage.append(entry)
         self._next_id += 1
