@@ -20,8 +20,8 @@ def draft(results: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
     Returns:
         str: Formatted Markdown string containing the manuscript draft
     """
-    if not isinstance(results, list) or not isinstance(context, dict):
-        raise ValueError("results must be a list and context must be a dictionary")
+    if results is None or not isinstance(results, list) or context is None or not isinstance(context, dict):
+        raise ValueError("results must be a list and context must be a dictionary, and neither can be None")
     
     # Initialize the manuscript content
     manuscript_parts = []
