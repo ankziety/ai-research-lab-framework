@@ -206,7 +206,7 @@ def _generate_results(results: List[Dict[str, Any]]) -> str:
             result_text += result["finding"]
         else:
             # Try to construct from available fields
-            available_fields = [k for k in result.keys() if k not in ['id', 'timestamp', 'metadata']]
+            available_fields = [k for k in result.keys() if k not in EXCLUDED_RESULT_FIELDS]
             if available_fields:
                 field_values = [f"{k}: {result[k]}" for k in available_fields[:3]]  # Limit to 3 fields
                 result_text += "; ".join(field_values)
