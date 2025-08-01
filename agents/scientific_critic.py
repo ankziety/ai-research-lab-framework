@@ -114,111 +114,159 @@ class ScientificCriticAgent(BaseAgent):
         return critique
     
     def _assess_logical_consistency(self, content: str) -> Dict[str, Any]:
-        """Assess logical consistency of the content."""
-        # Simplified implementation - real version would use sophisticated NLP
-        logical_flags = []
-        score = 85  # Default good score
+        """Assess logical consistency of the content using LLM analysis."""
         
-        # Check for common logical issues
-        if 'therefore' in content.lower() and 'because' not in content.lower():
-            logical_flags.append("Conclusion without clear reasoning")
-            score -= 10
+        consistency_prompt = f"""
+        Analyze the logical consistency of this research content. Look for:
+        - Logical flow and reasoning
+        - Contradictions or inconsistencies
+        - Unsupported claims or conclusions
+        - Clear argumentation structure
         
-        if content.count('however') > 3:
-            logical_flags.append("Multiple contradictory statements")
-            score -= 5
+        Content to analyze:
+        {content}
         
-        return {
-            'score': max(0, score),
-            'flags': logical_flags,
-            'assessment': 'Good logical flow' if score > 75 else 'Logical issues detected'
-        }
+        Provide a score (0-100) and identify specific logical issues if any.
+        
+        Format response as:
+        SCORE: [0-100]
+        ISSUES: [issue1 | issue2 | issue3] (or "None identified")
+        ASSESSMENT: [brief overall assessment]
+        """
+        
+        llm_response = self.llm_client.generate_response(
+            consistency_prompt, 
+            {'content': content}, 
+            agent_role="Logic Assessment Expert"
+        )
+        
+        return self._parse_assessment_response(llm_response, default_score=85)
     
     def _assess_methodological_rigor(self, content: str) -> Dict[str, Any]:
-        """Assess methodological rigor."""
-        rigor_keywords = [
-            'method', 'procedure', 'protocol', 'control', 'sample',
-            'statistical', 'significance', 'power', 'validation'
-        ]
+        """Assess methodological rigor using LLM analysis."""
         
-        content_lower = content.lower()
-        keyword_count = sum(1 for keyword in rigor_keywords if keyword in content_lower)
+        rigor_prompt = f"""
+        Evaluate the methodological rigor of this research content. Assess:
+        - Research design and methodology
+        - Sample size and selection criteria
+        - Control conditions and variables
+        - Statistical analysis approaches
+        - Validation methods
+        - Reproducibility considerations
         
-        score = min(100, keyword_count * 10 + 50)
+        Content to evaluate:
+        {content}
         
-        flags = []
-        if 'sample size' not in content_lower:
-            flags.append("Sample size not specified")
-            score -= 10
+        Provide a score (0-100) and identify methodological strengths/weaknesses.
         
-        if 'control' not in content_lower:
-            flags.append("Control conditions unclear")
-            score -= 10
+        Format response as:
+        SCORE: [0-100]
+        ISSUES: [issue1 | issue2 | issue3] (or "None identified")
+        ASSESSMENT: [brief overall assessment]
+        """
         
-        return {
-            'score': max(0, score),
-            'flags': flags,
-            'keyword_count': keyword_count,
-            'assessment': 'Rigorous methodology' if score > 75 else 'Methodology needs improvement'
+        llm_response = self.llm_client.generate_response(
+            rigor_prompt, 
+            {'content': content}, 
+            agent_role="Methodology Assessment Expert"
+        )
+        
+        return self._parse_assessment_response(llm_response, default_score=75)
+    
+    def _parse_assessment_response(self, response: str, default_score: int = 75) -> Dict[str, Any]:
+        """Parse assessment response from LLM."""
+        import re
+        
+        result = {
+            'score': default_score,
+            'flags': [],
+            'assessment': 'Assessment completed'
         }
+        
+        try:
+            # Extract score
+            score_match = re.search(r'SCORE:\s*(\d+)', response)
+            if score_match:
+                result['score'] = max(0, min(100, int(score_match.group(1))))
+            
+            # Extract issues/flags
+            issues_match = re.search(r'ISSUES:\s*([^\n]+)', response)
+            if issues_match:
+                issues_str = issues_match.group(1).strip()
+                if issues_str.lower() != "none identified":
+                    result['flags'] = [i.strip() for i in issues_str.split('|')]
+            
+            # Extract assessment
+            assessment_match = re.search(r'ASSESSMENT:\s*([^\n]+)', response)
+            if assessment_match:
+                result['assessment'] = assessment_match.group(1).strip()
+                
+        except Exception as e:
+            logger.warning(f"Failed to parse assessment response: {e}")
+        
+        return result
     
     def _detect_bias(self, content: str) -> Dict[str, Any]:
-        """Detect potential bias in the content."""
-        bias_indicators = []
-        score = 90  # Start with good score
+        """Detect potential bias in the content using LLM analysis."""
         
-        # Check for absolute language
-        absolute_words = ['always', 'never', 'all', 'none', 'completely', 'totally']
-        absolute_count = sum(1 for word in absolute_words if word in content.lower())
+        bias_prompt = f"""
+        Analyze this research content for potential bias. Look for:
+        - Confirmation bias (only presenting supporting evidence)
+        - Selection bias in data or sources
+        - Language bias (absolute statements, emotional language)
+        - Cultural or demographic bias
+        - Funding or conflict of interest bias
+        - Balanced perspective and limitations discussion
         
-        if absolute_count > 2:
-            bias_indicators.append("Excessive absolute language")
-            score -= 15
+        Content to analyze:
+        {content}
         
-        # Check for confirmation bias indicators
-        if 'confirms' in content.lower() and 'contradicts' not in content.lower():
-            bias_indicators.append("Potential confirmation bias")
-            score -= 10
+        Provide a score (0-100, where 100 is unbiased) and identify specific bias concerns.
         
-        # Check for balanced perspective
-        if 'limitation' not in content.lower():
-            bias_indicators.append("No limitations discussed")
-            score -= 10
+        Format response as:
+        SCORE: [0-100]
+        ISSUES: [bias1 | bias2 | bias3] (or "None identified")
+        ASSESSMENT: [brief overall assessment]
+        """
         
-        return {
-            'score': max(0, score),
-            'indicators': bias_indicators,
-            'absolute_language_count': absolute_count,
-            'assessment': 'Low bias detected' if score > 75 else 'Potential bias issues'
-        }
+        llm_response = self.llm_client.generate_response(
+            bias_prompt, 
+            {'content': content}, 
+            agent_role="Bias Detection Expert"
+        )
+        
+        return self._parse_assessment_response(llm_response, default_score=85)
     
     def _assess_evidence_quality(self, content: str) -> Dict[str, Any]:
-        """Assess quality of evidence presented."""
-        evidence_keywords = [
-            'study', 'research', 'data', 'evidence', 'finding',
-            'result', 'analysis', 'peer-reviewed', 'published'
-        ]
+        """Assess quality of evidence presented using LLM analysis."""
         
-        content_lower = content.lower()
-        evidence_count = sum(1 for keyword in evidence_keywords if keyword in content_lower)
+        evidence_prompt = f"""
+        Evaluate the quality and strength of evidence in this research content. Assess:
+        - Citation of peer-reviewed sources
+        - Quality and recency of references
+        - Strength of empirical evidence
+        - Appropriate use of primary vs secondary sources
+        - Statistical evidence and data quality
+        - Reproducibility of findings
         
-        score = min(100, evidence_count * 8 + 40)
+        Content to evaluate:
+        {content}
         
-        quality_flags = []
-        if 'peer-reviewed' not in content_lower:
-            quality_flags.append("Peer-review status unclear")
-            score -= 5
+        Provide a score (0-100) and identify evidence strengths/weaknesses.
         
-        if content_lower.count('study') < 2:
-            quality_flags.append("Limited research citations")
-            score -= 10
+        Format response as:
+        SCORE: [0-100]
+        ISSUES: [issue1 | issue2 | issue3] (or "None identified")
+        ASSESSMENT: [brief overall assessment]
+        """
         
-        return {
-            'score': max(0, score),
-            'flags': quality_flags,
-            'evidence_references': evidence_count,
-            'assessment': 'Strong evidence base' if score > 75 else 'Evidence needs strengthening'
-        }
+        llm_response = self.llm_client.generate_response(
+            evidence_prompt, 
+            {'content': content}, 
+            agent_role="Evidence Quality Expert"
+        )
+        
+        return self._parse_assessment_response(llm_response, default_score=75)
     
     def _assess_clarity(self, content: str) -> Dict[str, Any]:
         """Assess clarity and readability."""

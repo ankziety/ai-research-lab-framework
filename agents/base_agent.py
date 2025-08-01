@@ -5,13 +5,12 @@ Base Agent class for the multi-agent AI research framework.
 import logging
 import time
 from typing import Dict, List, Any, Optional
-from abc import ABC, abstractmethod
 from .llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
 
-class BaseAgent(ABC):
+class BaseAgent:
     """
     Base class for all agents in the AI-powered research framework.
     
@@ -48,7 +47,6 @@ class BaseAgent(ABC):
         
         logger.info(f"Agent {self.agent_id} ({self.role}) initialized")
     
-    @abstractmethod
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """
         Generate a response to a given prompt with context.
@@ -60,9 +58,22 @@ class BaseAgent(ABC):
         Returns:
             Generated response string
         """
-        pass
+        # Default implementation uses role and expertise for specialized responses
+        specialized_prompt = f"""
+        You are a {self.role} with expertise in: {', '.join(self.expertise)}.
+        Please provide a detailed analysis of the following:
+        
+        {prompt}
+        
+        Focus on aspects relevant to your expertise and provide evidence-based insights.
+        """
+        
+        return self.llm_client.generate_response(
+            specialized_prompt, 
+            context, 
+            agent_role=self.role
+        )
     
-    @abstractmethod
     def assess_task_relevance(self, task_description: str) -> float:
         """
         Assess how relevant a task is to this agent's expertise.
@@ -73,7 +84,56 @@ class BaseAgent(ABC):
         Returns:
             Relevance score between 0.0 and 1.0
         """
-        pass
+        # Default implementation based on keyword matching with expertise
+        task_lower = task_description.lower()
+        
+        # Check for matches with expertise areas
+        total_words = len(task_lower.split())
+        matches = 0
+        
+        for expertise_area in self.expertise:
+            expertise_words = expertise_area.lower().split()
+            for word in expertise_words:
+                if word in task_lower:
+                    matches += 1
+        
+        # Calculate relevance score
+        if total_words == 0:
+            return 0.0
+        
+        base_score = min(1.0, matches / max(1, total_words) * 5)  # Scale factor
+        
+        # Use LLM for more sophisticated relevance assessment if available
+        if hasattr(self.llm_client, 'openai_api_key') and self.llm_client.openai_api_key:
+            try:
+                relevance_prompt = f"""
+                Rate the relevance of this task to an expert in {', '.join(self.expertise)} on a scale of 0.0 to 1.0:
+                
+                Task: {task_description}
+                
+                Only respond with a number between 0.0 and 1.0.
+                """
+                
+                llm_response = self.llm_client.generate_response(
+                    relevance_prompt, 
+                    {}, 
+                    agent_role="Relevance Assessor"
+                )
+                
+                # Extract numeric score from response
+                try:
+                    import re
+                    score_match = re.search(r'(\d+\.?\d*)', llm_response)
+                    if score_match:
+                        llm_score = float(score_match.group(1))
+                        if llm_score <= 1.0:
+                            return llm_score
+                except:
+                    pass
+            except:
+                pass
+        
+        return base_score
     
     def receive_message(self, sender_id: str, message: str, 
                        context: Optional[Dict[str, Any]] = None) -> str:

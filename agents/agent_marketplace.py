@@ -5,10 +5,6 @@ Agent Marketplace - Manages pool of expert agents and hiring decisions.
 import logging
 from typing import Dict, List, Any, Optional
 from .base_agent import BaseAgent
-from .domain_experts import (
-    OphthalmologyExpert, PsychologyExpert, NeuroscienceExpert,
-    DataScienceExpert, LiteratureResearcher
-)
 from .scientific_critic import ScientificCriticAgent
 
 logger = logging.getLogger(__name__)
@@ -31,26 +27,36 @@ class AgentMarketplace:
         
         logger.info("Agent Marketplace initialized")
     
+    def _create_expert_agent(self, agent_id: str, role: str, expertise: List[str]):
+        """Create a general expert agent with specified role and expertise."""
+        from .base_agent import BaseAgent
+        
+        class GeneralExpertAgent(BaseAgent):
+            pass  # Uses default implementations from BaseAgent
+        
+        return GeneralExpertAgent(agent_id, role, expertise, self.llm_config)
+    
     def _initialize_default_agents(self):
-        """Initialize the default set of expert agents."""
+        """Initialize a general set of versatile expert agents."""
         default_agents = [
-            OphthalmologyExpert("ophthalmology_1", model_config=self.llm_config),
-            OphthalmologyExpert("ophthalmology_2", model_config=self.llm_config),  # Multiple agents per domain
-            PsychologyExpert("psychology_1", model_config=self.llm_config),
-            PsychologyExpert("psychology_2", model_config=self.llm_config),
-            NeuroscienceExpert("neuroscience_1", model_config=self.llm_config),
-            DataScienceExpert("data_science_1", model_config=self.llm_config),
-            DataScienceExpert("data_science_2", model_config=self.llm_config),
-            LiteratureResearcher("literature_1", model_config=self.llm_config),
-            LiteratureResearcher("literature_2", model_config=self.llm_config),
-            ScientificCriticAgent("critic_1", model_config=self.llm_config),
-            ScientificCriticAgent("critic_2", model_config=self.llm_config)
+            # General research agents 
+            self._create_expert_agent("research_methodology_1", "Research Methodology Expert", 
+                                    ["Research Design", "Statistical Analysis", "Study Methodology", "Data Collection"]),
+            self._create_expert_agent("literature_researcher_1", "Literature Research Expert",
+                                    ["Literature Review", "Citation Analysis", "Academic Writing", "Systematic Reviews"]),
+            self._create_expert_agent("data_scientist_1", "Data Science Expert",
+                                    ["Data Analysis", "Machine Learning", "Statistical Modeling", "Data Visualization"]),
+            self._create_expert_agent("critical_analyst_1", "Critical Analysis Expert",
+                                    ["Critical Thinking", "Bias Detection", "Logical Analysis", "Quality Assessment"]),
+            # Add backup agents for high demand scenarios
+            self._create_expert_agent("general_researcher_1", "General Research Expert",
+                                    ["Interdisciplinary Research", "Problem Solving", "Knowledge Synthesis"]),
         ]
         
         for agent in default_agents:
             self.register_agent(agent)
             
-        logger.info(f"Initialized {len(default_agents)} default agents")
+        logger.info(f"Initialized {len(default_agents)} general-purpose default agents")
     
     def register_agent(self, agent: BaseAgent):
         """
@@ -96,14 +102,18 @@ class AgentMarketplace:
         """
         matching_agents = []
         
-        # Map expertise domains to agent types
+        # Map expertise domains to agent types (more general)
         domain_mapping = {
-            'ophthalmology': ['Ophthalmology Expert'],
+            'research_methodology': ['Research Methodology Expert'],
+            'literature': ['Literature Research Expert', 'Literature Researcher'],
+            'data_science': ['Data Science Expert', 'Data Scientist'],
+            'critical_analysis': ['Critical Analysis Expert', 'Scientific Critic'],
+            'general_research': ['General Research Expert'],
+            # Legacy mappings for backward compatibility
             'psychology': ['Psychology Expert'],
-            'neuroscience': ['Neuroscience Expert'],
-            'data_science': ['Data Science Expert'],
-            'literature': ['Literature Researcher'],
-            'critic': ['Scientific Critic']
+            'neuroscience': ['Neuroscience Expert'], 
+            'ophthalmology': ['Ophthalmology Expert'],
+            'critic': ['Scientific Critic', 'Critical Analysis Expert']
         }
         
         target_roles = domain_mapping.get(expertise_domain, [])
@@ -296,6 +306,81 @@ class AgentMarketplace:
         
         return recommendations[:max_agents]
     
+    def create_expert_for_domain(self, domain: str, research_context: str = "") -> BaseAgent:
+        """
+        Dynamically create an expert agent for a specific domain.
+        
+        Args:
+            domain: The domain of expertise needed
+            research_context: Additional context about the research problem
+            
+        Returns:
+            Newly created expert agent
+        """
+        # Generate agent ID
+        existing_count = sum(1 for agent in self.agent_registry.values() 
+                           if domain.lower() in agent.role.lower())
+        agent_id = f"{domain.lower().replace(' ', '_')}_expert_{existing_count + 1}"
+        
+        # Determine expertise areas based on domain and context
+        expertise_areas = self._determine_expertise_areas(domain, research_context)
+        
+        # Create role description
+        role = f"{domain.title()} Expert"
+        
+        # Create the agent
+        new_agent = self._create_expert_agent(agent_id, role, expertise_areas)
+        
+        # Register the agent
+        self.register_agent(new_agent)
+        
+        logger.info(f"Created new expert agent: {agent_id} for domain: {domain}")
+        return new_agent
+    
+    def _determine_expertise_areas(self, domain: str, context: str = "") -> List[str]:
+        """
+        Determine specific expertise areas for a domain based on context.
+        
+        Args:
+            domain: Main domain of expertise
+            context: Research context to guide expertise selection
+            
+        Returns:
+            List of specific expertise areas
+        """
+        # Base expertise mapping
+        base_expertise = {
+            'biology': ['Biology', 'Life Sciences', 'Biological Research'],
+            'chemistry': ['Chemistry', 'Chemical Analysis', 'Molecular Science'],
+            'physics': ['Physics', 'Physical Sciences', 'Quantitative Analysis'],
+            'medicine': ['Medicine', 'Clinical Research', 'Health Sciences'],
+            'psychology': ['Psychology', 'Behavioral Science', 'Mental Health'],
+            'neuroscience': ['Neuroscience', 'Brain Science', 'Cognitive Science'],
+            'computer_science': ['Computer Science', 'Computational Methods', 'Software Engineering'],
+            'mathematics': ['Mathematics', 'Mathematical Modeling', 'Statistical Analysis'],
+            'engineering': ['Engineering', 'Technical Design', 'Systems Analysis'],
+            'social_sciences': ['Social Sciences', 'Human Behavior', 'Society Analysis'],
+            'environmental_science': ['Environmental Science', 'Ecology', 'Sustainability'],
+            'economics': ['Economics', 'Economic Analysis', 'Market Research']
+        }
+        
+        # Get base expertise or create generic ones
+        expertise = base_expertise.get(domain.lower(), [domain.title(), f"{domain.title()} Research"])
+        
+        # Add context-specific expertise if available
+        if context:
+            context_lower = context.lower()
+            if 'data' in context_lower or 'analysis' in context_lower:
+                expertise.append('Data Analysis')
+            if 'machine learning' in context_lower or 'ai' in context_lower:
+                expertise.append('Machine Learning')
+            if 'clinical' in context_lower:
+                expertise.append('Clinical Research')
+            if 'experimental' in context_lower:
+                expertise.append('Experimental Design')
+        
+        return expertise
+        
     def create_specialized_agent(self, role: str, expertise: List[str], 
                                agent_id: Optional[str] = None) -> BaseAgent:
         """
@@ -313,19 +398,7 @@ class AgentMarketplace:
             agent_id = f"{role.lower().replace(' ', '_')}_{len(self.agent_registry) + 1}"
         
         # Create a generic expert agent with custom role and expertise
-        from .base_agent import BaseAgent
-        
-        class CustomExpertAgent(BaseAgent):
-            def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
-                return f"As a {role}, I provide specialized analysis for: {prompt}"
-            
-            def assess_task_relevance(self, task_description: str) -> float:
-                # Simple keyword matching for custom expertise
-                task_lower = task_description.lower()
-                matches = sum(1 for exp in expertise if exp.lower() in task_lower)
-                return min(1.0, matches * 0.2)
-        
-        new_agent = CustomExpertAgent(agent_id, role, expertise)
+        new_agent = self._create_expert_agent(agent_id, role, expertise)
         self.register_agent(new_agent)
         
         logger.info(f"Created specialized agent: {agent_id} with role {role}")
