@@ -91,17 +91,23 @@ class ExperimentRunner:
         
         # Simulate experiment execution
         # In a real implementation, this would contain the actual experiment logic
+        # Simulate experiment execution
+        # Update status to 'running'
+        self._update_experiment_status(experiment_id, 'running')
+        
+        # Simulate a delay for long-running experiments (e.g., using time.sleep)
+        # In a real implementation, this would contain the actual experiment logic
+        computed_results = self._compute_example_results(params)
+        
+        # Update status to 'completed' and record results
         results = {
             'experiment_id': experiment_id,
             'status': 'completed',
             'parameters': params,
             'created_at': timestamp,
             'completed_at': datetime.now().isoformat(),
-            # Example computed results based on parameters
-            'computed_results': self._compute_example_results(params)
+            'computed_results': computed_results
         }
-        
-        # Update experiment status and results
         self._update_experiment_status(experiment_id, 'completed', results)
         
         return results
