@@ -193,7 +193,7 @@ class PIOrchestrator:
         # Determine which types of specialists are needed based on keywords
         request_lower = request.lower()
         
-        if any(keyword in request_lower for keyword in ['literature', 'papers', 'research', 'review']):
+        if any(keyword in request_lower for keyword in self.LITERATURE_KEYWORDS):
             subtasks.append({
                 'id': str(uuid.uuid4()),
                 'task_id': task_id,
