@@ -14,9 +14,7 @@ import sqlite3
 from datetime import datetime
 
 # Import the ExperimentRunner from the experiments module
-import sys
-sys.path.insert(0, str(Path(__file__).parent.parent / "experiments"))
-from experiment import ExperimentRunner
+from experiments.experiment import ExperimentRunner
 
 
 class TestExperimentRunner:
