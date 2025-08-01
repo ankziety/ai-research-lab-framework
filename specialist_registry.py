@@ -62,7 +62,7 @@ class SpecialistRegistry:
             
         return self._specialists[role]
     
-    def list_roles(self) -> List[str]:
+    def list_roles(self) -> list[str]:
         """
         Get a list of all registered role identifiers.
         
