@@ -201,6 +201,7 @@ class LiteratureRetriever:
         """
         # This would contain real parsing logic for ArXiv responses
         # ArXiv API returns XML format
+        # TODO: Implement parsing logic for ArXiv API responses
         papers = []
         
         # Example parsing structure (would be implemented for real API)
