@@ -132,8 +132,8 @@ class VectorMemory:
         if norm > 0:
             embedding = [x / norm for x in embedding]
         else:
-            # If norm is 0, create a small random-like vector based on text hash
-            text_hash = hash(text)
+            # If norm is 0, create a small random-like vector based on deterministic text hash
+            text_hash = int(hashlib.sha256(text.encode('utf-8')).hexdigest(), 16)
             embedding = [(text_hash % (i + 1)) / 1000.0 for i in range(100)]
             norm = math.sqrt(sum(x * x for x in embedding))
             if norm > 0:
