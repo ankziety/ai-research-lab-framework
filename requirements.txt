@@ -1,0 +1,4 @@
+# Core dependencies for VectorMemory
+# Note: This implementation uses basic Python libraries for compatibility
+# Production version should use: faiss-cpu, sentence-transformers, numpy
+pytest>=7.0.0
