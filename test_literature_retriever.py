@@ -15,7 +15,7 @@ import sys
 import os
 
 # Add the parent directory to the path to import literature_retriever
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from literature_retriever import LiteratureRetriever, search_literature
 
