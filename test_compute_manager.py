@@ -172,18 +172,18 @@ class TestModuleFunctions:
     
     def test_list_tasks_function(self):
         """Test the module-level list_tasks function."""
-        # Clear any existing tasks by creating a new manager
-        from compute_manager import _manager
-        _manager._tasks.clear()
+        # Use a fresh ComputeManager instance for isolated test state
+        from compute_manager import ComputeManager
+        manager = ComputeManager()
         
         task1 = {"command": "python script1.py"}
         task2 = {"command": "python script2.py"}
         node = "compute-node-01"
         
-        task_id1 = schedule(task1, node)
-        task_id2 = schedule(task2, node)
+        task_id1 = manager.schedule(task1, node)
+        task_id2 = manager.schedule(task2, node)
         
-        all_tasks = list_tasks()
+        all_tasks = manager.list_tasks()
         
         assert len(all_tasks) == 2
         assert task_id1 in all_tasks
