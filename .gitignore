@@ -19,3 +19,21 @@ __pycache__/
 
 # Database files
 *.db
+
+# Generated images and visualizations
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+
+# Generated experiment results
+*_experiment_results.*
+experiment_*.png
+visualization_*.png
+
+# Generated output directories
+visualizations/
+demo_visualizations/
+output/
+results/

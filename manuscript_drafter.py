@@ -8,6 +8,10 @@ and contextual information.
 from typing import List, Dict, Any
 import re
 
+# Constants for result processing
+EXCLUDED_RESULT_FIELDS = {'id', 'metadata', 'timestamp', 'created_at', 'updated_at'}
+MAX_FALLBACK_FIELDS = 3
+
 
 def draft(results: List[Dict[str, Any]], context: Dict[str, Any]) -> str:
     """
