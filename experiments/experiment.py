@@ -164,8 +164,14 @@ class ExperimentRunner:
         results = {}
         
         # Example: if parameters contain numerical values, compute some statistics
-        numerical_params = {k: v for k, v in params.items() 
-                          if isinstance(v, (int, float))}
+        numerical_params = {}
+        string_params = {}
+        
+        for k, v in params.items():
+            if isinstance(v, (int, float)):
+                numerical_params[k] = v
+            elif isinstance(v, str):
+                string_params[k] = v
         
         if numerical_params:
             values = list(numerical_params.values())
