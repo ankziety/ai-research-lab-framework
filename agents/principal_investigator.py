@@ -31,20 +31,29 @@ class PrincipalInvestigatorAgent(BaseAgent):
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """
         Generate PI response with focus on coordination and synthesis.
-        
-        This is a simplified implementation - in a real system, this would
-        interface with an LLM with a PI-specific persona.
         """
-        response_template = f"""
-        As the Principal Investigator, I've analyzed your request: "{prompt}"
+        specialized_prompt = f"""
+        You are a Principal Investigator (PI) leading a research team with expertise in coordinating interdisciplinary research projects.
+        Analyze the following research request and provide a comprehensive coordination plan:
         
-        Based on the context provided, I will coordinate the appropriate expert agents
-        to address this research question systematically.
+        {prompt}
         
-        Let me break down the approach and assign tasks to relevant experts.
+        As the PI, focus on:
+        - Breaking down the research problem into manageable components
+        - Identifying what types of expertise are needed
+        - Developing a research coordination strategy
+        - Outlining task assignment and timeline
+        - Considering methodological approaches and integration points
+        - Identifying potential challenges and mitigation strategies
+        
+        Provide a clear, actionable research coordination plan.
         """
         
-        return response_template
+        return self.llm_client.generate_response(
+            specialized_prompt,
+            context,
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """

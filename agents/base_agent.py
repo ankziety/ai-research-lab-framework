@@ -6,6 +6,7 @@ import logging
 import time
 from typing import Dict, List, Any, Optional
 from abc import ABC, abstractmethod
+from .llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,9 @@ class BaseAgent(ABC):
         }
         self.conversation_history = []
         self.current_task = None
+        
+        # Initialize LLM client with this agent's configuration
+        self.llm_client = get_llm_client(self.model_config)
         
         logger.info(f"Agent {self.agent_id} ({self.role}) initialized")
     

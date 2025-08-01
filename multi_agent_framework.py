@@ -72,6 +72,12 @@ class MultiAgentResearchFramework:
             'embedding_model': 'all-MiniLM-L6-v2',
             'max_context_length': 4000,
             
+            # LLM API configuration for AI agents
+            'openai_api_key': None,
+            'anthropic_api_key': None,
+            'default_llm_provider': 'openai',  # 'openai', 'anthropic', or 'local'
+            'default_model': 'gpt-4',
+            
             # Agent configuration
             'max_agents_per_research': 5,
             'agent_timeout': 300,  # 5 minutes
@@ -124,19 +130,31 @@ class MultiAgentResearchFramework:
         """Initialize the multi-agent system."""
         logger.info("Initializing multi-agent system...")
         
-        # Initialize agent marketplace
-        self.agent_marketplace = AgentMarketplace()
+        # Prepare LLM configuration for agents
+        llm_config = {
+            'openai_api_key': self.config.get('openai_api_key'),
+            'anthropic_api_key': self.config.get('anthropic_api_key'),
+            'default_llm_provider': self.config.get('default_llm_provider', 'openai'),
+            'default_model': self.config.get('default_model', 'gpt-4')
+        }
         
-        # Initialize Principal Investigator
+        # Initialize agent marketplace with LLM configuration
+        self.agent_marketplace = AgentMarketplace(llm_config=llm_config)
+        
+        # Initialize Principal Investigator with LLM configuration
+        pi_model_config = self.config.get('pi_model_config', {})
+        pi_model_config.update(llm_config)
         self.pi_agent = PrincipalInvestigatorAgent(
             agent_id="PI_main",
-            model_config=self.config.get('pi_model_config', {})
+            model_config=pi_model_config
         )
         
-        # Initialize Scientific Critic
+        # Initialize Scientific Critic with LLM configuration
+        critic_model_config = self.config.get('critic_model_config', {})
+        critic_model_config.update(llm_config)
         self.scientific_critic = ScientificCriticAgent(
             agent_id="critic_main",
-            model_config=self.config.get('critic_model_config', {})
+            model_config=critic_model_config
         )
         
         logger.info("Multi-agent system initialized")

@@ -47,13 +47,28 @@ def framework(config=None):
 
 # Default configuration template
 DEFAULT_CONFIG = {
+    # Directory paths
     'experiment_db_path': 'experiments/experiments.db',
     'output_dir': 'output',
     'manuscript_dir': 'manuscripts', 
     'visualization_dir': 'visualizations',
+    
+    # Literature API configuration
     'literature_api_url': None,
     'literature_api_key': None,
     'max_literature_results': 10,
+    
+    # LLM API configuration for AI agents
+    'openai_api_key': None,
+    'anthropic_api_key': None,
+    'default_llm_provider': 'openai',  # 'openai', 'anthropic', or 'local'
+    'default_model': 'gpt-4',
+    
+    # Agent behavior configuration
+    'max_agents_per_research': 5,
+    'agent_timeout': 300,  # 5 minutes
+    
+    # Framework behavior
     'auto_visualize': True,
     'auto_critique': True
 }

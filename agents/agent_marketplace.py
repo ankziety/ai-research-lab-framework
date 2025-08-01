@@ -19,11 +19,12 @@ class AgentMarketplace:
     Marketplace that manages a pool of expert agents and handles hiring decisions.
     """
     
-    def __init__(self):
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
         self.available_agents = {}
         self.hired_agents = {}
         self.agent_registry = {}
         self.hiring_history = []
+        self.llm_config = llm_config or {}
         
         # Initialize default agents
         self._initialize_default_agents()
@@ -33,17 +34,17 @@ class AgentMarketplace:
     def _initialize_default_agents(self):
         """Initialize the default set of expert agents."""
         default_agents = [
-            OphthalmologyExpert("ophthalmology_1"),
-            OphthalmologyExpert("ophthalmology_2"),  # Multiple agents per domain
-            PsychologyExpert("psychology_1"),
-            PsychologyExpert("psychology_2"),
-            NeuroscienceExpert("neuroscience_1"),
-            DataScienceExpert("data_science_1"),
-            DataScienceExpert("data_science_2"),
-            LiteratureResearcher("literature_1"),
-            LiteratureResearcher("literature_2"),
-            ScientificCriticAgent("critic_1"),
-            ScientificCriticAgent("critic_2")
+            OphthalmologyExpert("ophthalmology_1", model_config=self.llm_config),
+            OphthalmologyExpert("ophthalmology_2", model_config=self.llm_config),  # Multiple agents per domain
+            PsychologyExpert("psychology_1", model_config=self.llm_config),
+            PsychologyExpert("psychology_2", model_config=self.llm_config),
+            NeuroscienceExpert("neuroscience_1", model_config=self.llm_config),
+            DataScienceExpert("data_science_1", model_config=self.llm_config),
+            DataScienceExpert("data_science_2", model_config=self.llm_config),
+            LiteratureResearcher("literature_1", model_config=self.llm_config),
+            LiteratureResearcher("literature_2", model_config=self.llm_config),
+            ScientificCriticAgent("critic_1", model_config=self.llm_config),
+            ScientificCriticAgent("critic_2", model_config=self.llm_config)
         ]
         
         for agent in default_agents:

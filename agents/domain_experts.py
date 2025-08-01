@@ -28,26 +28,27 @@ class OphthalmologyExpert(BaseAgent):
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate ophthalmology-focused response."""
-        # Simplified response - real implementation would use specialized LLM
-        response = f"""
-        From an ophthalmological perspective regarding: "{prompt}"
+        # Use LLM client for actual AI-powered responses
+        specialized_prompt = f"""
+        You are an expert ophthalmologist with deep knowledge in vision science.
+        Provide a detailed clinical and research perspective on the following:
         
-        Clinical Assessment:
-        - Consider visual acuity and field defects
-        - Evaluate binocular vision function
-        - Assess retinal and optic nerve health
+        {prompt}
         
-        Diagnostic Considerations:
-        - Comprehensive eye examination needed
-        - Visual field testing recommended
-        - OCT imaging for retinal analysis
-        
-        Research Implications:
+        Focus on:
+        - Clinical assessment considerations
+        - Diagnostic approaches
+        - Research implications
         - Vision-related quality of life factors
-        - Potential for early intervention
-        - Long-term visual prognosis considerations
+        
+        Base your response on current ophthalmological knowledge and best practices.
         """
-        return response
+        
+        return self.llm_client.generate_response(
+            specialized_prompt, 
+            context, 
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """Assess relevance to ophthalmology domain."""
@@ -81,25 +82,27 @@ class PsychologyExpert(BaseAgent):
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate psychology-focused response."""
-        response = f"""
-        Psychological analysis of: "{prompt}"
+        specialized_prompt = f"""
+        You are an expert clinical psychologist with extensive knowledge in mental health and behavioral science.
+        Provide a comprehensive psychological analysis of the following:
         
-        Mental Health Considerations:
-        - Assess for anxiety and mood disorders
-        - Evaluate cognitive function and adaptation
-        - Consider psychosocial impact
+        {prompt}
         
-        Behavioral Patterns:
-        - Identify maladaptive coping strategies
-        - Assess functional impairment
-        - Consider environmental factors
+        Focus on:
+        - Mental health considerations and assessment
+        - Behavioral patterns and cognitive factors
+        - Psychosocial impact and adaptation
+        - Evidence-based intervention approaches
+        - Psychological research implications
         
-        Intervention Recommendations:
-        - Cognitive-behavioral therapy approaches
-        - Stress management techniques
-        - Psychoeducation and support resources
+        Base your response on current psychological research and clinical best practices.
         """
-        return response
+        
+        return self.llm_client.generate_response(
+            specialized_prompt,
+            context,
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """Assess relevance to psychology domain."""
@@ -133,25 +136,27 @@ class NeuroscienceExpert(BaseAgent):
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate neuroscience-focused response."""
-        response = f"""
-        Neurological analysis of: "{prompt}"
+        specialized_prompt = f"""
+        You are a neuroscience expert with deep knowledge in brain function, neurological disorders, and cognitive neuroscience.
+        Provide a detailed neurological analysis of the following:
         
-        Neural Mechanisms:
-        - Identify relevant brain regions and pathways
-        - Consider neurotransmitter systems involved
-        - Assess cortical and subcortical interactions
+        {prompt}
         
-        Neurological Assessment:
-        - Evaluate cognitive function domains
-        - Consider motor and sensory integration
-        - Assess for neurological deficits
+        Focus on:
+        - Neural mechanisms and brain pathways involved
+        - Neurological assessment considerations
+        - Cognitive and motor function implications
+        - Current neuroscience research findings
+        - Potential neuroplasticity factors
         
-        Research Directions:
-        - Neuroimaging studies recommended
-        - Electrophysiological investigations
-        - Molecular and cellular mechanisms
+        Base your response on current neuroscientific knowledge and research.
         """
-        return response
+        
+        return self.llm_client.generate_response(
+            specialized_prompt,
+            context,
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """Assess relevance to neuroscience domain."""
@@ -185,25 +190,28 @@ class DataScienceExpert(BaseAgent):
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate data science-focused response."""
-        response = f"""
-        Data science analysis for: "{prompt}"
+        specialized_prompt = f"""
+        You are a data science expert with extensive knowledge in statistical analysis, machine learning, and research methodology.
+        Provide a comprehensive data science analysis of the following:
         
-        Statistical Approach:
-        - Identify appropriate statistical methods
-        - Consider sample size and power analysis
-        - Evaluate data distribution and assumptions
+        {prompt}
         
-        Machine Learning Applications:
-        - Recommend suitable algorithms
-        - Feature engineering considerations
-        - Model validation strategies
+        Focus on:
+        - Statistical methods and analysis approaches
+        - Machine learning applications and algorithms
+        - Data visualization and interpretation
+        - Research design and methodology considerations
+        - Predictive modeling opportunities
+        - Data quality and validation strategies
         
-        Data Insights:
-        - Pattern recognition opportunities
-        - Predictive modeling potential
-        - Visualization recommendations
+        Base your response on current data science best practices and methodologies.
         """
-        return response
+        
+        return self.llm_client.generate_response(
+            specialized_prompt,
+            context,
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """Assess relevance to data science domain."""
@@ -237,25 +245,28 @@ class LiteratureResearcher(BaseAgent):
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate literature research-focused response."""
-        response = f"""
-        Literature research for: "{prompt}"
+        specialized_prompt = f"""
+        You are a literature research expert with extensive knowledge in systematic reviews, research methodology, and academic writing.
+        Provide a comprehensive literature research analysis of the following:
         
-        Search Strategy:
-        - Identify key search terms and databases
-        - Define inclusion/exclusion criteria
-        - Plan systematic review methodology
+        {prompt}
         
-        Critical Analysis:
-        - Evaluate study quality and bias
-        - Assess evidence strength
-        - Identify research gaps
+        Focus on:
+        - Literature search strategies and databases
+        - Critical evaluation of research quality
+        - Systematic review and meta-analysis approaches
+        - Evidence synthesis and gap identification
+        - Research methodology assessment
+        - Citation analysis and academic writing standards
         
-        Synthesis Approach:
-        - Organize findings thematically
-        - Compare methodologies across studies
-        - Recommend future research directions
+        Base your response on current standards for literature research and systematic reviews.
         """
-        return response
+        
+        return self.llm_client.generate_response(
+            specialized_prompt,
+            context,
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """Assess relevance to literature research domain."""

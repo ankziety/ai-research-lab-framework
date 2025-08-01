@@ -30,30 +30,29 @@ class ScientificCriticAgent(BaseAgent):
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate critical analysis response."""
-        response = f"""
-        Critical analysis of: "{prompt}"
+        specialized_prompt = f"""
+        You are a scientific critic with expertise in research methodology, logical reasoning, and bias detection.
+        Provide a rigorous critical analysis of the following research content:
         
-        Methodological Assessment:
-        - Evaluate research design appropriateness
-        - Assess sample size and selection bias
-        - Review statistical analysis methods
+        {prompt}
         
-        Logical Consistency:
-        - Check for internal contradictions
-        - Evaluate cause-effect relationships
-        - Assess evidence-conclusion alignment
+        Evaluate and provide feedback on:
+        - Methodological rigor and appropriateness
+        - Logical consistency and internal coherence
+        - Potential biases and limitations
+        - Evidence quality and strength
+        - Statistical validity and interpretation
+        - Research design strengths and weaknesses
+        - Recommendations for improvement
         
-        Bias Detection:
-        - Identify potential confirmation bias
-        - Evaluate researcher objectivity
-        - Check for systematic errors
-        
-        Quality Recommendations:
-        - Suggest methodology improvements
-        - Recommend additional controls
-        - Propose validation approaches
+        Be constructive but thorough in identifying potential issues and suggesting improvements.
         """
-        return response
+        
+        return self.llm_client.generate_response(
+            specialized_prompt,
+            context,
+            agent_role=self.role
+        )
     
     def assess_task_relevance(self, task_description: str) -> float:
         """Scientific critic is relevant to all research evaluation tasks."""

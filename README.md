@@ -57,6 +57,38 @@ The framework requires Python 3.6+ and has minimal dependencies:
 pip install matplotlib numpy pytest
 ```
 
+### Configuration
+
+The framework requires API keys for full AI-powered functionality:
+
+#### Required API Keys
+- **OpenAI API Key**: For AI agent responses (Principal Investigator, domain experts, scientific critic)
+- **Literature API Key**: For PubMed/ArXiv literature retrieval (optional, uses mock data if not provided)
+
+#### Configuration Options
+```python
+from ai_research_lab import create_framework
+
+# Configure with API keys
+config = {
+    'openai_api_key': 'your-openai-api-key-here',
+    'literature_api_key': 'your-pubmed-api-key-here',  # optional
+    'default_llm_provider': 'openai',  # 'openai', 'anthropic', or 'local'
+    'default_model': 'gpt-4'
+}
+
+framework = create_framework(config)
+```
+
+#### Environment Variables
+You can also set API keys via environment variables:
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+export LITERATURE_API_KEY="your-pubmed-api-key"  # optional
+```
+
+**Note**: Without API keys, the framework will use mock responses for demonstration purposes, but will not provide actual AI-powered research assistance.
+
 ### Basic Usage
 
 ```python
