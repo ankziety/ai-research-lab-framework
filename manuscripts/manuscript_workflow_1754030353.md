@@ -2,7 +2,7 @@
 
 ## Abstract
 
-**Background:** Optimize neural network architecture for classification tasks **Methods:** Systematic architecture search with performance evaluation **Results:** 1 experimental conditions were analyzed. **Conclusion:** Optimized architecture achieves superior classification performance
+**Background:** Optimize neural network architecture for classification tasks **Methods:** Systematic architecture search with performance evaluation **Results:** 1 experimental condition was analyzed. **Conclusion:** Optimized architecture achieves superior classification performance
 
 ## Introduction
 
