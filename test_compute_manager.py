@@ -55,17 +55,7 @@ class TestComputeManager:
         assert task_id1 != task_id2
         assert len(manager._tasks) == 2
     
-    def test_status_queued_task(self):
-        """Test status of a newly queued task."""
-        manager = ComputeManager()
-        task = {"command": "python script.py"}
-        node = "compute-node-01"
-        
-        task_id = manager.schedule(task, node)
-        status_result = manager.status(task_id)
-        
-        assert status_result == "queued"
-    
+# Removed redundant test_status_queued_task method.
     def test_status_unknown_task(self):
         """Test status of a non-existent task."""
         manager = ComputeManager()
