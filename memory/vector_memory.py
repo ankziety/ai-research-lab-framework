@@ -79,19 +79,12 @@ class VectorMemory:
         if not tokens:
             return [0.0] * 100  # Return zero vector for empty text
         
-        # Build vocabulary from all texts (excluding current text if it's in the list)
-        vocab = set()
-        all_token_lists = []
-        for t in all_texts:
-            token_list = self._simple_tokenize(t)
-            all_token_lists.append(token_list)
-            vocab.update(token_list)
-        
-        if not vocab:
+        # Use precomputed vocabulary and IDF values
+        if not self.vocab:
             return [0.0] * 100
         
         # Sort vocabulary for consistent ordering across embeddings
-        vocab_list = sorted(vocab)
+        vocab_list = sorted(self.vocab)
         vocab_size = min(len(vocab_list), 100)  # Limit vocabulary size
         vocab_list = vocab_list[:vocab_size]
         
