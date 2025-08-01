@@ -200,17 +200,12 @@ class TestLogging:
         node = "compute-node-01"
         
         # Capture stdout to check logging
-        captured_output = StringIO()
-        sys.stdout = captured_output
+        task_id = manager.schedule(task, node)
         
-        try:
-            task_id = manager.schedule(task, node)
-            
-            output = captured_output.getvalue()
-            assert f"[SCHEDULE] Task {task_id} scheduled to node '{node}'" in output
-            assert f"[SCHEDULE] Task details: {task}" in output
-        finally:
-            sys.stdout = sys.__stdout__
+        captured = capsys.readouterr()
+        output = captured.out
+        assert f"[SCHEDULE] Task {task_id} scheduled to node '{node}'" in output
+        assert f"[SCHEDULE] Task details: {task}" in output
     
     def test_status_logging(self):
         """Test that status checking logs the correct information."""
