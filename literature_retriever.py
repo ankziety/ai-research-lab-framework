@@ -182,6 +182,7 @@ class LiteratureRetriever:
         """
         # This would contain real parsing logic for PubMed responses
         # For now, it's a placeholder showing the expected structure
+        # TODO: Implement parsing logic to populate the `papers` list with actual data from PubMed responses.
         papers = []
         
         # Example parsing structure (would be implemented for real API)
