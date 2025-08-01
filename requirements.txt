@@ -10,6 +10,10 @@ faiss-cpu>=1.7.0
 openai>=1.0.0  # For OpenAI GPT models
 anthropic>=0.7.0  # For Claude models
 
+# Literature search enhancements (optional)
+google-api-python-client>=2.0.0  # For Google Search API
+serpapi>=0.1.0  # For Google Scholar via SerpAPI (optional)
+
 # Optional: For better embedding models and GPU support
 # faiss-gpu>=1.7.0  # For GPU-accelerated FAISS (optional)
 # torch>=1.11.0  # Required by sentence-transformers

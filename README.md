@@ -63,7 +63,13 @@ The framework requires API keys for full AI-powered functionality:
 
 #### Required API Keys
 - **OpenAI API Key**: For AI agent responses (Principal Investigator, domain experts, scientific critic)
-- **Literature API Key**: For PubMed/ArXiv literature retrieval (optional, uses mock data if not provided)
+
+#### Optional API Keys for Enhanced Literature Search
+- **Google Search API**: For Google Custom Search academic results
+- **SerpAPI Key**: For Google Scholar search access
+- **Semantic Scholar API**: Enhanced search (free tier available)
+- **OpenAlex Email**: Required for OpenAlex API access (free)
+- **CORE API Key**: Optional for CORE repository access
 
 #### Configuration Options
 ```python
@@ -72,7 +78,15 @@ from ai_research_lab import create_framework
 # Configure with API keys
 config = {
     'openai_api_key': 'your-openai-api-key-here',
-    'literature_api_key': 'your-pubmed-api-key-here',  # optional
+    
+    # Literature search APIs (all optional - fallback to mock data)
+    'google_search_api_key': 'your-google-api-key',
+    'google_search_engine_id': 'your-custom-search-engine-id',
+    'serpapi_key': 'your-serpapi-key',  # For Google Scholar
+    'semantic_scholar_api_key': 'your-semantic-scholar-key',
+    'openalex_email': 'your-email@domain.com',  # Required for OpenAlex
+    'core_api_key': 'your-core-key',  # Optional
+    
     'default_llm_provider': 'openai',  # 'openai', 'anthropic', 'gemini', 'huggingface', 'ollama'
     'default_model': 'gpt-4o',  # Latest GPT-4o model
     'cost_optimization': True,  # Auto-select cheapest suitable provider
@@ -191,27 +205,50 @@ print(f"Experiment ID: {results['experiment_id']}")
 ### Literature Retrieval
 
 ```python
-# AI-powered literature search across any domain
-# Biology/Medicine
+# AI-powered literature search across multiple sources and domains
+# Supports: PubMed, ArXiv, CrossRef, Google Scholar, Google Search, 
+# Semantic Scholar, OpenAlex, and CORE
+
+# Biology/Medicine with multiple sources
 literature = framework.retrieve_literature(
     query="CRISPR gene editing therapeutic applications",
-    max_results=10
+    max_results=10,
+    sources=['pubmed', 'semantic_scholar', 'google_scholar']
 )
 
-# Chemistry
+# Chemistry with open access focus
 literature = framework.retrieve_literature(
     query="green chemistry sustainable catalysis",
-    max_results=10
+    max_results=10,
+    sources=['arxiv', 'openalex', 'core']
 )
 
-# Physics
+# Physics with comprehensive search
 literature = framework.retrieve_literature(
     query="quantum computing error correction",
-    max_results=10
+    max_results=10,
+    sources=['pubmed', 'arxiv', 'crossref', 'semantic_scholar', 'google_search']
 )
 
+# Configure API keys for enhanced search capabilities
+config = {
+    'openai_api_key': 'your-openai-key',
+    'google_search_api_key': 'your-google-api-key',
+    'google_search_engine_id': 'your-search-engine-id',
+    'serpapi_key': 'your-serpapi-key',  # For Google Scholar
+    'semantic_scholar_api_key': 'your-semantic-scholar-key',
+    'openalex_email': 'your-email@domain.com',  # Required for OpenAlex
+    'core_api_key': 'your-core-key'  # Optional for CORE
+}
+
+framework = create_framework(config)
+
 for paper in literature:
-    print(f"{paper['title']} ({paper['publication_year']})")
+    print(f"{paper['title']} ({paper['publication_year']}) - {paper['source']}")
+    print(f"Citations: {paper.get('citation_count', 0)}")
+    if paper.get('open_access'):
+        print(f"Open Access PDF: {paper.get('pdf_url', 'Available')}")
+```
 ```
 
 ### Manuscript Drafting
