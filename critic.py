@@ -69,7 +69,7 @@ class Critic:
         """Analyze content using various heuristics."""
         words = text.split()
         sentences = re.split(r'[.!?]+', text)
-        paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+        paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
         
         # Basic metrics
         word_count = len(words)
