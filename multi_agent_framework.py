@@ -172,8 +172,11 @@ class MultiAgentResearchFramework:
         
         # Initialize literature retriever
         self.literature_retriever = LiteratureRetriever(
-            api_base_url=self.config.get('literature_api_url'),
-            api_key=self.config.get('literature_api_key')
+            api_key=self.config.get('literature_api_key'),
+            config={
+                'api_base_url': self.config.get('literature_api_url'),
+                'max_results': self.config.get('max_literature_results', 10)
+            }
         )
         
         # Initialize traditional critic

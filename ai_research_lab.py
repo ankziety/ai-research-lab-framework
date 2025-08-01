@@ -46,7 +46,7 @@ class AIPoweredResearchFramework(MultiAgentResearchFramework):
     on interdisciplinary research problems, with:
     
     - Principal Investigator (PI) Agent coordinating research
-    - Agent Marketplace with domain experts (Ophthalmology, Psychology, Neuroscience, etc.)
+    - Agent Marketplace with domain experts that are dynamically created based on research needs
     - Scientific Critic Agent for quality control
     - Vector Database for memory management and context retrieval
     - Knowledge Repository for validated findings
@@ -311,10 +311,10 @@ if __name__ == "__main__":
     # Create framework instance
     framework = create_framework()
     
-    # Example: Multi-agent research on binocular vision and anxiety
+    # Example: Multi-agent research on environmental sustainability
     research_question = """
-    Investigate the relationship between binocular vision dysfunction and anxiety disorders.
-    Consider ophthalmological, psychological, and neurological factors.
+    Investigate the impact of renewable energy adoption on local economic development.
+    Consider economic, social, and environmental factors in the transition process.
     """
     
     # Conduct multi-agent research
@@ -328,15 +328,15 @@ if __name__ == "__main__":
     
     # Example: Legacy workflow for backward compatibility
     experiment_params = {
-        'study_type': 'binocular_vision_assessment',
-        'participants': 50,
-        'measures': ['visual_acuity', 'convergence', 'anxiety_scale'],
-        'duration_weeks': 12
+        'study_type': 'economic_impact_assessment',
+        'participants': 100,
+        'measures': ['employment_data', 'investment_levels', 'community_survey'],
+        'duration_weeks': 16
     }
     
     manuscript_context = {
-        'objective': 'Evaluate relationship between binocular vision and anxiety',
-        'methods': 'Cross-sectional study with standardized assessments',
+        'objective': 'Evaluate economic impacts of renewable energy transition',
+        'methods': 'Mixed-methods study with quantitative economic analysis',
         'conclusion': 'To be determined from data analysis'
     }
     
@@ -344,7 +344,7 @@ if __name__ == "__main__":
     legacy_results = framework.run_complete_workflow(
         experiment_params=experiment_params,
         manuscript_context=manuscript_context,
-        literature_query='binocular vision dysfunction anxiety mental health'
+        literature_query='renewable energy economic development rural communities'
     )
     
     print(f"Legacy workflow completed: {legacy_results['workflow_id']}")

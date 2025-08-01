@@ -509,38 +509,234 @@ class LiteratureRetriever:
     
     def _get_pubmed_details(self, pmid: str) -> Dict:
         """Get detailed PubMed paper information."""
-        # Implementation would fetch detailed XML and parse
-        # For now, return mock detailed data
-        return {
-            'pmid': pmid,
-            'detailed_abstract': 'Detailed abstract with full methodology and results...',
-            'full_authors': ['Complete author list with affiliations'],
-            'mesh_terms': ['Detailed MeSH terms'],
-            'references': ['List of references'],
-            'cited_by': ['Papers citing this work']
-        }
+        try:
+            # Fetch detailed information from PubMed
+            fetch_url = f"{self.pubmed_base_url}efetch.fcgi"
+            fetch_params = {
+                'db': 'pubmed',
+                'id': pmid,
+                'retmode': 'xml',
+                'rettype': 'full'
+            }
+            
+            response = requests.get(fetch_url, params=fetch_params, timeout=self.session_timeout)
+            response.raise_for_status()
+            
+            # Parse XML response for detailed information
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+            
+            # Extract detailed information
+            article = root.find('.//Article')
+            if article is None:
+                logger.warning(f"No article found for PMID {pmid}")
+                return {}
+            
+            # Extract title
+            title_elem = article.find('.//ArticleTitle')
+            title = title_elem.text if title_elem is not None else 'No title available'
+            
+            # Extract abstract
+            abstract_elem = article.find('.//AbstractText')
+            abstract = abstract_elem.text if abstract_elem is not None else 'No abstract available'
+            
+            # Extract authors
+            authors = []
+            author_list = article.find('.//AuthorList')
+            if author_list is not None:
+                for author in author_list.findall('.//Author'):
+                    lastname = author.find('.//LastName')
+                    firstname = author.find('.//ForeName')
+                    if lastname is not None and firstname is not None:
+                        authors.append(f"{firstname.text} {lastname.text}")
+            
+            # Extract MeSH terms
+            mesh_terms = []
+            mesh_list = root.find('.//MeshHeadingList')
+            if mesh_list is not None:
+                for mesh in mesh_list.findall('.//MeshHeading'):
+                    descriptor = mesh.find('.//DescriptorName')
+                    if descriptor is not None:
+                        mesh_terms.append(descriptor.text)
+            
+            # Extract journal information
+            journal_elem = article.find('.//Journal')
+            journal_title = ''
+            if journal_elem is not None:
+                journal_title_elem = journal_elem.find('.//Title')
+                if journal_title_elem is not None:
+                    journal_title = journal_title_elem.text
+            
+            # Extract publication date
+            pub_date_elem = article.find('.//PubDate')
+            pub_year = ''
+            if pub_date_elem is not None:
+                year_elem = pub_date_elem.find('.//Year')
+                if year_elem is not None:
+                    pub_year = year_elem.text
+            
+            return {
+                'pmid': pmid,
+                'title': title,
+                'abstract': abstract,
+                'authors': authors,
+                'journal': journal_title,
+                'publication_year': pub_year,
+                'mesh_terms': mesh_terms,
+                'url': f'https://pubmed.ncbi.nlm.nih.gov/{pmid}/',
+                'source': 'pubmed'
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get PubMed details for {pmid}: {str(e)}")
+            return {
+                'pmid': pmid,
+                'error': f'Failed to retrieve details: {str(e)}',
+                'source': 'pubmed'
+            }
     
     def _get_arxiv_details(self, arxiv_id: str) -> Dict:
         """Get detailed ArXiv paper information."""
-        return {
-            'arxiv_id': arxiv_id,
-            'detailed_abstract': 'Detailed abstract with mathematical formulations...',
-            'full_text_url': f'https://arxiv.org/abs/{arxiv_id}',
-            'pdf_url': f'https://arxiv.org/pdf/{arxiv_id}.pdf',
-            'version_history': ['Version information'],
-            'comments': 'Author comments on the paper'
-        }
+        try:
+            # Query ArXiv API for detailed information
+            query_url = f"{self.arxiv_base_url}?id_list={arxiv_id}"
+            
+            response = requests.get(query_url, timeout=self.session_timeout)
+            response.raise_for_status()
+            
+            # Parse XML response
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(response.content)
+            
+            # Find the entry for this paper
+            ns = {'atom': 'http://www.w3.org/2005/Atom', 'arxiv': 'http://arxiv.org/schemas/atom'}
+            entry = root.find('.//atom:entry', ns)
+            
+            if entry is None:
+                logger.warning(f"No entry found for ArXiv ID {arxiv_id}")
+                return {}
+            
+            # Extract information
+            title_elem = entry.find('.//atom:title', ns)
+            title = title_elem.text.strip() if title_elem is not None else 'No title available'
+            
+            summary_elem = entry.find('.//atom:summary', ns)
+            summary = summary_elem.text.strip() if summary_elem is not None else 'No abstract available'
+            
+            # Extract authors
+            authors = []
+            for author in entry.findall('.//atom:author', ns):
+                name_elem = author.find('.//atom:name', ns)
+                if name_elem is not None:
+                    authors.append(name_elem.text)
+            
+            # Extract categories
+            categories = []
+            for category in entry.findall('.//atom:category', ns):
+                term = category.get('term')
+                if term:
+                    categories.append(term)
+            
+            # Extract published date
+            published_elem = entry.find('.//atom:published', ns)
+            published_date = published_elem.text[:10] if published_elem is not None else ''
+            
+            # Extract links
+            pdf_url = None
+            abs_url = None
+            for link in entry.findall('.//atom:link', ns):
+                if link.get('type') == 'application/pdf':
+                    pdf_url = link.get('href')
+                elif link.get('rel') == 'alternate':
+                    abs_url = link.get('href')
+            
+            return {
+                'arxiv_id': arxiv_id,
+                'title': title,
+                'abstract': summary,
+                'authors': authors,
+                'categories': categories,
+                'published_date': published_date,
+                'pdf_url': pdf_url or f'https://arxiv.org/pdf/{arxiv_id}.pdf',
+                'url': abs_url or f'https://arxiv.org/abs/{arxiv_id}',
+                'source': 'arxiv'
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get ArXiv details for {arxiv_id}: {str(e)}")
+            return {
+                'arxiv_id': arxiv_id,
+                'error': f'Failed to retrieve details: {str(e)}',
+                'source': 'arxiv'
+            }
     
     def _get_crossref_details(self, doi: str) -> Dict:
         """Get detailed CrossRef paper information."""
-        return {
-            'doi': doi,
-            'publisher_info': 'Detailed publisher information',
-            'copyright': 'Copyright information',
-            'funding': ['Funding sources'],
-            'license': 'License information',
-            'full_text_links': ['Links to full text']
-        }
+        try:
+            # Query CrossRef API for detailed information
+            query_url = f"{self.crossref_base_url}/{doi}"
+            headers = {'Accept': 'application/json'}
+            
+            response = requests.get(query_url, headers=headers, timeout=self.session_timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            work = data.get('message', {})
+            
+            # Extract information
+            title = work.get('title', ['No title available'])[0]
+            abstract = work.get('abstract', 'No abstract available')
+            
+            # Extract authors
+            authors = []
+            author_list = work.get('author', [])
+            for author in author_list:
+                given = author.get('given', '')
+                family = author.get('family', '')
+                if given and family:
+                    authors.append(f"{given} {family}")
+                elif family:
+                    authors.append(family)
+            
+            # Extract journal information
+            container_title = work.get('container-title', [''])[0]
+            publisher = work.get('publisher', '')
+            
+            # Extract publication date
+            pub_date = work.get('published-print', work.get('published-online', {}))
+            date_parts = pub_date.get('date-parts', [[]])[0] if pub_date else []
+            pub_year = str(date_parts[0]) if date_parts else ''
+            
+            # Extract other metadata
+            volume = work.get('volume', '')
+            issue = work.get('issue', '')
+            pages = work.get('page', '')
+            
+            # Extract URLs
+            url = work.get('URL', f'https://doi.org/{doi}')
+            
+            return {
+                'doi': doi,
+                'title': title,
+                'abstract': abstract,
+                'authors': authors,
+                'journal': container_title,
+                'publisher': publisher,
+                'publication_year': pub_year,
+                'volume': volume,
+                'issue': issue,
+                'pages': pages,
+                'url': url,
+                'source': 'crossref'
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get CrossRef details for {doi}: {str(e)}")
+            return {
+                'doi': doi,
+                'error': f'Failed to retrieve details: {str(e)}',
+                'source': 'crossref'
+            }
     
     def get_search_statistics(self) -> Dict:
         """Get statistics about search history and performance."""

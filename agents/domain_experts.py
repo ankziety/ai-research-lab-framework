@@ -9,28 +9,31 @@ from .base_agent import BaseAgent
 logger = logging.getLogger(__name__)
 
 
-class OphthalmologyExpert(BaseAgent):
+class MedicalExpert(BaseAgent):
     """
-    Expert agent specializing in ophthalmology and vision science.
+    Expert agent specializing in medical and health sciences.
+    Can be configured for specific medical domains.
     """
     
-    def __init__(self, agent_id: str = "ophthalmology_expert", 
+    def __init__(self, agent_id: str = "medical_expert", 
+                 domain: str = "general_medicine",
                  model_config: Optional[Dict[str, Any]] = None):
         super().__init__(
             agent_id=agent_id,
-            role="Ophthalmology Expert",
+            role=f"Medical Expert - {domain.replace('_', ' ').title()}",
             expertise=[
-                "Ophthalmology", "Vision Science", "Retinal Disorders", 
-                "Glaucoma", "Binocular Vision", "Eye Movement Disorders"
+                "Medical Research", "Clinical Studies", "Health Assessment", 
+                "Disease Mechanisms", "Treatment Protocols", "Patient Care",
+                "Medical Literature", "Evidence-Based Medicine"
             ],
             model_config=model_config
         )
+        self.domain = domain
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
-        """Generate ophthalmology-focused response."""
-        # Use LLM client for actual AI-powered responses
+        """Generate medical domain-focused response."""
         specialized_prompt = f"""
-        You are an expert ophthalmologist with deep knowledge in vision science.
+        You are a medical expert specializing in {self.domain.replace('_', ' ')}.
         Provide a detailed clinical and research perspective on the following:
         
         {prompt}
@@ -39,9 +42,10 @@ class OphthalmologyExpert(BaseAgent):
         - Clinical assessment considerations
         - Diagnostic approaches
         - Research implications
-        - Vision-related quality of life factors
+        - Health-related quality of life factors
+        - Evidence-based treatment options
         
-        Base your response on current ophthalmological knowledge and best practices.
+        Base your response on current medical knowledge and best practices.
         """
         
         return self.llm_client.generate_response(
@@ -51,15 +55,27 @@ class OphthalmologyExpert(BaseAgent):
         )
     
     def assess_task_relevance(self, task_description: str) -> float:
-        """Assess relevance to ophthalmology domain."""
-        ophthalmology_keywords = [
-            'eye', 'vision', 'visual', 'retina', 'glaucoma', 'ophthalmology',
-            'binocular', 'strabismus', 'amblyopia', 'diplopia', 'visual field',
-            'optic nerve', 'macular', 'cornea', 'lens', 'pupil'
+        """Assess relevance to medical domain."""
+        medical_keywords = [
+            'health', 'medical', 'clinical', 'disease', 'treatment', 'patient',
+            'diagnosis', 'therapy', 'medicine', 'healthcare', 'wellness',
+            'syndrome', 'disorder', 'pathology', 'pharmacology', 'surgery'
         ]
         
+        # Add domain-specific keywords
+        domain_keywords = {
+            'cardiology': ['heart', 'cardiac', 'cardiovascular', 'blood pressure'],
+            'neurology': ['brain', 'neural', 'neurological', 'cognitive'],
+            'psychiatry': ['mental', 'psychological', 'mood', 'anxiety', 'depression'],
+            'ophthalmology': ['eye', 'vision', 'visual', 'retina', 'glaucoma', 'binocular'],
+            'endocrinology': ['hormone', 'diabetes', 'thyroid', 'metabolism'],
+            'oncology': ['cancer', 'tumor', 'malignant', 'chemotherapy']
+        }
+        
+        all_keywords = medical_keywords + domain_keywords.get(self.domain, [])
+        
         task_lower = task_description.lower()
-        matches = sum(1 for keyword in ophthalmology_keywords if keyword in task_lower)
+        matches = sum(1 for keyword in all_keywords if keyword in task_lower)
         return min(1.0, matches * 0.15)
 
 
