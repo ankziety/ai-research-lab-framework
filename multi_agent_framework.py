@@ -79,8 +79,10 @@ class MultiAgentResearchFramework:
             'default_model': 'gpt-4',
             
             # Agent configuration
-            'max_agents_per_research': 5,
-            'agent_timeout': 300,  # 5 minutes
+            'max_agents_per_research': config.get('max_agents_per_research', 8),
+            'agent_timeout': config.get('agent_timeout', 1800),  # 30 minutes default
+            'agent_memory_limit': config.get('agent_memory_limit', 1000),  # Configurable memory
+            'max_context_length': config.get('max_context_length', 10000),  # Configurable context
             
             # Legacy component configuration
             'experiment_db_path': 'experiments/experiments.db',

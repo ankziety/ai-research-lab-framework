@@ -37,15 +37,49 @@ class LLMClient:
             config.get('anthropic_api_key') or 
             os.getenv('ANTHROPIC_API_KEY')
         )
+        self.gemini_api_key = (
+            config.get('gemini_api_key') or
+            os.getenv('GEMINI_API_KEY')
+        )
+        self.huggingface_api_key = (
+            config.get('huggingface_api_key') or
+            os.getenv('HUGGINGFACE_API_KEY')
+        )
+        
+        # Local model configurations
+        self.ollama_endpoint = config.get('ollama_endpoint', 'http://localhost:11434')
+        self.local_model_endpoint = config.get('local_model_endpoint', None)
+        
+        # Provider pricing for cost optimization
+        self.provider_costs = {
+            'openai': {'gpt-4o': 0.03, 'gpt-4o-mini': 0.00015},
+            'anthropic': {'claude-3-sonnet': 0.003, 'claude-3-haiku': 0.00025},
+            'gemini': {'gemini-pro': 0.0005, 'gemini-pro-vision': 0.002},
+            'huggingface': {'default': 0.0001},  # Typically cheaper
+            'ollama': {'default': 0.0},  # Free local inference
+        }
         
         self._validate_configuration()
     
     def _validate_configuration(self):
         """Validate that required API keys are available."""
-        if self.provider == 'openai' and not self.openai_api_key:
-            logger.warning("OpenAI API key not found. Using mock responses.")
-        elif self.provider == 'anthropic' and not self.anthropic_api_key:
-            logger.warning("Anthropic API key not found. Using mock responses.")
+        available_providers = []
+        
+        if self.provider == 'openai' and self.openai_api_key:
+            available_providers.append('openai')
+        elif self.provider == 'anthropic' and self.anthropic_api_key:
+            available_providers.append('anthropic')
+        elif self.provider == 'gemini' and self.gemini_api_key:
+            available_providers.append('gemini')
+        elif self.provider == 'huggingface' and self.huggingface_api_key:
+            available_providers.append('huggingface')
+        elif self.provider == 'ollama':
+            available_providers.append('ollama')
+        
+        if not available_providers:
+            logger.warning(f"No valid API keys found for {self.provider}. Using mock responses.")
+        else:
+            logger.info(f"LLM client configured with {len(available_providers)} available providers")
     
     def generate_response(self, prompt: str, context: Dict[str, Any], 
                          agent_role: str = "AI Assistant") -> str:
@@ -65,6 +99,12 @@ class LLMClient:
                 return self._generate_openai_response(prompt, context, agent_role)
             elif self.provider == 'anthropic' and self.anthropic_api_key:
                 return self._generate_anthropic_response(prompt, context, agent_role)
+            elif self.provider == 'gemini' and self.gemini_api_key:
+                return self._generate_gemini_response(prompt, context, agent_role)
+            elif self.provider == 'huggingface' and self.huggingface_api_key:
+                return self._generate_huggingface_response(prompt, context, agent_role)
+            elif self.provider == 'ollama':
+                return self._generate_ollama_response(prompt, context, agent_role)
             else:
                 return self._generate_mock_response(prompt, context, agent_role)
                 
@@ -126,8 +166,151 @@ class LLMClient:
             logger.error(f"Anthropic API error: {str(e)}")
             return self._generate_mock_response(prompt, context, agent_role)
     
-    def _generate_mock_response(self, prompt: str, context: Dict[str, Any], 
-                               agent_role: str) -> str:
+    def _generate_gemini_response(self, prompt: str, context: Dict[str, Any], 
+                                 agent_role: str) -> str:
+        """Generate response using Google Gemini API."""
+        try:
+            import google.generativeai as genai
+            
+            genai.configure(api_key=self.gemini_api_key)
+            model = genai.GenerativeModel('gemini-pro')
+            
+            system_prompt = f"You are a {agent_role}. Provide expert insights based on your domain knowledge."
+            full_prompt = f"{system_prompt}\n\nUser: {prompt}"
+            
+            response = model.generate_content(full_prompt)
+            return response.text
+            
+        except ImportError:
+            logger.warning("Google Generative AI library not installed. Using mock response.")
+            return self._generate_mock_response(prompt, context, agent_role)
+        except Exception as e:
+            logger.error(f"Gemini API error: {str(e)}")
+            return self._generate_mock_response(prompt, context, agent_role)
+    
+    def _generate_huggingface_response(self, prompt: str, context: Dict[str, Any], 
+                                      agent_role: str) -> str:
+        """Generate response using HuggingFace Inference API."""
+        try:
+            import requests
+            
+            api_url = "https://api-inference.huggingface.co/models/microsoft/DialoGPT-large"
+            headers = {"Authorization": f"Bearer {self.huggingface_api_key}"}
+            
+            system_message = f"You are a {agent_role}. Provide expert insights based on your domain knowledge."
+            payload = {
+                "inputs": f"{system_message}\n\nUser: {prompt}\nAssistant:",
+                "parameters": {
+                    "max_new_tokens": 1000,
+                    "temperature": 0.7,
+                    "do_sample": True
+                }
+            }
+            
+            response = requests.post(api_url, headers=headers, json=payload, timeout=30)
+            response.raise_for_status()
+            
+            result = response.json()
+            if isinstance(result, list) and len(result) > 0:
+                return result[0].get('generated_text', '').split('Assistant:')[-1].strip()
+            else:
+                return str(result)
+            
+        except Exception as e:
+            logger.error(f"HuggingFace API error: {str(e)}")
+            return self._generate_mock_response(prompt, context, agent_role)
+    
+    def _generate_ollama_response(self, prompt: str, context: Dict[str, Any], 
+                                 agent_role: str) -> str:
+        """Generate response using OLLAMA local inference."""
+        try:
+            import requests
+            
+            system_message = f"You are a {agent_role}. Provide expert insights based on your domain knowledge."
+            
+            payload = {
+                "model": self.model,  # e.g., 'llama2', 'mistral', 'codellama'
+                "prompt": f"{system_message}\n\nUser: {prompt}\nAssistant:",
+                "stream": False,
+                "options": {
+                    "temperature": 0.7,
+                    "num_predict": 1000
+                }
+            }
+            
+            response = requests.post(
+                f"{self.ollama_endpoint}/api/generate",
+                json=payload,
+                timeout=60
+            )
+            response.raise_for_status()
+            
+            result = response.json()
+            return result.get('response', 'No response generated')
+            
+        except Exception as e:
+            logger.error(f"OLLAMA API error: {str(e)}")
+            return self._generate_mock_response(prompt, context, agent_role)
+    
+    def select_optimal_provider(self, prompt: str, task_complexity: str = 'medium') -> str:
+        """
+        Select the most cost-effective provider for the given task.
+        
+        Args:
+            prompt: The input prompt
+            task_complexity: 'simple', 'medium', or 'complex'
+            
+        Returns:
+            Optimal provider name
+        """
+        prompt_length = len(prompt.split())
+        
+        # For simple tasks, prefer cheaper options
+        if task_complexity == 'simple' or prompt_length < 50:
+            if self.huggingface_api_key:
+                return 'huggingface'
+            elif self.ollama_endpoint:
+                return 'ollama'
+            elif self.gemini_api_key:
+                return 'gemini'
+        
+        # For complex tasks, prefer more capable models
+        elif task_complexity == 'complex' or prompt_length > 500:
+            if self.openai_api_key:
+                return 'openai'
+            elif self.anthropic_api_key:
+                return 'anthropic'
+        
+        # Default to configured provider
+        return self.provider
+    
+    def generate_response_optimized(self, prompt: str, context: Dict[str, Any], 
+                                  agent_role: str = "AI Assistant", 
+                                  task_complexity: str = 'medium') -> str:
+        """
+        Generate response using the most cost-effective provider for the task.
+        
+        Args:
+            prompt: The input prompt
+            context: Additional context information
+            agent_role: The role/persona of the agent
+            task_complexity: Complexity level for provider selection
+            
+        Returns:
+            Generated response string
+        """
+        optimal_provider = self.select_optimal_provider(prompt, task_complexity)
+        
+        # Temporarily switch to optimal provider
+        original_provider = self.provider
+        self.provider = optimal_provider
+        
+        try:
+            response = self.generate_response(prompt, context, agent_role)
+            return response
+        finally:
+            # Restore original provider
+            self.provider = original_provider
         """Generate a mock response for demonstration purposes."""
         # Simulate API delay
         time.sleep(0.1)

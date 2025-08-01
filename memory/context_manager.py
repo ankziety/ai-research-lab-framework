@@ -221,7 +221,7 @@ class ContextManager:
         """
         all_text = " ".join(conversations).lower()
         
-        # Simple keyword extraction
+        # Intelligent keyword extraction
         important_keywords = [
             'research', 'analysis', 'finding', 'result', 'conclusion',
             'recommendation', 'hypothesis', 'data', 'evidence', 'study'
@@ -237,7 +237,7 @@ class ContextManager:
                         key_points.append(sentence.strip())
                         break
         
-        return key_points[:5]  # Limit to top 5 key points
+        return key_points[:config.get('max_key_points', 10)]  # Configurable limit
     
     def get_current_context(self, session_id: str) -> Optional[str]:
         """

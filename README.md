@@ -73,8 +73,9 @@ from ai_research_lab import create_framework
 config = {
     'openai_api_key': 'your-openai-api-key-here',
     'literature_api_key': 'your-pubmed-api-key-here',  # optional
-    'default_llm_provider': 'openai',  # 'openai', 'anthropic', or 'local'
-    'default_model': 'gpt-4'
+    'default_llm_provider': 'openai',  # 'openai', 'anthropic', 'gemini', 'huggingface', 'ollama'
+    'default_model': 'gpt-4o',  # Latest GPT-4o model
+    'cost_optimization': True,  # Auto-select cheapest suitable provider
 }
 
 framework = create_framework(config)
@@ -84,6 +85,9 @@ framework = create_framework(config)
 You can also set API keys via environment variables:
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+export GEMINI_API_KEY="your-google-api-key"  
+export HUGGINGFACE_API_KEY="your-huggingface-token"
 export LITERATURE_API_KEY="your-pubmed-api-key"  # optional
 ```
 
