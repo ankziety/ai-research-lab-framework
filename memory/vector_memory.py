@@ -171,8 +171,8 @@ class VectorMemory:
         Args:
             text: The text to store
         """
-        if not text.strip():
-            return  # Don't store empty texts
+        # Allow storing empty or whitespace-only texts
+        pass
         
         # Get all existing texts for TF-IDF computation
         with sqlite3.connect(self.db_path) as conn:
