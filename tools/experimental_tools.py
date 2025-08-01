@@ -151,7 +151,10 @@ class ExperimentRunner(BaseTool):
     
     def _simulate_experiment_execution(self, design: Dict[str, Any], task: Dict[str, Any]) -> Dict[str, Any]:
         """Simulate realistic experiment execution with data generation."""
-        np.random.seed(42)  # For reproducible results in demo
+        # Set random seed if provided in task or context for reproducibility; otherwise, use true randomness
+        seed = task.get('random_seed') if isinstance(task, dict) else None
+        if seed is not None:
+            np.random.seed(seed)
         
         sample_size = design.get('sample_size', task.get('parameters', {}).get('sample_size', 100))
         
