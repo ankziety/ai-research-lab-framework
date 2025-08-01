@@ -92,7 +92,7 @@ def _extract_numeric_fields(results: List[Dict]) -> List[str]:
             numeric_count = sum(1 for r in results 
                               if key in r and isinstance(r[key], (int, float)) 
                               and not isinstance(r[key], bool))
-            if numeric_count > len(results) * 0.5:  # At least 50% should be numeric
+            if numeric_count > len(results) * NUMERIC_FIELD_THRESHOLD:  # At least 50% should be numeric
                 numeric_fields.append(key)
     
     return numeric_fields
