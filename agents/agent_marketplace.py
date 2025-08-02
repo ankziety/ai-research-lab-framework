@@ -10,6 +10,17 @@ from .scientific_critic import ScientificCriticAgent
 logger = logging.getLogger(__name__)
 
 
+class GeneralExpertAgent(BaseAgent):
+    """
+    General expert agent that can be configured for any domain.
+    Uses default implementations from BaseAgent.
+    """
+    
+    def __init__(self, agent_id: str, role: str, expertise: List[str], 
+                 model_config: Optional[Dict[str, Any]] = None):
+        super().__init__(agent_id, role, expertise, model_config)
+
+
 class AgentMarketplace:
     """
     Marketplace that manages a pool of expert agents and handles hiring decisions.
@@ -29,11 +40,6 @@ class AgentMarketplace:
     
     def _create_expert_agent(self, agent_id: str, role: str, expertise: List[str]):
         """Create a general expert agent with specified role and expertise."""
-        from .base_agent import BaseAgent
-        
-        class GeneralExpertAgent(BaseAgent):
-            pass  # Uses default implementations from BaseAgent
-        
         return GeneralExpertAgent(agent_id, role, expertise, self.llm_config)
     
     def _initialize_default_agents(self):

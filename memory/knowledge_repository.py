@@ -289,8 +289,9 @@ class KnowledgeRepository:
             if finding['confidence_score'] >= 0.8:  # High-confidence findings
                 agents = tuple(sorted(finding['validating_agents']))
                 if len(agents) > 1:  # Multi-agent validation
-                    patterns['successful_agent_combinations'][agents] = \
-                        patterns['successful_agent_combinations'].get(agents, 0) + 1
+                    agent_key = ' + '.join(agents)  # Convert tuple to string key
+                    patterns['successful_agent_combinations'][agent_key] = \
+                        patterns['successful_agent_combinations'].get(agent_key, 0) + 1
         
         # Filter patterns by minimum occurrences
         patterns['successful_agent_combinations'] = {
@@ -356,9 +357,11 @@ class KnowledgeRepository:
         
         # Suggest additional agents based on successful combinations
         for agent_combo, success_count in successful_combinations.items():
-            overlap = set(agent_combo) & set(current_agents)
-            if overlap and len(overlap) < len(agent_combo):
-                missing_agents = set(agent_combo) - set(current_agents)
+            # Parse agent combo string back to list
+            agent_list = agent_combo.split(' + ')
+            overlap = set(agent_list) & set(current_agents)
+            if overlap and len(overlap) < len(agent_list):
+                missing_agents = set(agent_list) - set(current_agents)
                 recommendations['suggested_agents'].extend(list(missing_agents))
         
         # Remove duplicates and limit suggestions

@@ -28,6 +28,14 @@ class ScientificCriticAgent(BaseAgent):
         )
         self.critique_history = []
     
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        base_dict = super().to_dict()
+        base_dict.update({
+            'critique_history_count': len(self.critique_history)
+        })
+        return base_dict
+    
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """Generate critical analysis response."""
         specialized_prompt = f"""

@@ -285,3 +285,20 @@ class BaseAgent:
     
     def __repr__(self) -> str:
         return self.__str__()
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        Convert agent to dictionary for JSON serialization.
+        
+        Returns:
+            Dictionary representation of the agent
+        """
+        return {
+            'agent_id': self.agent_id,
+            'role': self.role,
+            'expertise': self.expertise,
+            'performance_metrics': self.performance_metrics.copy(),
+            'current_task': self.current_task,
+            'conversation_count': len(self.conversation_history),
+            'agent_type': self.__class__.__name__
+        }

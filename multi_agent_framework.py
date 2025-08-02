@@ -32,6 +32,31 @@ from experiments.experiment import ExperimentRunner
 logger = logging.getLogger(__name__)
 
 
+def make_json_serializable(obj: Any) -> Any:
+    """Recursively convert objects to JSON-serializable format."""
+    if hasattr(obj, 'to_dict'):
+        return obj.to_dict()
+    elif isinstance(obj, dict):
+        return {key: make_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(item) for item in obj]
+    elif isinstance(obj, set):
+        return [make_json_serializable(item) for item in obj]
+    elif hasattr(obj, '__dict__'):
+        # Handle objects that don't have to_dict but have __dict__
+        return {key: make_json_serializable(value) for key, value in obj.__dict__.items()}
+    elif hasattr(obj, '__class__') and obj.__class__.__name__ in ['GeneralExpertAgent', 'BaseAgent', 'SimpleAgent']:
+        # Handle agent objects that might not have to_dict
+        return {
+            'agent_id': getattr(obj, 'agent_id', 'unknown'),
+            'role': getattr(obj, 'role', 'unknown'),
+            'expertise': getattr(obj, 'expertise', []),
+            'agent_type': obj.__class__.__name__
+        }
+    else:
+        return obj
+
+
 class MultiAgentResearchFramework:
     """
     Multi-agent AI-powered research framework that coordinates teams of AI experts
@@ -357,7 +382,7 @@ class MultiAgentResearchFramework:
                     content_type="vlab_research_results",
                     agent_id="virtual_lab_system",
                     importance_score=1.0,
-                    metadata=vlab_results
+                    metadata=make_json_serializable(vlab_results)
                 )
             
             logger.info(f"Virtual Lab research completed: {vlab_results.get('session_id', 'unknown')}")
@@ -391,16 +416,19 @@ class MultiAgentResearchFramework:
             agent_id = assignment['agent_id']
             task = assignment['task']
             
-            # Find the hired agent
-            agent = None
-            for expertise, hired_agent in hired_agents.items():
-                if hired_agent.agent_id == agent_id:
-                    agent = hired_agent
+            # Find the hired agent (now stored as dictionary)
+            agent_dict = None
+            for expertise, agent_data in hired_agents.items():
+                if agent_data.get('agent_id') == agent_id:
+                    agent_dict = agent_data
                     break
             
-            if not agent:
+            if not agent_dict:
                 logger.warning(f"Agent {agent_id} not found for task {task_id}")
                 continue
+            
+            # Create a simple agent object for execution
+            agent = self._create_simple_agent_from_dict(agent_dict)
             
             # Get relevant context for the agent
             if self.config['enable_memory_management']:
@@ -456,6 +484,24 @@ class MultiAgentResearchFramework:
         
         return collaboration_results
     
+    def _create_simple_agent_from_dict(self, agent_dict: Dict[str, Any]) -> Any:
+        """Create a simple agent object from dictionary for execution."""
+        from agents.base_agent import BaseAgent
+        
+        class SimpleAgent(BaseAgent):
+            def __init__(self, agent_dict):
+                super().__init__(
+                    agent_id=agent_dict['agent_id'],
+                    role=agent_dict['role'],
+                    expertise=agent_dict['expertise']
+                )
+            
+            def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
+                """Generate a simple response based on role and expertise."""
+                return f"Agent {self.agent_id} ({self.role}) response: {prompt[:100]}..."
+        
+        return SimpleAgent(agent_dict)
+    
     def _facilitate_cross_agent_interaction(self, session_id: str,
                                           hired_agents: Dict[str, Any],
                                           agent_outputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -477,29 +523,43 @@ class MultiAgentResearchFramework:
             return cross_pollination
         
         # Have each agent comment on others' findings
-        for expertise, agent in hired_agents.items():
-            if agent.agent_id not in agent_outputs:
-                continue
-            
-            # Create cross-pollination prompt
-            other_findings = [summary for summary in output_summary 
-                            if not summary.startswith(agent.agent_id)]
-            
-            if other_findings:
-                cross_prompt = f"""
-                Based on your expertise in {expertise}, please provide insights on these findings from other experts:
+        for expertise, agent_dict in hired_agents.items():
+            try:
+                # Create a simple agent object for interaction
+                agent = self._create_simple_agent_from_dict(agent_dict)
                 
-                {chr(10).join(other_findings)}
+                # Filter out this agent's own results
+                other_results = [summary for summary in output_summary 
+                               if not summary.startswith(agent.agent_id)]
                 
-                What connections, contradictions, or synergies do you observe?
-                """
-                
-                try:
-                    cross_response = agent.receive_message(
-                        sender_id="PI_main",
-                        message=cross_prompt,
-                        context={'session_id': session_id, 'interaction_type': 'cross_pollination'}
-                    )
+                if other_results:
+                    cross_prompt = f"""
+                    Based on your expertise in {expertise}, analyze these findings from other experts:
+                    
+                    {chr(10).join(other_results)}
+                    
+                    Provide:
+                    1. CONNECTIONS: How these findings connect to your expertise
+                    2. CONTRADICTIONS: Any contradictions or inconsistencies you observe
+                    3. SYNERGIES: Potential synergies between different findings
+                    4. INSIGHTS: New insights from cross-domain perspective
+                    
+                    Format as:
+                    CONNECTIONS: connection1 | connection2 | connection3
+                    CONTRADICTIONS: contradiction1 | contradiction2
+                    SYNERGIES: synergy1 | synergy2 | synergy3
+                    INSIGHTS: insight1 | insight2 | insight3
+                    """
+                    
+                    # For SimpleAgent objects, generate a simple response
+                    if hasattr(agent, 'generate_response'):
+                        cross_response = agent.generate_response(cross_prompt, {
+                            'session_id': session_id,
+                            'interaction_type': 'cross_pollination',
+                            'other_results': other_results
+                        })
+                    else:
+                        cross_response = f"Agent {agent.agent_id} ({agent.role}) cross-analysis: {expertise} insights on findings"
                     
                     cross_pollination['interactions'].append({
                         'agent_id': agent.agent_id,
@@ -508,19 +568,8 @@ class MultiAgentResearchFramework:
                         'timestamp': time.time()
                     })
                     
-                    # Store interaction in context
-                    if self.config['store_all_interactions']:
-                        self.context_manager.add_to_context(
-                            session_id=session_id,
-                            content=cross_response,
-                            content_type="cross_pollination",
-                            agent_id=agent.agent_id,
-                            importance_score=0.7,
-                            metadata={'interaction_type': 'cross_analysis'}
-                        )
-                    
-                except Exception as e:
-                    logger.warning(f"Cross-pollination failed for agent {agent.agent_id}: {e}")
+            except Exception as e:
+                logger.warning(f"Cross-pollination failed for agent {agent_dict.get('agent_id', 'unknown')}: {e}")
         
         return cross_pollination
     

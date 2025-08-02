@@ -13,6 +13,19 @@ from pathlib import Path
 from typing import Dict, Any
 
 from ai_research_lab import create_framework
+from virtual_lab import MeetingRecord, MeetingAgenda
+
+
+def make_json_serializable(obj: Any) -> Any:
+    """Recursively convert objects to JSON-serializable format."""
+    if hasattr(obj, 'to_dict'):
+        return obj.to_dict()
+    elif isinstance(obj, dict):
+        return {key: make_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, (list, tuple)):
+        return [make_json_serializable(item) for item in obj]
+    else:
+        return obj
 
 
 def run_experiment_command(args):
@@ -307,7 +320,8 @@ def virtual_lab_research_command(args):
     # Save results if requested
     if args.output:
         with open(args.output, 'w') as f:
-            json.dump(results, f, indent=2)
+            serializable_results = make_json_serializable(results)
+            json.dump(serializable_results, f, indent=2)
         print(f"\nResults saved to: {args.output}")
     
     return 0
