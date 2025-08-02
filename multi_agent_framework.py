@@ -53,6 +53,37 @@ def make_json_serializable(obj: Any) -> Any:
             'expertise': getattr(obj, 'expertise', []),
             'agent_type': obj.__class__.__name__
         }
+    elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingRecord':
+        # Handle MeetingRecord objects specifically
+        return {
+            'meeting_id': getattr(obj, 'meeting_id', 'unknown'),
+            'meeting_type': getattr(obj, 'meeting_type', 'unknown'),
+            'phase': getattr(obj, 'phase', 'unknown'),
+            'participants': getattr(obj, 'participants', []),
+            'agenda': make_json_serializable(getattr(obj, 'agenda', {})),
+            'discussion_transcript': getattr(obj, 'discussion_transcript', []),
+            'outcomes': getattr(obj, 'outcomes', {}),
+            'decisions': getattr(obj, 'decisions', []),
+            'action_items': getattr(obj, 'action_items', []),
+            'start_time': getattr(obj, 'start_time', 0.0),
+            'end_time': getattr(obj, 'end_time', 0.0),
+            'success': getattr(obj, 'success', False)
+        }
+    elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingAgenda':
+        # Handle MeetingAgenda objects specifically
+        return {
+            'meeting_id': getattr(obj, 'meeting_id', 'unknown'),
+            'meeting_type': getattr(obj, 'meeting_type', 'unknown'),
+            'phase': getattr(obj, 'phase', 'unknown'),
+            'objectives': getattr(obj, 'objectives', []),
+            'participants': getattr(obj, 'participants', []),
+            'discussion_topics': getattr(obj, 'discussion_topics', []),
+            'expected_outcomes': getattr(obj, 'expected_outcomes', []),
+            'duration_minutes': getattr(obj, 'duration_minutes', 10)
+        }
+    elif hasattr(obj, 'value'):
+        # Handle Enum objects
+        return obj.value
     else:
         return obj
 
@@ -100,6 +131,10 @@ class MultiAgentResearchFramework:
     
     def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Load configuration with defaults."""
+        # Handle None config
+        if config is None:
+            config = {}
+            
         default_config = {
             # Memory configuration
             'vector_db_path': 'memory/vector_memory.db',
@@ -196,18 +231,34 @@ class MultiAgentResearchFramework:
         logger.info("Multi-agent system initialized")
     
     def _init_virtual_lab(self):
-        """Initialize the Virtual Lab meeting system."""
+        """Initialize the Virtual Lab meeting system with cost management."""
         logger.info("Initializing Virtual Lab meeting system...")
         
-        # Initialize Virtual Lab with the multi-agent components
+        # Initialize cost manager configuration
+        budget_limit = self.config.get('budget_limit', 100.0)
+        cost_config = {
+            'budget_limit': budget_limit,
+            'cost_optimization': self.config.get('cost_optimization', True),
+            'enable_dynamic_tools': self.config.get('enable_dynamic_tools', True),
+            'default_model': self.config.get('default_model', 'gpt-3.5-turbo'),
+            'premium_model': self.config.get('premium_model', 'gpt-4'),
+            'web_search_apis': self.config.get('web_search_apis', {}),
+            'code_execution': self.config.get('code_execution', {
+                'sandbox_enabled': True,
+                'timeout_seconds': 30,
+                'memory_limit_mb': 512
+            })
+        }
+        
+        # Initialize Virtual Lab with the multi-agent components and cost management
         self.virtual_lab = VirtualLabMeetingSystem(
             pi_agent=self.pi_agent,
             scientific_critic=self.scientific_critic,
             agent_marketplace=self.agent_marketplace,
-            config=self.config
+            config=cost_config
         )
         
-        logger.info("Virtual Lab meeting system initialized")
+        logger.info(f"Virtual Lab meeting system initialized with budget: ${budget_limit:.2f}")
     
     def _init_legacy_components(self):
         logger.info("Initializing legacy components...")
@@ -217,13 +268,22 @@ class MultiAgentResearchFramework:
             db_path=self.config.get('experiment_db_path')
         )
         
-        # Initialize literature retriever
+        # Initialize literature retriever with proper API key configuration
+        literature_config = {
+            'api_base_url': self.config.get('literature_api_url'),
+            'max_results': self.config.get('max_literature_results', 10),
+            'openai_api_key': self.config.get('openai_api_key'),
+            'google_search_api_key': self.config.get('google_search_api_key'),
+            'google_search_engine_id': self.config.get('google_search_engine_id'),
+            'serpapi_key': self.config.get('serpapi_key'),
+            'semantic_scholar_api_key': self.config.get('semantic_scholar_api_key'),
+            'openalex_email': self.config.get('openalex_email'),
+            'core_api_key': self.config.get('core_api_key')
+        }
+        
         self.literature_retriever = LiteratureRetriever(
             api_key=self.config.get('literature_api_key'),
-            config={
-                'api_base_url': self.config.get('literature_api_url'),
-                'max_results': self.config.get('max_literature_results', 10)
-            }
+            config=literature_config
         )
         
         # Initialize traditional critic
@@ -839,6 +899,8 @@ class MultiAgentResearchFramework:
         """Close all database connections and cleanup resources."""
         if hasattr(self, 'vector_db'):
             self.vector_db.close()
+        if hasattr(self, 'experiment_runner'):
+            self.experiment_runner.close()
         logger.info("Multi-Agent Research Framework closed")
 
 
