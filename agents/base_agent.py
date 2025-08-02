@@ -66,6 +66,16 @@ class BaseAgent:
         {prompt}
         
         Focus on aspects relevant to your expertise and provide evidence-based insights.
+        
+        IMPORTANT: Format your response using Markdown for better readability:
+        - Use **bold** for emphasis on key points
+        - Use bullet points or numbered lists for multiple items
+        - Use `code` formatting for technical terms, function names, or code snippets
+        - Use ### for section headers when organizing longer responses
+        - Use > for important quotes or highlights
+        - Use tables when presenting comparative data
+        
+        This will ensure your response is well-structured and easy to read.
         """
         
         return self.llm_client.generate_response(
@@ -185,6 +195,8 @@ class BaseAgent:
         
         if relevance_score >= 0.3:  # Threshold for task acceptance
             self.current_task = task
+            # Update last active time when task is assigned
+            self.performance_metrics['last_active'] = time.time()
             logger.info(f"Agent {self.agent_id} accepted task: {task.get('id', 'unknown')}")
             return True
         else:
@@ -232,6 +244,9 @@ class BaseAgent:
         """
         total_tasks = self.performance_metrics['tasks_completed']
         
+        # Update last active time
+        self.performance_metrics['last_active'] = time.time()
+        
         if total_tasks > 0:
             # Update success rate
             current_successes = self.performance_metrics['success_rate'] * total_tasks
@@ -244,10 +259,14 @@ class BaseAgent:
             self.performance_metrics['average_quality_score'] = (
                 (current_avg * total_tasks + quality_score) / (total_tasks + 1)
             )
+        else:
+            # Initialize metrics for first update
+            self.performance_metrics['success_rate'] = 1.0 if success else 0.0
+            self.performance_metrics['average_quality_score'] = quality_score
     
     def get_status(self) -> Dict[str, Any]:
         """
-        Get current agent status and metrics.
+        Get current status of the agent.
         
         Returns:
             Dictionary containing agent status information
@@ -256,10 +275,28 @@ class BaseAgent:
             'agent_id': self.agent_id,
             'role': self.role,
             'expertise': self.expertise,
-            'current_task': self.current_task.get('id') if self.current_task else None,
-            'performance_metrics': self.performance_metrics.copy(),
-            'conversation_count': len(self.conversation_history)
+            'current_task': self.current_task,
+            'performance_metrics': self.performance_metrics,
+            'is_active': self.is_active()
         }
+    
+    def is_active(self) -> bool:
+        """
+        Check if the agent is currently active (working on a task).
+        
+        Returns:
+            True if the agent is actively working, False otherwise
+        """
+        # Agent is considered active if it has a current task
+        # or has been active recently (within last 5 minutes)
+        if self.current_task is not None:
+            return True
+        
+        # Check if agent was active recently
+        if self.performance_metrics.get('last_active'):
+            time_since_active = time.time() - self.performance_metrics['last_active']
+            return time_since_active < 300  # 5 minutes
+        return False
     
     def get_conversation_history(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """
@@ -306,18 +343,23 @@ class BaseAgent:
             # Enhance with cost and capability information
             enhanced_tools = []
             for tool_info in available_tools:
-                tool = tool_info['tool']
-                enhanced_tool = {
-                    'tool_id': tool.tool_id,
-                    'name': tool.name,
-                    'description': tool.description,
-                    'capabilities': tool.capabilities,
-                    'confidence': tool_info['confidence'],
-                    'success_rate': tool.success_rate,
-                    'usage_count': tool.usage_count,
-                    'requirements': tool.requirements
-                }
-                enhanced_tools.append(enhanced_tool)
+                # Get the actual tool instance from registry
+                tool_id = tool_info['tool_id']
+                tool = tool_registry.tools.get(tool_id)
+                
+                if tool:
+                    enhanced_tool = {
+                        'tool_id': tool.tool_id,
+                        'name': tool.name,
+                        'description': tool.description,
+                        'capabilities': tool.capabilities,
+                        'confidence': tool_info['confidence'],
+                        'success_rate': tool.success_rate,
+                        'usage_count': tool.usage_count,
+                        'requirements': tool.requirements,
+                        'tool': tool  # Include the actual tool instance
+                    }
+                    enhanced_tools.append(enhanced_tool)
             
             logger.info(f"Agent {self.agent_id} discovered {len(enhanced_tools)} tools for task")
             return enhanced_tools

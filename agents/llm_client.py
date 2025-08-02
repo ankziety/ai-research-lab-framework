@@ -13,6 +13,24 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient:
+    # Fallback model cost table (USD per 1K tokens)
+    _MODEL_COSTS = {
+        'gpt-4o': (0.005, 0.015),
+        'gpt-4o-mini': (0.00015, 0.0006),
+        'gpt-3.5-turbo': (0.0005, 0.0015),
+        'claude-3-sonnet': (0.003, 0.015),
+        'claude-3-haiku': (0.00025, 0.00125),
+        'gemini-pro': (0.0005, 0.0015),
+        'llama2': (0.0, 0.0)
+    }
+
+    def _estimate_cost_local(self, tokens_input: int, tokens_output: int) -> float:
+        """Quick cost estimate without external CostManager."""
+        input_cost_per_1k, output_cost_per_1k = self._MODEL_COSTS.get(
+            self.model,
+            (0.0005, 0.0015)  # sensible default
+        )
+        return (tokens_input / 1000) * input_cost_per_1k + (tokens_output / 1000) * output_cost_per_1k
     """
     Client for interacting with various LLM providers.
     """
@@ -103,15 +121,14 @@ class LLMClient:
         try:
             # Estimate cost before generation
             estimated_tokens_output = tokens_input * 2  # Rough estimate
-            estimated_cost = 0.0
-            
             if cost_manager:
                 estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
-                
                 # Check if we can afford this request
                 if not cost_manager.can_afford(estimated_cost):
                     logger.warning(f"Insufficient budget for LLM request: ${estimated_cost:.4f}")
                     return f"Budget limit reached. Estimated cost: ${estimated_cost:.4f}"
+            else:
+                estimated_cost = self._estimate_cost_local(tokens_input, estimated_tokens_output)
             
             # Generate response
             if self.provider == 'openai' and self.openai_api_key:
@@ -129,8 +146,6 @@ class LLMClient:
             
             # Track actual usage and cost
             tokens_output = len(response.split())
-            actual_cost = 0.0
-            
             if cost_manager:
                 actual_cost = cost_manager.estimate_cost(self.model, tokens_input, tokens_output)
                 cost_manager.track_usage(
@@ -142,6 +157,8 @@ class LLMClient:
                     agent_id=agent_id,
                     success=True
                 )
+            else:
+                actual_cost = self._estimate_cost_local(tokens_input, tokens_output)
             
             execution_time = time.time() - start_time
             logger.info(f"LLM response generated: {tokens_input + tokens_output} tokens, ${actual_cost:.4f}, {execution_time:.2f}s")
