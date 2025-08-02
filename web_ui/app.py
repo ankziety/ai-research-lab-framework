@@ -45,12 +45,15 @@ if not secret_key:
     # Determine if running in development mode
     flask_env = os.environ.get('FLASK_ENV', '').lower()
     flask_debug = os.environ.get('FLASK_DEBUG', '').lower()
-    if flask_env in ('development', 'debug') or flask_debug in ('1', 'true', 'yes'):
+    is_production = os.environ.get('PRODUCTION', '').lower() in ('1', 'true', 'yes')
+    
+    # Default to development mode if no explicit production flag is set
+    if not is_production or flask_env in ('development', 'debug') or flask_debug in ('1', 'true', 'yes'):
         # Generate a random secret key for development
         secret_key = secrets.token_urlsafe(32)
         logging.warning("SECRET_KEY not set, using a random key for development. Do not use this in production!")
     else:
-        raise RuntimeError("SECRET_KEY environment variable must be set in production.")
+        raise RuntimeError("SECRET_KEY environment variable must be set in production. Set PRODUCTION=true if running in production.")
 app.config['SECRET_KEY'] = secret_key
 app.config['SESSION_TYPE'] = 'filesystem'
 
@@ -352,7 +355,8 @@ def initialize_framework():
 def get_system_metrics():
     """Get current system performance metrics."""
     try:
-        cpu_percent = psutil.cpu_percent(interval=1)
+        # Use non-blocking CPU measurement to avoid websocket timeout issues
+        cpu_percent = psutil.cpu_percent(interval=None)
         memory = psutil.virtual_memory()
         
         metrics = {
@@ -734,7 +738,6 @@ def start_research():
                         'raw_results': str(results)
                     }
                 
-                global current_session
                 current_session = {
                     'session_id': session_id,
                     'status': serializable_results.get('status', 'completed'),
@@ -760,7 +763,6 @@ def start_research():
                 
             except Exception as e:
                 logger.error(f"Research error: {e}")
-                global current_session
                 current_session = {
                     'session_id': session_id,
                     'status': 'failed',

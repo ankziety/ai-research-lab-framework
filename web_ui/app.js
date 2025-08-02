@@ -11,6 +11,7 @@ class AIResearchLabApp {
         this.currentSession = null;
         this.systemConfig = {};
         this.agents = new Map();
+        this.meetings = [];
         this.currentPhase = 0;
         this.isResearchActive = false;
         
@@ -31,7 +32,15 @@ class AIResearchLabApp {
     // ========================================
     
     initializeWebSocket() {
-        this.socket = io();
+        this.socket = io({
+            timeout: 60000,           // 60 second connection timeout
+            reconnection: true,       // Enable reconnection
+            reconnectionDelay: 1000,  // Initial delay for reconnection
+            reconnectionDelayMax: 5000, // Max delay for reconnection
+            reconnectionAttempts: 10, // Max reconnection attempts
+            forceNew: false,         // Don't force new connection if one exists
+            transports: ['websocket', 'polling'] // Allow both transports
+        });
         this.setupWebSocketEventHandlers();
     }
 
@@ -39,11 +48,45 @@ class AIResearchLabApp {
         this.socket.on('connect', () => {
             console.log('Connected to server');
             this.updateSystemStatus('online');
+            this.showNotification('success', 'Connected', 'Successfully connected to server');
         });
 
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from server');
+        this.socket.on('disconnect', (reason) => {
+            console.log('Disconnected from server:', reason);
             this.updateSystemStatus('offline');
+            if (reason === 'io server disconnect') {
+                // Server initiated disconnect, try to reconnect
+                this.socket.connect();
+            }
+            this.showNotification('warning', 'Disconnected', `Connection lost: ${reason}`);
+        });
+
+        this.socket.on('connect_error', (error) => {
+            console.error('Connection error:', error);
+            this.updateSystemStatus('error');
+            this.showNotification('error', 'Connection Error', 'Failed to connect to server');
+        });
+
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('Reconnected after', attemptNumber, 'attempts');
+            this.updateSystemStatus('online');
+            this.showNotification('success', 'Reconnected', `Reconnected after ${attemptNumber} attempts`);
+        });
+
+        this.socket.on('reconnect_attempt', (attemptNumber) => {
+            console.log('Attempting to reconnect...', attemptNumber);
+            this.updateSystemStatus('reconnecting');
+        });
+
+        this.socket.on('reconnect_error', (error) => {
+            console.error('Reconnection error:', error);
+            this.updateSystemStatus('error');
+        });
+
+        this.socket.on('reconnect_failed', () => {
+            console.error('Failed to reconnect');
+            this.updateSystemStatus('failed');
+            this.showNotification('error', 'Connection Failed', 'Unable to reconnect to server');
         });
 
         this.socket.on('system_status', (data) => {
@@ -95,6 +138,7 @@ class AIResearchLabApp {
         this.initializeProgressTracking();
         this.initializeActivityLog();
         this.initializeChatLogs();
+        this.initializeMeetings();
         this.initializeSettings();
         this.initializeConstraints();
     }
@@ -875,7 +919,137 @@ class AIResearchLabApp {
     // Meetings
     // ========================================
     
+    initializeMeetings() {
+        this.loadMeetings();
+        this.setupMeetingsEventHandlers();
+    }
+    
+    setupMeetingsEventHandlers() {
+        // Handle meeting selection
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('.meeting-entry')) {
+                const meetingId = e.target.closest('.meeting-entry').dataset.meetingId;
+                this.showMeetingDetails(meetingId);
+            }
+        });
+    }
+    
+    async loadMeetings() {
+        try {
+            const response = await fetch('/api/meetings');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.meetings = data.meetings;
+                this.updateMeetingsList(data.meetings);
+                this.updateMeetingsStats(data.meetings);
+            }
+        } catch (error) {
+            console.error('Error loading meetings:', error);
+        }
+    }
+    
+    updateMeetingsList(meetings) {
+        const meetingsList = document.getElementById('meetingsList');
+        if (!meetingsList) return;
+        
+        meetingsList.innerHTML = '';
+        
+        if (meetings.length === 0) {
+            meetingsList.innerHTML = '<div class="empty-state">No meetings recorded yet</div>';
+            return;
+        }
+        
+        meetings.forEach(meeting => {
+            const meetingEntry = this.createMeetingEntry(meeting);
+            meetingsList.appendChild(meetingEntry);
+        });
+    }
+    
+    createMeetingEntry(meeting) {
+        const entry = document.createElement('div');
+        entry.className = 'meeting-entry';
+        entry.dataset.meetingId = meeting.meeting_id;
+        
+        const duration = this.formatDuration(meeting.duration);
+        const timestamp = new Date(meeting.timestamp * 1000).toLocaleString();
+        
+        entry.innerHTML = `
+            <div class="meeting-header">
+                <h4>${meeting.topic}</h4>
+                <span class="meeting-time">${timestamp}</span>
+            </div>
+            <div class="meeting-info">
+                <span class="meeting-duration">${duration}</span>
+                <span class="meeting-participants">${meeting.participants} participants</span>
+            </div>
+            <div class="meeting-outcome">
+                ${meeting.outcome ? '✓ Completed' : '⏳ In Progress'}
+            </div>
+        `;
+        
+        return entry;
+    }
+    
+    updateMeetingsStats(meetings) {
+        const totalMeetings = document.getElementById('totalMeetings');
+        const avgDuration = document.getElementById('avgMeetingDuration');
+        
+        if (totalMeetings) {
+            totalMeetings.textContent = meetings.length;
+        }
+        
+        if (avgDuration && meetings.length > 0) {
+            const totalDuration = meetings.reduce((sum, meeting) => sum + (meeting.duration || 0), 0);
+            const averageDuration = totalDuration / meetings.length;
+            avgDuration.textContent = this.formatDuration(averageDuration);
+        }
+    }
+    
+    showMeetingDetails(meetingId) {
+        // Find the meeting data
+        const meeting = this.meetings.find(m => m.meeting_id === meetingId);
+        if (!meeting) return;
+        
+        const detailsContainer = document.getElementById('meetingDetails');
+        if (!detailsContainer) return;
+        
+        const duration = this.formatDuration(meeting.duration);
+        const timestamp = new Date(meeting.timestamp * 1000).toLocaleString();
+        
+        detailsContainer.innerHTML = `
+            <h3>${meeting.topic}</h3>
+            <div class="meeting-detail-info">
+                <p><strong>Date:</strong> ${timestamp}</p>
+                <p><strong>Duration:</strong> ${duration}</p>
+                <p><strong>Participants:</strong> ${meeting.participants}</p>
+            </div>
+            <div class="meeting-outcome-details">
+                <h4>Outcomes</h4>
+                <div class="outcome-content">
+                    ${meeting.outcome ? JSON.parse(meeting.outcome) : 'No outcomes recorded'}
+                </div>
+            </div>
+            <div class="meeting-transcript">
+                <h4>Discussion</h4>
+                <div class="transcript-content">
+                    ${meeting.transcript ? JSON.parse(meeting.transcript) : 'No transcript available'}
+                </div>
+            </div>
+        `;
+    }
+    
+    formatDuration(seconds) {
+        if (!seconds) return '0m';
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        return `${minutes}m ${remainingSeconds}s`;
+    }
+    
     addMeetingEntry(data) {
+        // Add to meetings list
+        this.loadMeetings();
+        
         // Add to activity log
         this.addActivityLogEntry({
             type: 'meeting',
@@ -1220,7 +1394,10 @@ class AIResearchLabApp {
         const statusTexts = {
             offline: 'Offline',
             online: 'Online',
-            running: 'Research Active'
+            running: 'Research Active',
+            error: 'Connection Error',
+            reconnecting: 'Reconnecting...',
+            failed: 'Connection Failed'
         };
         
         statusText.textContent = statusTexts[status] || status;
