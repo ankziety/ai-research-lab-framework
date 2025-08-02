@@ -2,7 +2,8 @@
 Multi-Agent AI-Powered Research Framework
 
 A comprehensive multi-agent system that coordinates AI researchers to collaborate
-on interdisciplinary research problems across any domain.
+on interdisciplinary research problems across any domain. Now enhanced with 
+Virtual Lab methodology for structured meeting-based research collaboration.
 """
 
 import logging
@@ -18,6 +19,9 @@ from agents import (
 # Import memory management components  
 from memory import VectorDatabase, ContextManager, KnowledgeRepository
 
+# Import Virtual Lab meeting system
+from virtual_lab import VirtualLabMeetingSystem
+
 # Import original framework components for backward compatibility
 from manuscript_drafter import draft as draft_manuscript
 from literature_retriever import LiteratureRetriever
@@ -31,12 +35,14 @@ logger = logging.getLogger(__name__)
 class MultiAgentResearchFramework:
     """
     Multi-agent AI-powered research framework that coordinates teams of AI experts
-    to collaborate on research problems across any domain.
+    to collaborate on research problems across any domain. Enhanced with Virtual Lab
+    methodology for structured meeting-based research collaboration.
     
     The framework consists of:
     - Principal Investigator (PI) Agent that coordinates research
     - Agent Marketplace with domain expert agents  
     - Scientific Critic Agent for quality control
+    - Virtual Lab Meeting System for structured collaboration
     - Vector Database for memory and context management
     - Knowledge Repository for validated findings
     """
@@ -56,13 +62,16 @@ class MultiAgentResearchFramework:
         # Initialize multi-agent system
         self._init_agent_system()
         
+        # Initialize Virtual Lab meeting system
+        self._init_virtual_lab()
+        
         # Initialize original components for compatibility
         self._init_legacy_components()
         
         # Setup directories
         self._setup_directories()
         
-        logger.info("Multi-Agent Research Framework initialized successfully")
+        logger.info("Multi-Agent Research Framework with Virtual Lab initialized successfully")
     
     def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Load configuration with defaults."""
@@ -161,8 +170,21 @@ class MultiAgentResearchFramework:
         
         logger.info("Multi-agent system initialized")
     
+    def _init_virtual_lab(self):
+        """Initialize the Virtual Lab meeting system."""
+        logger.info("Initializing Virtual Lab meeting system...")
+        
+        # Initialize Virtual Lab with the multi-agent components
+        self.virtual_lab = VirtualLabMeetingSystem(
+            pi_agent=self.pi_agent,
+            scientific_critic=self.scientific_critic,
+            agent_marketplace=self.agent_marketplace,
+            config=self.config
+        )
+        
+        logger.info("Virtual Lab meeting system initialized")
+    
     def _init_legacy_components(self):
-        """Initialize legacy components for backward compatibility."""
         logger.info("Initializing legacy components...")
         
         # Initialize experiment runner
@@ -297,6 +319,56 @@ class MultiAgentResearchFramework:
                 'research_question': research_question,
                 'status': 'failed',
                 'error': str(e),
+                'timestamp': time.time()
+            }
+    
+    def conduct_virtual_lab_research(self, research_question: str, 
+                                   constraints: Optional[Dict[str, Any]] = None,
+                                   context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Conduct research using the Virtual Lab methodology with structured meetings.
+        
+        This is the enhanced research method that uses the Virtual Lab approach
+        with meeting-based collaboration between AI agents.
+        
+        Args:
+            research_question: The research question to investigate
+            constraints: Optional constraints (budget, time, etc.)
+            context: Optional additional context
+            
+        Returns:
+            Complete Virtual Lab research session results
+        """
+        logger.info(f"Starting Virtual Lab research: {research_question[:100]}...")
+        
+        try:
+            # Use Virtual Lab meeting system for structured research
+            vlab_results = self.virtual_lab.conduct_research_session(
+                research_question=research_question,
+                constraints=constraints,
+                context=context
+            )
+            
+            # Store results in context manager if enabled
+            if self.config['store_all_interactions'] and vlab_results.get('session_id'):
+                self.context_manager.add_to_context(
+                    session_id=vlab_results['session_id'],
+                    content=f"Virtual Lab Research Results: {vlab_results.get('final_results', {})}",
+                    content_type="vlab_research_results",
+                    agent_id="virtual_lab_system",
+                    importance_score=1.0,
+                    metadata=vlab_results
+                )
+            
+            logger.info(f"Virtual Lab research completed: {vlab_results.get('session_id', 'unknown')}")
+            return vlab_results
+            
+        except Exception as e:
+            logger.error(f"Virtual Lab research failed: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'research_question': research_question,
                 'timestamp': time.time()
             }
     
@@ -670,12 +742,44 @@ class MultiAgentResearchFramework:
     
     def get_framework_statistics(self) -> Dict[str, Any]:
         """Get comprehensive framework statistics."""
-        return {
+        stats = {
             'agent_marketplace': self.agent_marketplace.get_marketplace_statistics(),
             'knowledge_repository': self.knowledge_repository.get_repository_stats(),
             'vector_database': self.vector_db.get_stats(),
             'context_manager': self.context_manager.get_context_stats()
         }
+        
+        # Add Virtual Lab statistics
+        if hasattr(self, 'virtual_lab'):
+            stats['virtual_lab'] = self.virtual_lab.get_meeting_statistics()
+        
+        return stats
+    
+    # Virtual Lab specific methods
+    
+    def get_virtual_lab_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific Virtual Lab research session."""
+        if hasattr(self, 'virtual_lab'):
+            return self.virtual_lab.get_research_session(session_id)
+        return None
+    
+    def list_virtual_lab_sessions(self) -> List[str]:
+        """List all Virtual Lab research session IDs."""
+        if hasattr(self, 'virtual_lab'):
+            return self.virtual_lab.list_research_sessions()
+        return []
+    
+    def get_meeting_history(self, limit: Optional[int] = None) -> List[Any]:
+        """Get Virtual Lab meeting history."""
+        if hasattr(self, 'virtual_lab'):
+            return self.virtual_lab.get_meeting_history(limit)
+        return []
+    
+    def get_virtual_lab_statistics(self) -> Dict[str, Any]:
+        """Get detailed Virtual Lab meeting statistics."""
+        if hasattr(self, 'virtual_lab'):
+            return self.virtual_lab.get_meeting_statistics()
+        return {}
     
     def cleanup_old_data(self, days_old: int = 30):
         """Clean up old data from memory systems."""

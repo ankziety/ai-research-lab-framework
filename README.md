@@ -1,12 +1,22 @@
 # AI-Powered Research Framework
 
-A comprehensive framework for AI-powered research workflows that integrates experiment execution, literature retrieval, manuscript drafting, result visualization, and research critique capabilities across any research domain.
+A comprehensive framework for AI-powered research workflows that integrates experiment execution, literature retrieval, manuscript drafting, result visualization, and research critique capabilities across any research domain. **Now enhanced with Virtual Lab methodology for structured meeting-based research collaboration.**
 
 ## Overview
 
 The AI-Powered Research Framework provides a unified platform for conducting end-to-end research workflows in any field. It leverages AI to assist researchers by automating literature reviews, generating manuscript drafts, providing intelligent critique, and orchestrating complete research pipelines - from initial experiments to publication-ready outputs.
 
+**NEW: Virtual Lab Methodology** - Inspired by the paper "The Virtual Lab of AI agents designs new SARS-CoV-2 nanobodies" by Swanson et al. (2025), the framework now includes a sophisticated meeting-based research coordination system where AI agents collaborate through structured meetings to conduct interdisciplinary research.
+
 ## Features
+
+### 🧪 Virtual Lab Research Methodology (NEW)
+- **Meeting-Based Coordination**: Structured team and individual meetings between AI agents
+- **7-Phase Research Process**: Team selection, project specification, tools selection, implementation, workflow design, execution, and synthesis
+- **Cross-Agent Collaboration**: Agents with different expertise collaborate and critique each other's work
+- **Iterative Refinement**: Multiple rounds of discussion and improvement
+- **Scientific Critique Integration**: Built-in quality control and validation
+- **Minimal Human Input**: AI agents handle most of the research coordination autonomously
 
 ### 🧪 Experiment Management
 - **Automated Execution**: Run computational experiments with parameter tracking
@@ -115,6 +125,26 @@ from ai_research_lab import create_framework
 # Create framework instance
 framework = create_framework()
 
+# NEW: Virtual Lab Research (Recommended)
+# Uses structured meeting-based collaboration between AI agents
+virtual_lab_results = framework.conduct_virtual_lab_research(
+    research_question="Design new computational approaches for drug discovery targeting viral proteins",
+    constraints={
+        'budget': 50000,
+        'timeline_weeks': 12,
+        'team_size_max': 6
+    },
+    context={
+        'domain': 'computational_biology',
+        'priority': 'high'
+    }
+)
+
+print(f"Virtual Lab Session: {virtual_lab_results['session_id']}")
+print(f"Phases Completed: {virtual_lab_results['final_results']['session_summary']['phases_completed']}/7")
+print(f"Key Findings: {virtual_lab_results['final_results']['validated_findings']}")
+
+# Traditional Multi-Agent Research (Still Available)
 # Example 1: Biology research workflow
 experiment_params = {
     'treatment': 'drug_compound_X',
@@ -140,11 +170,28 @@ print(f"Workflow completed: {results['workflow_id']}")
 print(f"Manuscript saved to: {results['manuscript']['path']}")
 ```
 
-### Command Line Interface
+### Virtual Lab Command Line Interface
 
-The framework includes a comprehensive CLI for all operations across any research domain:
+The framework includes enhanced CLI support for Virtual Lab research:
 
 ```bash
+# Run Virtual Lab research session
+python cli.py virtual-lab-research \
+    --question "Design new computational approaches for drug discovery" \
+    --budget 50000 \
+    --timeline-weeks 12 \
+    --max-agents 6
+
+# View Virtual Lab session results
+python cli.py show-vlab-session --session-id vlab_session_123456
+
+# List all Virtual Lab sessions
+python cli.py list-vlab-sessions
+
+# Get Virtual Lab meeting statistics
+python cli.py vlab-stats
+
+# Traditional commands still available
 # Biology/Medicine: Run a treatment study
 python cli.py run-experiment --params treatment=drug_X dosage=50 duration=14
 
@@ -167,7 +214,88 @@ python cli.py visualize --results-file results.json --output research_plot.png
 python cli.py critique --file manuscript.md
 ```
 
+## Virtual Lab Methodology
+
+The Virtual Lab is an enhanced research approach that coordinates AI agents through structured meetings to conduct sophisticated, interdisciplinary research. It implements the methodology described in "The Virtual Lab of AI agents designs new SARS-CoV-2 nanobodies" by Swanson et al.
+
+### 7-Phase Research Process
+
+1. **Team Selection**: Individual meeting with PI to analyze research requirements and hire appropriate expert agents
+2. **Project Specification**: Team meeting to define objectives, scope, and success criteria
+3. **Tools Selection**: Team meeting to brainstorm and select computational/analytical tools
+4. **Tools Implementation**: Individual meetings to implement selected tools with scientific critique
+5. **Workflow Design**: Individual meeting with PI to design integrated research workflow
+6. **Execution**: Execute workflow with cross-agent collaboration and critique
+7. **Synthesis**: Final team meeting to synthesize findings and conduct scientific critique
+
+### Meeting Types
+
+- **Team Meetings**: All agents collaborate on broad research questions
+- **Individual Meetings**: Focused work between specific agents (often with scientific critic)
+- **Aggregation Meetings**: Combine results from parallel work streams
+
+### Key Advantages
+
+- **Structured Coordination**: Systematic approach to complex research problems
+- **Cross-Pollination**: Agents critique and build upon each other's work
+- **Quality Control**: Integrated scientific critique throughout the process
+- **Scalability**: Can handle teams of 2-8 expert agents
+- **Minimal Human Input**: Requires only initial research question and constraints
+
+### Example Virtual Lab Usage
+
+```python
+from multi_agent_framework import MultiAgentResearchFramework
+
+# Initialize framework
+framework = MultiAgentResearchFramework({
+    'openai_api_key': 'your-api-key',
+    'max_agents_per_research': 6,
+    'store_all_interactions': True
+})
+
+# Conduct Virtual Lab research
+results = framework.conduct_virtual_lab_research(
+    research_question="Develop machine learning models for predicting protein-protein interactions in cancer",
+    constraints={
+        'budget': 75000,
+        'timeline_weeks': 16,
+        'team_size_max': 5
+    },
+    context={
+        'domain': 'oncology_informatics',
+        'priority': 'medium',
+        'requires_validation': True
+    }
+)
+
+# Access results
+session_summary = results['final_results']['session_summary']
+validated_findings = results['final_results']['validated_findings']
+quality_assessment = results['final_results']['quality_assessment']
+
+print(f"Research completed in {session_summary['duration']:.1f} seconds")
+print(f"Quality score: {quality_assessment['overall_score']}/100")
+
+# Access detailed meeting records
+meeting_history = framework.get_meeting_history()
+for meeting in meeting_history:
+    print(f"Meeting: {meeting.meeting_id} ({meeting.phase.value})")
+    print(f"Participants: {meeting.participants}")
+    print(f"Decisions: {meeting.decisions}")
+```
+
 ## Individual Component Usage
+
+### Virtual Lab Demo
+
+```bash
+# Run the Virtual Lab demonstration
+python demo_virtual_lab.py
+
+# Run minimal Virtual Lab verification
+python minimal_virtual_lab_demo.py
+```
 
 ## Individual Component Usage
 
@@ -315,6 +443,9 @@ framework = create_framework(config)
 ### Run All Tests
 
 ```bash
+# Run Virtual Lab tests
+python test_virtual_lab.py
+
 # Run integration tests
 python test_integration.py
 
@@ -333,6 +464,12 @@ python -m pytest test_*.py -v
 ### Demo and Examples
 
 ```bash
+# Run Virtual Lab demo (NEW)
+python demo_virtual_lab.py
+
+# Run minimal Virtual Lab verification
+python minimal_virtual_lab_demo.py
+
 # Run comprehensive framework demo
 python demo_integrated.py
 
@@ -347,7 +484,8 @@ python example_usage.py       # Results visualizer examples
 The framework follows a modular architecture with the following components:
 
 ### Core Components
-- **AIResearchLabFramework**: Main orchestration class
+- **MultiAgentResearchFramework**: Main orchestration class with Virtual Lab integration
+- **VirtualLabMeetingSystem**: Meeting-based research coordination (NEW)
 - **ExperimentRunner**: Experiment execution and tracking
 - **LiteratureRetriever**: Scientific literature search and retrieval
 - **ManuscriptDrafter**: Scientific manuscript generation
@@ -356,6 +494,9 @@ The framework follows a modular architecture with the following components:
 - **SpecialistRegistry**: Component management and extensibility
 
 ### Integration Points
+- **Virtual Lab Workflow**: Structured 7-phase research methodology (NEW)
+- **Meeting-Based Coordination**: Team and individual meetings between AI agents (NEW)
+- **Cross-Agent Collaboration**: Agents critique and enhance each other's work (NEW)
 - **Workflow Orchestration**: End-to-end research pipelines
 - **Configuration Management**: Centralized settings and preferences
 - **Error Handling**: Consistent error management across components
@@ -373,9 +514,14 @@ The framework follows a modular architecture with the following components:
 
 ```
 ai-powered-research-framework/
+├── virtual_lab.py               # NEW: Virtual Lab meeting system implementation
 ├── ai_research_lab.py          # Main AI-powered framework integration class
+├── multi_agent_framework.py    # Enhanced multi-agent system with Virtual Lab
 ├── cli.py                      # Command-line interface
 ├── __init__.py                 # Package initialization
+├── demo_virtual_lab.py         # NEW: Virtual Lab comprehensive demo
+├── minimal_virtual_lab_demo.py # NEW: Virtual Lab minimal verification
+├── test_virtual_lab.py         # NEW: Virtual Lab tests
 ├── demo_integrated.py          # Comprehensive framework demo
 ├── test_integration.py         # Integration tests
 ├── README.md                   # This documentation
@@ -387,10 +533,29 @@ ai-powered-research-framework/
 ├── critic.py                   # AI-driven research output critique
 ├── results_visualizer.py       # Intelligent data visualization
 ├── specialist_registry.py      # Component registry and management
+├── agents/                     # Multi-agent system components
+│   ├── __init__.py
+│   ├── base_agent.py           # Base agent class
+│   ├── principal_investigator.py # PI agent for coordination
+│   ├── scientific_critic.py    # Scientific critic agent
+│   ├── domain_experts.py       # Domain expert agents
+│   ├── agent_marketplace.py    # Agent hiring and management
+│   └── llm_client.py           # LLM integration
+├── memory/                     # Memory and context management
+│   ├── __init__.py
+│   ├── vector_database.py      # Vector database for embeddings
+│   ├── context_manager.py      # Context management
+│   └── knowledge_repository.py # Validated knowledge storage
 ├── experiments/
 │   ├── __init__.py
 │   ├── experiment.py           # Automated experiment execution and tracking
 │   └── README.md
+├── tools/                      # Research tools and utilities
+│   ├── __init__.py
+│   ├── base_tool.py            # Base tool interface
+│   ├── experimental_tools.py   # Experiment design and execution
+│   ├── collaboration_tools.py  # Agent collaboration utilities
+│   └── tool_registry.py       # Tool management
 │
 ├── Original Demos & Tests/
 ├── demo.py                     # Original manuscript drafter demo
@@ -407,7 +572,14 @@ ai-powered-research-framework/
 
 ## AI-Powered Research Approach
 
-This framework leverages artificial intelligence to enhance research productivity across any domain:
+This framework leverages artificial intelligence to enhance research productivity across any domain, now with advanced Virtual Lab methodology:
+
+### 🤖 Virtual Lab Multi-Agent Collaboration (NEW)
+- **Meeting-Based Research**: AI agents conduct structured team and individual meetings
+- **Cross-Pollination**: Agents with different expertise critique and enhance each other's work
+- **Iterative Refinement**: Multiple rounds of discussion and improvement
+- **Scientific Quality Control**: Integrated critique and validation throughout the process
+- **Systematic Methodology**: 7-phase structured approach to complex research problems
 
 ### 🤖 AI-Assisted Literature Review
 - **Intelligent Query Processing**: Natural language queries automatically translated to database searches
