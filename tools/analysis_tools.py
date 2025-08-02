@@ -7,12 +7,20 @@ Tools for data analysis, pattern detection, and hypothesis validation.
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import logging
 import io
 import base64
+
+# Optional seaborn import - gracefully handle if not available
+try:
+    import seaborn as sns
+    HAS_SEABORN = True
+except ImportError:
+    sns = None
+    HAS_SEABORN = False
+    logging.warning("Seaborn not available - some advanced plotting features will be disabled")
 
 from .base_tool import BaseTool
 
@@ -37,7 +45,8 @@ class DataVisualizer(BaseTool):
                 "publication_quality_figures"
             ],
             requirements={
-                "required_packages": ["matplotlib", "seaborn", "pandas"],
+                "required_packages": ["matplotlib", "pandas"],
+                "optional_packages": ["seaborn"],
                 "min_memory": 50
             }
         )
@@ -169,14 +178,27 @@ class DataVisualizer(BaseTool):
         if len(columns) < 2:
             return {'error': 'Need at least 2 numeric columns for correlation analysis'}
         
-        plt.style.use('seaborn-v0_8')
+        # Use seaborn style if available, otherwise use default
+        try:
+            plt.style.use('seaborn-v0_8')
+        except OSError:
+            plt.style.use('default')
         
         # Correlation heatmap
         fig, ax = plt.subplots(figsize=(10, 8))
         corr_matrix = df[columns].corr()
         
-        sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0,
-                   square=True, linewidths=0.5, cbar_kws={"shrink": .8})
+        if HAS_SEABORN:
+            sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0,
+                       square=True, linewidths=0.5, cbar_kws={"shrink": .8})
+        else:
+            # Fallback to matplotlib imshow if seaborn not available
+            im = ax.imshow(corr_matrix, cmap='coolwarm', aspect='auto', vmin=-1, vmax=1)
+            ax.set_xticks(range(len(corr_matrix.columns)))
+            ax.set_yticks(range(len(corr_matrix.columns)))
+            ax.set_xticklabels(corr_matrix.columns, rotation=45)
+            ax.set_yticklabels(corr_matrix.columns)
+            plt.colorbar(im, ax=ax, shrink=0.8)
         plt.title('Correlation Matrix')
         plt.tight_layout()
         
@@ -246,7 +268,12 @@ class DataVisualizer(BaseTool):
         if categorical_col not in df.columns or numeric_col not in df.columns:
             return {'error': 'Specified columns not found in data'}
         
-        plt.style.use('seaborn-v0_8')
+        # Use seaborn style if available, otherwise use default
+        try:
+            plt.style.use('seaborn-v0_8')
+        except OSError:
+            plt.style.use('default')
+            
         fig, axes = plt.subplots(1, 3, figsize=(15, 5))
         
         # Box plot
@@ -254,9 +281,19 @@ class DataVisualizer(BaseTool):
         axes[0].set_title(f'{numeric_col} by {categorical_col}')
         axes[0].set_ylabel(numeric_col)
         
-        # Violin plot
-        sns.violinplot(data=df, x=categorical_col, y=numeric_col, ax=axes[1])
-        axes[1].set_title(f'{numeric_col} Distribution by {categorical_col}')
+        # Violin plot (or histogram fallback)
+        if HAS_SEABORN:
+            sns.violinplot(data=df, x=categorical_col, y=numeric_col, ax=axes[1])
+            axes[1].set_title(f'{numeric_col} Distribution by {categorical_col}')
+        else:
+            # Fallback to histogram if seaborn not available
+            for category in df[categorical_col].unique():
+                subset = df[df[categorical_col] == category][numeric_col]
+                axes[1].hist(subset, alpha=0.6, label=str(category))
+            axes[1].set_title(f'{numeric_col} Distribution by {categorical_col} (Histogram)')
+            axes[1].set_xlabel(numeric_col)
+            axes[1].set_ylabel('Frequency')
+            axes[1].legend()
         
         # Bar plot with error bars
         grouped_stats = df.groupby(categorical_col)[numeric_col].agg(['mean', 'std'])
