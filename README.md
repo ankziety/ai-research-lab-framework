@@ -61,27 +61,92 @@ The AI-Powered Research Framework provides a unified platform for conducting end
 
 ### Installation
 
-The framework requires Python 3.6+ and has minimal dependencies:
+#### Prerequisites
+- Python 3.8+ (recommended: Python 3.10 or newer)
+- Git
+
+#### Step 1: Clone the Repository
+```bash
+# Clone the AI Research Lab Framework
+git clone https://github.com/ankziety/ai-research-lab-framework.git
+cd ai-research-lab-framework
+```
+
+#### Step 2: Create Virtual Environment
+We recommend using a virtual environment to keep dependencies isolated:
 
 ```bash
-pip install matplotlib numpy pytest
+# Create a virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Linux/macOS:
+source .venv/bin/activate
+
+# On Windows:
+.venv\Scripts\activate
+```
+
+#### Step 3: Install Dependencies
+```bash
+# Install all required dependencies
+pip install -r requirements.txt
+```
+
+The framework requires the following core dependencies:
+- matplotlib>=3.5.0
+- numpy>=1.21.0  
+- pytest>=6.0.0
+- sentence-transformers>=2.2.0
+- faiss-cpu>=1.7.0
+- openai>=1.0.0 (for AI features)
+- anthropic>=0.7.0 (for Claude AI models)
+
+#### Step 4: Verify Installation
+```bash
+# Test that the framework works correctly
+python cli.py --help
+
+# Run basic tests
+python test_simple.py
 ```
 
 ### Configuration
 
-The framework requires API keys for full AI-powered functionality:
+The framework works without API keys but provides mock responses for demonstration. For full AI-powered functionality, configure your API keys:
 
-#### Required API Keys
+#### Required API Keys (for AI features)
 - **OpenAI API Key**: For AI agent responses (Principal Investigator, domain experts, scientific critic)
 
-#### Optional API Keys for Enhanced Literature Search
+#### Optional API Keys (for Enhanced Literature Search)  
 - **Google Search API**: For Google Custom Search academic results
 - **SerpAPI Key**: For Google Scholar search access
 - **Semantic Scholar API**: Enhanced search (free tier available)
 - **OpenAlex Email**: Required for OpenAlex API access (free)
 - **CORE API Key**: Optional for CORE repository access
 
-#### Configuration Options
+#### Method 1: Environment Variables (Recommended)
+Set your API keys as environment variables:
+
+```bash
+# Essential for AI features
+export OPENAI_API_KEY="your-openai-api-key-here"
+
+# Optional for additional AI models
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+export GEMINI_API_KEY="your-google-api-key"  
+export HUGGINGFACE_API_KEY="your-huggingface-token"
+
+# Optional for enhanced literature search
+export GOOGLE_SEARCH_API_KEY="your-google-api-key"
+export GOOGLE_SEARCH_ENGINE_ID="your-custom-search-engine-id" 
+export SERPAPI_KEY="your-serpapi-key"
+export SEMANTIC_SCHOLAR_API_KEY="your-semantic-scholar-key"
+export OPENALEX_EMAIL="your-email@domain.com"
+export CORE_API_KEY="your-core-key"
+```
+
+#### Method 2: Configuration in Code
 ```python
 from ai_research_lab import create_framework
 
@@ -105,17 +170,40 @@ config = {
 framework = create_framework(config)
 ```
 
-#### Environment Variables
-You can also set API keys via environment variables:
-```bash
-export OPENAI_API_KEY="your-openai-api-key"
-export ANTHROPIC_API_KEY="your-anthropic-api-key"
-export GEMINI_API_KEY="your-google-api-key"  
-export HUGGINGFACE_API_KEY="your-huggingface-token"
-export LITERATURE_API_KEY="your-pubmed-api-key"  # optional
-```
+#### Getting API Keys
+
+**OpenAI API Key** (Essential for AI features):
+1. Go to [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Sign up for an account if you don't have one
+3. Click "Create new secret key"
+4. Copy and save your API key securely
+
+**For other API keys**, see the respective provider documentation.
 
 **Note**: Without API keys, the framework will use mock responses for demonstration purposes, but will not provide actual AI-powered research assistance.
+
+### Getting Help
+
+The CLI provides comprehensive help for all commands:
+
+```bash
+# Main help menu with all available commands
+python cli.py --help
+
+# Get help for specific commands
+python cli.py virtual-lab-research --help
+python cli.py run-experiment --help
+python cli.py draft-manuscript --help
+
+# Quick command reference
+python cli.py --help | grep -A 20 "Examples:"
+```
+
+The help system shows:
+- All available commands and their descriptions
+- Required and optional parameters for each command
+- Practical examples for common use cases
+- Both Virtual Lab (NEW) and traditional research workflows
 
 ### Basic Usage
 
@@ -175,21 +263,24 @@ print(f"Manuscript saved to: {results['manuscript']['path']}")
 The framework includes enhanced CLI support for Virtual Lab research:
 
 ```bash
-# Run Virtual Lab research session
+# Run Virtual Lab research session (NEW)
 python cli.py virtual-lab-research \
     --question "Design new computational approaches for drug discovery" \
     --budget 50000 \
     --timeline-weeks 12 \
-    --max-agents 6
+    --max-agents 6 \
+    --domain computational_biology \
+    --priority high \
+    --output vlab_results.json
 
-# View Virtual Lab session results
+# View Virtual Lab session results (NEW)
 python cli.py show-vlab-session --session-id vlab_session_123456
 
-# List all Virtual Lab sessions
+# List all Virtual Lab sessions (NEW)
 python cli.py list-vlab-sessions
 
-# Get Virtual Lab meeting statistics
-python cli.py vlab-stats
+# Get Virtual Lab meeting statistics (NEW)
+python cli.py vlab-stats --output vlab_statistics.json
 
 # Traditional commands still available
 # Biology/Medicine: Run a treatment study
