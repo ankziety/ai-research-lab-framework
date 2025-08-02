@@ -19,11 +19,121 @@ class ToolRegistry:
     that agents can use to conduct research and experiments.
     """
     
-    def __init__(self):
+    def __init__(self, auto_register_default: bool = True):
         """Initialize the tool registry."""
         self.tools: Dict[str, BaseTool] = {}
         self.tool_categories: Dict[str, List[str]] = {}
         self.agent_tool_usage: Dict[str, Dict[str, int]] = {}
+        
+        if auto_register_default:
+            self._register_default_tools()
+    
+    def _register_default_tools(self):
+        """Register default tools from the tools module."""
+        try:
+            # Import and register analysis tools
+            from .analysis_tools import DataVisualizer, PatternDetector, HypothesisValidator
+            
+            # Register data visualizer
+            data_viz = DataVisualizer()
+            self.register_tool(data_viz, categories=['analysis', 'visualization'])
+            
+            # Register pattern detector if available
+            try:
+                pattern_detector = PatternDetector()
+                self.register_tool(pattern_detector, categories=['analysis', 'pattern_detection'])
+            except Exception as e:
+                logger.warning(f"Could not register PatternDetector: {e}")
+            
+            # Register hypothesis validator if available
+            try:
+                hypothesis_validator = HypothesisValidator()
+                self.register_tool(hypothesis_validator, categories=['analysis', 'validation'])
+            except Exception as e:
+                logger.warning(f"Could not register HypothesisValidator: {e}")
+            
+            # Import and register experimental tools
+            from .experimental_tools import ExperimentRunner, DataCollector, StatisticalAnalyzer
+            
+            try:
+                experiment_runner = ExperimentRunner()
+                self.register_tool(experiment_runner, categories=['experimental', 'research'])
+            except Exception as e:
+                logger.warning(f"Could not register ExperimentRunner: {e}")
+            
+            try:
+                data_collector = DataCollector()
+                self.register_tool(data_collector, categories=['experimental', 'data_collection'])
+            except Exception as e:
+                logger.warning(f"Could not register DataCollector: {e}")
+                
+            try:
+                statistical_analyzer = StatisticalAnalyzer()
+                self.register_tool(statistical_analyzer, categories=['analysis', 'statistics'])
+            except Exception as e:
+                logger.warning(f"Could not register StatisticalAnalyzer: {e}")
+            
+            # Import and register literature tools
+            from .literature_tools import LiteratureSearchTool, CitationAnalyzer
+            
+            try:
+                literature_search = LiteratureSearchTool()
+                self.register_tool(literature_search, categories=['literature', 'search'])
+            except Exception as e:
+                logger.warning(f"Could not register LiteratureSearchTool: {e}")
+                
+            try:
+                citation_analyzer = CitationAnalyzer()
+                self.register_tool(citation_analyzer, categories=['literature', 'analysis'])
+            except Exception as e:
+                logger.warning(f"Could not register CitationAnalyzer: {e}")
+            
+            # Import and register collaboration tools
+            from .collaboration_tools import TeamCommunication, TaskCoordinator
+            
+            try:
+                team_comm = TeamCommunication()
+                self.register_tool(team_comm, categories=['collaboration', 'communication'])
+            except Exception as e:
+                logger.warning(f"Could not register TeamCommunication: {e}")
+                
+            try:
+                task_coordinator = TaskCoordinator()
+                self.register_tool(task_coordinator, categories=['collaboration', 'coordination'])
+            except Exception as e:
+                logger.warning(f"Could not register TaskCoordinator: {e}")
+            
+            # Import and register generic tools
+            from .generic_tools import WebSearchTool, CodeInterpreterTool, DataAnalysisTool, ResearchAssistantTool
+            
+            try:
+                web_search = WebSearchTool()
+                self.register_tool(web_search, categories=['research', 'information'])
+            except Exception as e:
+                logger.warning(f"Could not register WebSearchTool: {e}")
+                
+            try:
+                code_interpreter = CodeInterpreterTool()
+                self.register_tool(code_interpreter, categories=['analysis', 'computation'])
+            except Exception as e:
+                logger.warning(f"Could not register CodeInterpreterTool: {e}")
+                
+            try:
+                data_analysis = DataAnalysisTool()
+                self.register_tool(data_analysis, categories=['analysis', 'statistics'])
+            except Exception as e:
+                logger.warning(f"Could not register DataAnalysisTool: {e}")
+                
+            try:
+                research_assistant = ResearchAssistantTool()
+                self.register_tool(research_assistant, categories=['research', 'coordination'])
+            except Exception as e:
+                logger.warning(f"Could not register ResearchAssistantTool: {e}")
+            
+            logger.info(f"Registered {len(self.tools)} default tools in ToolRegistry")
+            
+        except Exception as e:
+            logger.error(f"Failed to register default tools: {e}")
         
     def register_tool(self, tool: BaseTool, categories: List[str] = None):
         """
@@ -64,15 +174,26 @@ class ToolRegistry:
             # Get confidence score for this task
             confidence = tool.can_handle(task_description, requirements)
             
-            if confidence > 0.1:  # Only include tools with reasonable confidence
-                # Factor in past usage by this agent
+            # Accept lower confidences if no obvious keywords match
+            if confidence > 0.05:
                 usage_bonus = self._get_agent_usage_bonus(agent_id, tool_id)
                 adjusted_confidence = min(1.0, confidence + usage_bonus)
-                
                 recommendations.append({
                     'tool_id': tool_id,
-                    'tool': tool,
                     'confidence': adjusted_confidence,
+                    'name': tool.name,
+                    'description': tool.description,
+                    'capabilities': tool.capabilities,
+                    'success_rate': tool.success_rate,
+                    'usage_count': tool.usage_count
+                })
+
+        # Fallback: if no tools pass threshold, return all available tools with base confidence 0.05
+        if not recommendations:
+            for tool_id, tool in self.tools.items():
+                recommendations.append({
+                    'tool_id': tool_id,
+                    'confidence': 0.05,
                     'name': tool.name,
                     'description': tool.description,
                     'capabilities': tool.capabilities,
