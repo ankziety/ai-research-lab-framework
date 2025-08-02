@@ -280,6 +280,302 @@ class BaseAgent:
         self.conversation_history.clear()
         logger.info(f"Cleared conversation history for agent {self.agent_id}")
     
+    def discover_available_tools(self, task_description: str) -> List[Dict[str, Any]]:
+        """
+        Discover tools available for a specific task.
+        
+        Args:
+            task_description: Description of the task to be performed
+            
+        Returns:
+            List of available tools with confidence scores
+        """
+        try:
+            from tools.tool_registry import ToolRegistry
+            
+            # Get tool registry instance
+            tool_registry = ToolRegistry()
+            
+            # Discover tools for this task
+            available_tools = tool_registry.discover_tools(
+                agent_id=self.agent_id,
+                task_description=task_description,
+                requirements={'agent_expertise': self.expertise}
+            )
+            
+            # Enhance with cost and capability information
+            enhanced_tools = []
+            for tool_info in available_tools:
+                tool = tool_info['tool']
+                enhanced_tool = {
+                    'tool_id': tool.tool_id,
+                    'name': tool.name,
+                    'description': tool.description,
+                    'capabilities': tool.capabilities,
+                    'confidence': tool_info['confidence'],
+                    'success_rate': tool.success_rate,
+                    'usage_count': tool.usage_count,
+                    'requirements': tool.requirements
+                }
+                enhanced_tools.append(enhanced_tool)
+            
+            logger.info(f"Agent {self.agent_id} discovered {len(enhanced_tools)} tools for task")
+            return enhanced_tools
+            
+        except Exception as e:
+            logger.error(f"Tool discovery failed for agent {self.agent_id}: {e}")
+            return []
+    
+    def request_tool(self, tool_id: str, context: Dict[str, Any]) -> Optional[Any]:
+        """
+        Request access to a specific tool.
+        
+        Args:
+            tool_id: ID of the requested tool
+            context: Execution context for validation
+            
+        Returns:
+            Tool instance if accessible, None if not available
+        """
+        try:
+            from tools.tool_registry import ToolRegistry
+            
+            # Get tool registry instance
+            tool_registry = ToolRegistry()
+            
+            # Request tool with context
+            tool = tool_registry.request_tool(
+                agent_id=self.agent_id,
+                tool_id=tool_id,
+                context=context
+            )
+            
+            if tool:
+                logger.info(f"Agent {self.agent_id} granted access to tool {tool_id}")
+                return tool
+            else:
+                logger.warning(f"Agent {self.agent_id} denied access to tool {tool_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Tool request failed for agent {self.agent_id}: {e}")
+            return None
+    
+    def execute_with_tools(self, task: str, tools: List[Any]) -> Dict[str, Any]:
+        """
+        Execute a task using multiple tools.
+        
+        Args:
+            task: Task description
+            tools: List of tool instances to use
+            
+        Returns:
+            Execution results with output and metadata
+        """
+        results = {
+            'success': False,
+            'output': '',
+            'tool_results': [],
+            'metadata': {
+                'agent_id': self.agent_id,
+                'tools_used': len(tools),
+                'execution_time': 0,
+                'total_cost': 0.0
+            }
+        }
+        
+        start_time = time.time()
+        
+        try:
+            # Execute each tool
+            for i, tool in enumerate(tools):
+                try:
+                    # Prepare task for tool
+                    tool_task = {
+                        'description': task,
+                        'agent_id': self.agent_id,
+                        'tool_index': i
+                    }
+                    
+                    # Execute tool
+                    tool_result = tool.execute(tool_task, {
+                        'agent_id': self.agent_id,
+                        'agent_role': self.role,
+                        'agent_expertise': self.expertise
+                    })
+                    
+                    # Track cost if available
+                    if 'cost' in tool_result.get('metadata', {}):
+                        results['metadata']['total_cost'] += tool_result['metadata']['cost']
+                    
+                    results['tool_results'].append({
+                        'tool_id': tool.tool_id,
+                        'tool_name': tool.name,
+                        'result': tool_result,
+                        'success': tool_result.get('success', False)
+                    })
+                    
+                except Exception as e:
+                    logger.error(f"Tool execution failed: {e}")
+                    results['tool_results'].append({
+                        'tool_id': getattr(tool, 'tool_id', 'unknown'),
+                        'tool_name': getattr(tool, 'name', 'unknown'),
+                        'result': {'success': False, 'error': str(e)},
+                        'success': False
+                    })
+            
+            # Determine overall success
+            successful_tools = sum(1 for result in results['tool_results'] if result['success'])
+            results['success'] = successful_tools > 0
+            
+            # Generate combined output
+            if results['success']:
+                outputs = []
+                for result in results['tool_results']:
+                    if result['success']:
+                        output = result['result'].get('output', '')
+                        if output:
+                            outputs.append(f"Tool {result['tool_name']}: {output}")
+                
+                results['output'] = '\n\n'.join(outputs)
+            
+            results['metadata']['execution_time'] = time.time() - start_time
+            
+            logger.info(f"Agent {self.agent_id} executed task with {len(tools)} tools, {successful_tools} successful")
+            return results
+            
+        except Exception as e:
+            logger.error(f"Tool execution failed for agent {self.agent_id}: {e}")
+            results['metadata']['execution_time'] = time.time() - start_time
+            results['error'] = str(e)
+            return results
+    
+    def build_custom_tool(self, tool_spec: Dict[str, Any]) -> Optional[Any]:
+        """
+        Build a custom tool based on specification.
+        
+        Args:
+            tool_spec: Tool specification with parameters
+            
+        Returns:
+            Custom tool instance if successful, None otherwise
+        """
+        try:
+            from tools.dynamic_tool_builder import WebSearchTool, CodeExecutionTool, ModelSwitchingTool, CustomToolChainBuilder
+            
+            tool_type = tool_spec.get('type', '')
+            tool_config = tool_spec.get('config', {})
+            
+            if tool_type == 'web_search':
+                # Build web search tool
+                api_keys = tool_config.get('api_keys', {})
+                cost_manager = tool_config.get('cost_manager')
+                return WebSearchTool(api_keys, cost_manager)
+                
+            elif tool_type == 'code_execution':
+                # Build code execution tool
+                sandbox_config = tool_config.get('sandbox_config', {})
+                cost_manager = tool_config.get('cost_manager')
+                return CodeExecutionTool(sandbox_config, cost_manager)
+                
+            elif tool_type == 'model_switching':
+                # Build model switching tool
+                cost_manager = tool_config.get('cost_manager')
+                llm_client = tool_config.get('llm_client')
+                if cost_manager and llm_client:
+                    return ModelSwitchingTool(cost_manager, llm_client)
+                    
+            elif tool_type == 'custom_chain':
+                # Build custom tool chain
+                tool_registry = tool_config.get('tool_registry')
+                cost_manager = tool_config.get('cost_manager')
+                if tool_registry:
+                    return CustomToolChainBuilder(tool_registry, cost_manager)
+            
+            logger.warning(f"Unknown tool type: {tool_type}")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Custom tool building failed for agent {self.agent_id}: {e}")
+            return None
+    
+    def optimize_tool_usage(self, task_description: str, available_tools: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Optimize tool selection based on cost and performance.
+        
+        Args:
+            task_description: Description of the task
+            available_tools: List of available tools
+            
+        Returns:
+            Optimized list of tools with usage recommendations
+        """
+        try:
+            # Score tools based on multiple factors
+            scored_tools = []
+            
+            for tool in available_tools:
+                score = 0.0
+                
+                # Confidence score (0-1)
+                score += tool.get('confidence', 0.0) * 0.4
+                
+                # Success rate score (0-1)
+                score += tool.get('success_rate', 0.0) * 0.3
+                
+                # Usage experience score (0-1)
+                usage_count = tool.get('usage_count', 0)
+                experience_score = min(1.0, usage_count / 10.0)  # Cap at 10 uses
+                score += experience_score * 0.2
+                
+                # Capability match score (0-1)
+                task_terms = set(task_description.lower().split())
+                capability_terms = set()
+                for capability in tool.get('capabilities', []):
+                    capability_terms.update(capability.lower().split())
+                
+                if capability_terms:
+                    match_score = len(task_terms & capability_terms) / max(1, len(task_terms))
+                    score += match_score * 0.1
+                
+                scored_tools.append({
+                    **tool,
+                    'optimization_score': score
+                })
+            
+            # Sort by optimization score
+            scored_tools.sort(key=lambda x: x['optimization_score'], reverse=True)
+            
+            # Return top tools with usage recommendations
+            optimized_tools = []
+            for tool in scored_tools[:3]:  # Top 3 tools
+                recommendation = {
+                    **tool,
+                    'recommended_usage': self._generate_usage_recommendation(tool, task_description)
+                }
+                optimized_tools.append(recommendation)
+            
+            logger.info(f"Agent {self.agent_id} optimized {len(optimized_tools)} tools for task")
+            return optimized_tools
+            
+        except Exception as e:
+            logger.error(f"Tool optimization failed for agent {self.agent_id}: {e}")
+            return available_tools
+    
+    def _generate_usage_recommendation(self, tool: Dict[str, Any], task_description: str) -> str:
+        """Generate usage recommendation for a tool."""
+        confidence = tool.get('confidence', 0.0)
+        success_rate = tool.get('success_rate', 0.0)
+        
+        if confidence > 0.8 and success_rate > 0.8:
+            return "Primary tool - high confidence and success rate"
+        elif confidence > 0.6 and success_rate > 0.6:
+            return "Secondary tool - good confidence and success rate"
+        elif confidence > 0.4:
+            return "Fallback tool - moderate confidence"
+        else:
+            return "Experimental tool - low confidence, use with caution"
+    
     def __str__(self) -> str:
         return f"Agent({self.agent_id}, {self.role})"
     
