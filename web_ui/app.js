@@ -76,6 +76,12 @@ class AIResearchLabApp {
         this.socket.on('activity_log', (data) => {
             this.addActivityLogEntry(data);
         });
+        this.socket.on('chat_log', (data) => {
+            this.addChatLogEntry(data);
+        });
+        this.socket.on('meeting', (data) => {
+            this.addMeetingEntry(data);
+        });
     }
     
     // ========================================
@@ -88,6 +94,7 @@ class AIResearchLabApp {
         this.initializeAgentVisualization();
         this.initializeProgressTracking();
         this.initializeActivityLog();
+        this.initializeChatLogs();
         this.initializeSettings();
         this.initializeConstraints();
     }
@@ -173,6 +180,27 @@ class AIResearchLabApp {
         });
     }
     
+    initializeChatLogs() {
+        const clearBtn = document.getElementById('clearChatLogsBtn');
+        const exportBtn = document.getElementById('exportChatLogsBtn');
+        const typeFilter = document.getElementById('chatLogType');
+        
+        clearBtn.addEventListener('click', () => {
+            this.clearChatLogs();
+        });
+        
+        exportBtn.addEventListener('click', () => {
+            this.exportChatLogs();
+        });
+        
+        typeFilter.addEventListener('change', () => {
+            this.filterChatLogs(typeFilter.value);
+        });
+        
+        // Load existing chat logs
+        this.loadChatLogs();
+    }
+    
     initializeSettings() {
         const settingsBtn = document.getElementById('settingsBtn');
         const closeBtn = document.getElementById('closeSettingsBtn');
@@ -214,12 +242,100 @@ class AIResearchLabApp {
             });
         });
         
+        // API key test buttons
+        const testButtons = document.querySelectorAll('.test-key');
+        testButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.testApiKey(btn);
+            });
+        });
+        
         // Modal click outside to close
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 this.hideSettingsModal();
             }
         });
+    }
+    
+    async testApiKey(button) {
+        const provider = button.dataset.provider;
+        const inputId = this.getInputIdForProvider(provider);
+        const input = document.getElementById(inputId);
+        const apiKey = input.value.trim();
+        
+        if (!apiKey) {
+            this.showNotification('error', 'Error', `Please enter a ${provider} API key first`);
+            return;
+        }
+        
+        // Update button state
+        button.classList.add('testing');
+        const icon = button.querySelector('i');
+        icon.className = 'fas fa-spinner fa-spin';
+        
+        try {
+            const response = await fetch('/api/config/test', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    provider: provider,
+                    api_key: apiKey
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.valid) {
+                button.classList.remove('testing');
+                button.classList.add('valid');
+                icon.className = 'fas fa-check';
+                this.showNotification('success', 'API Key Valid', result.message);
+            } else {
+                button.classList.remove('testing');
+                button.classList.add('invalid');
+                icon.className = 'fas fa-times';
+                this.showNotification('error', 'Invalid API Key', result.message);
+            }
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                button.classList.remove('valid', 'invalid');
+                icon.className = 'fas fa-check';
+            }, 3000);
+            
+        } catch (error) {
+            console.error('Error testing API key:', error);
+            button.classList.remove('testing');
+            button.classList.add('invalid');
+            icon.className = 'fas fa-times';
+            this.showNotification('error', 'Error', 'Failed to test API key');
+            
+            // Reset button after 3 seconds
+            setTimeout(() => {
+                button.classList.remove('invalid');
+                icon.className = 'fas fa-check';
+            }, 3000);
+        }
+    }
+    
+    getInputIdForProvider(provider) {
+        const mapping = {
+            'openai': 'openaiKey',
+            'anthropic': 'anthropicKey',
+            'gemini': 'geminiKey',
+            'huggingface': 'huggingfaceKey',
+            'ollama': 'ollamaEndpoint',
+            'google_search': 'googleSearchKey',
+            'google_search_engine': 'googleSearchEngineId',
+            'serpapi': 'serpapiKey',
+            'semantic_scholar': 'semanticScholarKey',
+            'openalex': 'openalexEmail',
+            'core': 'coreKey'
+        };
+        return mapping[provider];
     }
     
     // ========================================
@@ -661,6 +777,123 @@ class AIResearchLabApp {
     }
     
     // ========================================
+    // Chat Logs
+    // ========================================
+    
+    async loadChatLogs() {
+        try {
+            const response = await fetch('/api/chat-logs');
+            const data = await response.json();
+            
+            if (data.logs) {
+                data.logs.forEach(log => {
+                    this.addChatLogEntry(log);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading chat logs:', error);
+        }
+    }
+    
+    addChatLogEntry(data) {
+        const chatStream = document.getElementById('chatStream');
+        const entry = document.createElement('div');
+        entry.className = `chat-item ${data.type || 'system'}`;
+        
+        const timeString = new Date(data.timestamp * 1000).toLocaleTimeString();
+        
+        entry.innerHTML = `
+            <div class="chat-avatar">
+                ${this.getChatIcon(data.type || 'system')}
+            </div>
+            <div class="chat-content">
+                <div class="chat-header">
+                    <span class="chat-author">${data.author || 'System'}</span>
+                    <span class="chat-type">${data.type || 'system'}</span>
+                    <span class="chat-time">${timeString}</span>
+                </div>
+                <div class="chat-message">${data.message}</div>
+            </div>
+        `;
+        
+        chatStream.appendChild(entry);
+        chatStream.scrollTop = chatStream.scrollHeight;
+        
+        // Remove old entries if too many
+        while (chatStream.children.length > 200) {
+            chatStream.removeChild(chatStream.firstChild);
+        }
+    }
+    
+    getChatIcon(type) {
+        const icons = {
+            thought: '<i class="fas fa-brain"></i>',
+            choice: '<i class="fas fa-check-circle"></i>',
+            communication: '<i class="fas fa-comments"></i>',
+            tool_call: '<i class="fas fa-wrench"></i>',
+            system: '<i class="fas fa-cog"></i>'
+        };
+        
+        return icons[type] || icons.system;
+    }
+    
+    clearChatLogs() {
+        const chatStream = document.getElementById('chatStream');
+        chatStream.innerHTML = '';
+    }
+    
+    exportChatLogs() {
+        const logs = Array.from(document.querySelectorAll('.chat-item')).map(item => {
+            const author = item.querySelector('.chat-author').textContent;
+            const type = item.querySelector('.chat-type').textContent;
+            const time = item.querySelector('.chat-time').textContent;
+            const message = item.querySelector('.chat-message').textContent;
+            return `[${time}] [${type}] ${author}: ${message}`;
+        });
+        
+        const blob = new Blob([logs.join('\n')], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `chat_logs_${new Date().toISOString().split('T')[0]}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+    
+    filterChatLogs(type) {
+        const chatItems = document.querySelectorAll('.chat-item');
+        chatItems.forEach(item => {
+            if (!type || item.classList.contains(type)) {
+                item.style.display = 'flex';
+            } else {
+                item.style.display = 'none';
+            }
+        });
+    }
+    
+    // ========================================
+    // Meetings
+    // ========================================
+    
+    addMeetingEntry(data) {
+        // Add to activity log
+        this.addActivityLogEntry({
+            type: 'meeting',
+            author: 'System',
+            message: `Meeting: ${data.topic} (${data.participants} participants)`,
+            timestamp: data.timestamp
+        });
+        
+        // Add to chat log
+        this.addChatLogEntry({
+            type: 'communication',
+            author: 'Meeting',
+            message: `Meeting started: ${data.topic} with ${data.participants} participants`,
+            timestamp: data.timestamp
+        });
+    }
+    
+    // ========================================
     // Configuration Management
     // ========================================
     
@@ -676,6 +909,31 @@ class AIResearchLabApp {
     }
     
     populateConfigForm(config) {
+        // Populate API keys
+        if (config.api_keys) {
+            document.getElementById('openaiKey').value = config.api_keys.openai || '';
+            document.getElementById('anthropicKey').value = config.api_keys.anthropic || '';
+            document.getElementById('geminiKey').value = config.api_keys.gemini || '';
+            document.getElementById('huggingfaceKey').value = config.api_keys.huggingface || '';
+            document.getElementById('ollamaEndpoint').value = config.api_keys.ollama_endpoint || 'http://localhost:11434';
+        }
+        
+        // Populate search API keys
+        if (config.search_api_keys) {
+            document.getElementById('googleSearchKey').value = config.search_api_keys.google_search || '';
+            document.getElementById('googleSearchEngineId').value = config.search_api_keys.google_search_engine_id || '';
+            document.getElementById('serpapiKey').value = config.search_api_keys.serpapi || '';
+            document.getElementById('semanticScholarKey').value = config.search_api_keys.semantic_scholar || '';
+            document.getElementById('openalexEmail').value = config.search_api_keys.openalex_email || '';
+            document.getElementById('coreKey').value = config.search_api_keys.core || '';
+        }
+        
+        // Populate framework settings
+        if (config.framework) {
+            document.getElementById('defaultProvider').value = config.framework.default_llm_provider || 'openai';
+            document.getElementById('defaultModel').value = config.framework.default_model || 'gpt-4';
+        }
+        
         // Populate system settings
         if (config.system) {
             document.getElementById('outputDir').value = config.system.output_dir || '';
@@ -684,16 +942,89 @@ class AIResearchLabApp {
             document.getElementById('enableNotifications').checked = config.system.enable_notifications || false;
         }
         
-        // Show API key status
-        if (config.api_keys_configured) {
-            const openaiIndicator = document.createElement('span');
-            openaiIndicator.textContent = config.api_keys_configured.openai ? ' ✓' : ' ✗';
-            openaiIndicator.style.color = config.api_keys_configured.openai ? 'green' : 'red';
-            
-            const anthropicIndicator = document.createElement('span');
-            anthropicIndicator.textContent = config.api_keys_configured.anthropic ? ' ✓' : ' ✗';
-            anthropicIndicator.style.color = config.api_keys_configured.anthropic ? 'green' : 'red';
+        // Populate free options
+        if (config.free_options) {
+            document.getElementById('enableFreeSearch').checked = config.free_options.enable_free_search !== false;
+            document.getElementById('enableMockResponses').checked = config.free_options.enable_mock_responses !== false;
         }
+        
+        // Update API key status indicators
+        this.updateApiKeyStatuses(config.api_keys_configured);
+        this.updateSearchApiKeyStatuses(config.search_api_keys_configured);
+        
+        // Update available providers
+        this.updateAvailableProviders(config.available_providers || []);
+    }
+    
+    updateApiKeyStatuses(apiKeysConfigured) {
+        const statusElements = {
+            openai: document.getElementById('openaiStatus'),
+            anthropic: document.getElementById('anthropicStatus'),
+            gemini: document.getElementById('geminiStatus'),
+            huggingface: document.getElementById('huggingfaceStatus'),
+            ollama: document.getElementById('ollamaStatus')
+        };
+        
+        Object.entries(statusElements).forEach(([provider, element]) => {
+            if (element) {
+                const isConfigured = apiKeysConfigured[provider];
+                element.textContent = isConfigured ? '✓ Configured' : '✗ Not configured';
+                element.className = `key-status ${isConfigured ? 'valid' : 'invalid'}`;
+            }
+        });
+    }
+    
+    updateSearchApiKeyStatuses(searchApiKeysConfigured) {
+        const statusElements = {
+            google_search: document.getElementById('googleSearchStatus'),
+            google_search_engine_id: document.getElementById('googleSearchEngineIdStatus'),
+            serpapi: document.getElementById('serpapiStatus'),
+            semantic_scholar: document.getElementById('semanticScholarStatus'),
+            openalex_email: document.getElementById('openalexStatus'),
+            core: document.getElementById('coreStatus')
+        };
+        
+        Object.entries(statusElements).forEach(([provider, element]) => {
+            if (element) {
+                const isConfigured = searchApiKeysConfigured[provider];
+                element.textContent = isConfigured ? '✓ Configured' : '✗ Not configured';
+                element.className = `key-status ${isConfigured ? 'valid' : 'invalid'}`;
+            }
+        });
+    }
+    
+    updateAvailableProviders(providers) {
+        const defaultProviderSelect = document.getElementById('defaultProvider');
+        const currentValue = defaultProviderSelect.value;
+        
+        // Clear existing options
+        defaultProviderSelect.innerHTML = '';
+        
+        // Add available providers
+        providers.forEach(provider => {
+            const option = document.createElement('option');
+            option.value = provider;
+            option.textContent = this.getProviderDisplayName(provider);
+            defaultProviderSelect.appendChild(option);
+        });
+        
+        // Restore previous selection if still available
+        if (providers.includes(currentValue)) {
+            defaultProviderSelect.value = currentValue;
+        } else if (providers.length > 0) {
+            defaultProviderSelect.value = providers[0];
+        }
+    }
+    
+    getProviderDisplayName(provider) {
+        const names = {
+            openai: 'OpenAI (GPT-4)',
+            anthropic: 'Anthropic (Claude)',
+            gemini: 'Google (Gemini)',
+            huggingface: 'HuggingFace',
+            ollama: 'Ollama (Local)'
+        };
+        return names[provider] || provider;
     }
     
     showSettingsModal() {
@@ -710,15 +1041,48 @@ class AIResearchLabApp {
         const config = {
             api_keys: {
                 openai: document.getElementById('openaiKey').value,
-                anthropic: document.getElementById('anthropicKey').value
+                anthropic: document.getElementById('anthropicKey').value,
+                gemini: document.getElementById('geminiKey').value,
+                huggingface: document.getElementById('huggingfaceKey').value,
+                ollama_endpoint: document.getElementById('ollamaEndpoint').value
+            },
+            search_api_keys: {
+                google_search: document.getElementById('googleSearchKey').value,
+                google_search_engine_id: document.getElementById('googleSearchEngineId').value,
+                serpapi: document.getElementById('serpapiKey').value,
+                semantic_scholar: document.getElementById('semanticScholarKey').value,
+                openalex_email: document.getElementById('openalexEmail').value,
+                core: document.getElementById('coreKey').value
+            },
+            framework: {
+                default_llm_provider: document.getElementById('defaultProvider').value,
+                default_model: document.getElementById('defaultModel').value
             },
             system: {
                 output_dir: document.getElementById('outputDir').value,
                 max_concurrent_agents: parseInt(document.getElementById('maxConcurrentAgents').value),
                 auto_save_results: document.getElementById('autoSaveResults').checked,
                 enable_notifications: document.getElementById('enableNotifications').checked
+            },
+            free_options: {
+                enable_free_search: document.getElementById('enableFreeSearch').checked,
+                enable_mock_responses: document.getElementById('enableMockResponses').checked
             }
         };
+        
+        // Validate API keys
+        const validationErrors = this.validateApiKeys(config.api_keys);
+        if (validationErrors.length > 0) {
+            this.showNotification('error', 'Validation Error', validationErrors.join('\n'));
+            return;
+        }
+
+        // Validate search API keys
+        const searchValidationErrors = this.validateSearchApiKeys(config.search_api_keys);
+        if (searchValidationErrors.length > 0) {
+            this.showNotification('error', 'Validation Error', searchValidationErrors.join('\n'));
+            return;
+        }
         
         try {
             const response = await fetch('/api/config', {
@@ -735,6 +1099,9 @@ class AIResearchLabApp {
                 this.hideSettingsModal();
                 this.showNotification('success', 'Settings Saved', result.message);
                 this.systemConfig = { ...this.systemConfig, ...config };
+                this.updateApiKeyStatuses(result.api_keys_configured);
+                this.updateSearchApiKeyStatuses(result.search_api_keys_configured);
+                this.updateAvailableProviders(result.available_providers || []);
             } else {
                 this.showNotification('error', 'Error', result.error);
             }
@@ -742,6 +1109,67 @@ class AIResearchLabApp {
             console.error('Error saving settings:', error);
             this.showNotification('error', 'Error', 'Failed to save settings');
         }
+    }
+    
+    validateApiKeys(apiKeys) {
+        const errors = [];
+        
+        // Validate OpenAI key format
+        if (apiKeys.openai && !apiKeys.openai.startsWith('sk-')) {
+            errors.push('OpenAI API key should start with "sk-"');
+        }
+        
+        // Validate Anthropic key format
+        if (apiKeys.anthropic && !apiKeys.anthropic.startsWith('sk-ant-')) {
+            errors.push('Anthropic API key should start with "sk-ant-"');
+        }
+        
+        // Validate Gemini key format
+        if (apiKeys.gemini && !apiKeys.gemini.startsWith('AIza')) {
+            errors.push('Google Gemini API key should start with "AIza"');
+        }
+        
+        // Validate HuggingFace key format
+        if (apiKeys.huggingface && !apiKeys.huggingface.startsWith('hf_')) {
+            errors.push('HuggingFace API key should start with "hf_"');
+        }
+        
+        // Validate Ollama endpoint format
+        if (apiKeys.ollama_endpoint && !apiKeys.ollama_endpoint.startsWith('http')) {
+            errors.push('Ollama endpoint should be a valid HTTP URL');
+        }
+        
+        return errors;
+    }
+
+    validateSearchApiKeys(searchApiKeys) {
+        const errors = [];
+
+        if (searchApiKeys.google_search && !searchApiKeys.google_search.startsWith('AIza')) {
+            errors.push('Google Search API key should start with "AIza"');
+        }
+
+        if (searchApiKeys.google_search_engine_id && !searchApiKeys.google_search_engine_id.startsWith('01')) {
+            errors.push('Google Search Engine ID should start with "01"');
+        }
+
+        if (searchApiKeys.serpapi && searchApiKeys.serpapi.length < 10) {
+            errors.push('SerpAPI key should be at least 10 characters long');
+        }
+
+        if (searchApiKeys.semantic_scholar && !searchApiKeys.semantic_scholar.startsWith('hf_')) {
+            errors.push('Semantic Scholar API key should start with "hf_"');
+        }
+
+        if (searchApiKeys.openalex_email && !searchApiKeys.openalex_email.includes('@')) {
+            errors.push('OpenAlex email should be a valid email address');
+        }
+
+        if (searchApiKeys.core && !searchApiKeys.core.startsWith('sk-')) {
+            errors.push('Core API key should start with "sk-"');
+        }
+
+        return errors;
     }
     
     // ========================================

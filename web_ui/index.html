@@ -51,6 +51,10 @@
                         <i class="fas fa-comments"></i>
                         <span>Activity Log</span>
                     </button>
+                    <button class="nav-item" data-panel="chat-logs">
+                        <i class="fas fa-brain"></i>
+                        <span>Chat Log</span>
+                    </button>
                     <button class="nav-item" data-panel="metrics">
                         <i class="fas fa-analytics"></i>
                         <span>Metrics</span>
@@ -277,6 +281,49 @@
                     </div>
                 </section>
 
+                <!-- Chat Logs Panel -->
+                <section class="panel" id="chat-logs-panel">
+                    <div class="panel-header">
+                        <h2>Chat Log</h2>
+                        <div class="chat-controls">
+                            <select id="chatLogType">
+                                <option value="">All Types</option>
+                                <option value="thought">Thoughts</option>
+                                <option value="choice">Choices</option>
+                                <option value="communication">Communications</option>
+                                <option value="tool_call">Tool Calls</option>
+                                <option value="system">System</option>
+                            </select>
+                            <button class="btn btn-ghost" id="clearChatLogsBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportChatLogsBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-stream" id="chatStream">
+                        <div class="chat-item system">
+                            <div class="chat-avatar">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                            <div class="chat-content">
+                                <div class="chat-header">
+                                    <span class="chat-author">System</span>
+                                    <span class="chat-type">system</span>
+                                    <span class="chat-time">Just now</span>
+                                </div>
+                                <div class="chat-message">
+                                    Chat log initialized. All thoughts, choices, and communications will be displayed here.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Metrics Panel -->
                 <section class="panel" id="metrics-panel">
                     <div class="panel-header">
@@ -362,22 +409,189 @@
                 <div class="modal-content">
                     <div class="settings-section">
                         <h3>API Configuration</h3>
-                        <div class="form-group">
-                            <label for="openaiKey">OpenAI API Key</label>
-                            <div class="key-input">
-                                <input type="password" id="openaiKey" placeholder="sk-...">
-                                <button class="btn btn-ghost toggle-key" data-target="openaiKey">
-                                    <i class="fas fa-eye"></i>
-                                </button>
+                        <div class="api-keys-grid">
+                            <div class="form-group">
+                                <label for="openaiKey">OpenAI API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="openaiKey" placeholder="sk-...">
+                                    <button class="btn btn-ghost toggle-key" data-target="openaiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="openai">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="openaiStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="anthropicKey">Anthropic API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="anthropicKey" placeholder="sk-ant-...">
+                                    <button class="btn btn-ghost toggle-key" data-target="anthropicKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="anthropic">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="anthropicStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="geminiKey">Google Gemini API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="geminiKey" placeholder="AIza...">
+                                    <button class="btn btn-ghost toggle-key" data-target="geminiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="gemini">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="geminiStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="huggingfaceKey">HuggingFace API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="huggingfaceKey" placeholder="hf_...">
+                                    <button class="btn btn-ghost toggle-key" data-target="huggingfaceKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="huggingface">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="huggingfaceStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="ollamaEndpoint">Ollama Endpoint</label>
+                                <div class="key-input">
+                                    <input type="text" id="ollamaEndpoint" placeholder="http://localhost:11434">
+                                    <button class="btn btn-ghost test-key" data-provider="ollama">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="ollamaStatus"></div>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label for="anthropicKey">Anthropic API Key</label>
-                            <div class="key-input">
-                                <input type="password" id="anthropicKey" placeholder="sk-ant-...">
-                                <button class="btn btn-ghost toggle-key" data-target="anthropicKey">
-                                    <i class="fas fa-eye"></i>
-                                </button>
+                        
+                        <div class="provider-selection">
+                            <h4>Default LLM Provider</h4>
+                            <div class="form-group">
+                                <label for="defaultProvider">Primary Provider</label>
+                                <select id="defaultProvider">
+                                    <option value="openai">OpenAI (GPT-4)</option>
+                                    <option value="anthropic">Anthropic (Claude)</option>
+                                    <option value="gemini">Google (Gemini)</option>
+                                    <option value="huggingface">HuggingFace</option>
+                                    <option value="ollama">Ollama (Local)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="defaultModel">Default Model</label>
+                                <input type="text" id="defaultModel" placeholder="gpt-4" value="gpt-4">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>Search API Configuration</h3>
+                        <div class="search-keys-grid">
+                            <div class="form-group">
+                                <label for="googleSearchKey">Google Search API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="googleSearchKey" placeholder="AIza...">
+                                    <button class="btn btn-ghost toggle-key" data-target="googleSearchKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="google_search">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="googleSearchStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="googleSearchEngineId">Google Search Engine ID</label>
+                                <div class="key-input">
+                                    <input type="text" id="googleSearchEngineId" placeholder="012345678901234567890:abcdefghijk">
+                                    <button class="btn btn-ghost test-key" data-provider="google_search_engine">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="googleSearchEngineStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="serpapiKey">SerpAPI Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="serpapiKey" placeholder="...">
+                                    <button class="btn btn-ghost toggle-key" data-target="serpapiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="serpapi">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="serpapiStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="semanticScholarKey">Semantic Scholar API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="semanticScholarKey" placeholder="...">
+                                    <button class="btn btn-ghost toggle-key" data-target="semanticScholarKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="semantic_scholar">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="semanticScholarStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="openalexEmail">OpenAlex Email</label>
+                                <div class="key-input">
+                                    <input type="email" id="openalexEmail" placeholder="your@email.com">
+                                    <button class="btn btn-ghost test-key" data-provider="openalex">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="openalexStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="coreKey">CORE API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="coreKey" placeholder="...">
+                                    <button class="btn btn-ghost toggle-key" data-target="coreKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="core">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="coreStatus"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="free-options">
+                            <h4>Free Options</h4>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enableFreeSearch" checked>
+                                    Enable free search (uses mock data when APIs unavailable)
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enableMockResponses" checked>
+                                    Enable mock responses for testing
+                                </label>
                             </div>
                         </div>
                     </div>
@@ -419,6 +633,7 @@
         </div>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
