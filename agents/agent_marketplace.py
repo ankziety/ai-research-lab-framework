@@ -11,14 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 class GeneralExpertAgent(BaseAgent):
-    """
-    General expert agent that can be configured for any domain.
-    Uses default implementations from BaseAgent.
-    """
+    """General expert agent that can adapt to various research domains."""
     
     def __init__(self, agent_id: str, role: str, expertise: List[str], 
-                 model_config: Optional[Dict[str, Any]] = None):
-        super().__init__(agent_id, role, expertise, model_config)
+                 model_config: Optional[Dict[str, Any]] = None, cost_manager=None):
+        super().__init__(agent_id, role, expertise, model_config, cost_manager)
 
 
 class AgentMarketplace:
@@ -26,12 +23,13 @@ class AgentMarketplace:
     Marketplace that manages a pool of expert agents and handles hiring decisions.
     """
     
-    def __init__(self, llm_config: Optional[Dict[str, Any]] = None):
+    def __init__(self, llm_config: Optional[Dict[str, Any]] = None, cost_manager=None):
         self.available_agents = {}
         self.hired_agents = {}
         self.agent_registry = {}
         self.hiring_history = []
         self.llm_config = llm_config or {}
+        self.cost_manager = cost_manager
         
         # Initialize default agents
         self._initialize_default_agents()
@@ -40,7 +38,7 @@ class AgentMarketplace:
     
     def _create_expert_agent(self, agent_id: str, role: str, expertise: List[str]):
         """Create a general expert agent with specified role and expertise."""
-        return GeneralExpertAgent(agent_id, role, expertise, self.llm_config)
+        return GeneralExpertAgent(agent_id, role, expertise, self.llm_config, self.cost_manager)
     
     def _initialize_default_agents(self):
         """Initialize a general set of versatile expert agents."""

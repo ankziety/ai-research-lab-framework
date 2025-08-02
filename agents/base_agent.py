@@ -19,7 +19,7 @@ class BaseAgent:
     """
     
     def __init__(self, agent_id: str, role: str, expertise: List[str], 
-                 model_config: Optional[Dict[str, Any]] = None):
+                 model_config: Optional[Dict[str, Any]] = None, cost_manager=None):
         """
         Initialize base agent.
         
@@ -28,11 +28,13 @@ class BaseAgent:
             role: The agent's role (e.g., "Ophthalmology Expert")
             expertise: List of expertise domains
             model_config: Configuration for the underlying LLM
+            cost_manager: Optional cost manager for tracking API usage
         """
         self.agent_id = agent_id
         self.role = role
         self.expertise = expertise
         self.model_config = model_config or {}
+        self.cost_manager = cost_manager
         self.performance_metrics = {
             'tasks_completed': 0,
             'success_rate': 0.0,
@@ -78,10 +80,18 @@ class BaseAgent:
         This will ensure your response is well-structured and easy to read.
         """
         
+        # Add agent context for cost tracking
+        context_with_agent = {
+            **context,
+            'agent_id': self.agent_id,
+            'task_type': context.get('task_type', 'general')
+        }
+        
         return self.llm_client.generate_response(
             specialized_prompt, 
-            context, 
-            agent_role=self.role
+            context_with_agent, 
+            agent_role=self.role,
+            cost_manager=self.cost_manager
         )
     
     def assess_task_relevance(self, task_description: str) -> float:
