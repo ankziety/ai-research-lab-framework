@@ -39,6 +39,7 @@ class MeetingType(Enum):
 class ResearchPhase(Enum):
     """Structured research phases inspired by the Virtual Lab paper."""
     TEAM_SELECTION = "team_selection"
+    LITERATURE_REVIEW = "literature_review"
     PROJECT_SPECIFICATION = "project_specification"  
     TOOLS_SELECTION = "tools_selection"
     TOOLS_IMPLEMENTATION = "tools_implementation"
@@ -215,6 +216,8 @@ class VirtualLabMeetingSystem:
         
         if phase == ResearchPhase.TEAM_SELECTION:
             return self._phase_team_selection(session_id, research_question, constraints)
+        elif phase == ResearchPhase.LITERATURE_REVIEW:
+            return self._phase_literature_review(session_id, research_question, constraints)
         elif phase == ResearchPhase.PROJECT_SPECIFICATION:
             return self._phase_project_specification(session_id, research_question, constraints)
         elif phase == ResearchPhase.TOOLS_SELECTION:
@@ -326,6 +329,250 @@ class VirtualLabMeetingSystem:
                 }
         
         return meeting_result
+    
+    def _phase_literature_review(self, session_id: str, research_question: str, constraints: Dict) -> Dict:
+        """Complete literature review phase with real search and analysis."""
+        
+        # Create literature review agenda
+        agenda = MeetingAgenda(
+            meeting_id=f"{session_id}_literature_review",
+            meeting_type=MeetingType.TEAM_MEETING,
+            phase=ResearchPhase.LITERATURE_REVIEW,
+            objectives=[
+                "Conduct comprehensive literature search",
+                "Analyze existing research and identify gaps",
+                "Synthesize key findings and insights",
+                "Refine research direction based on literature"
+            ],
+            participants=[self.pi_agent.agent_id],
+            discussion_topics=[
+                "Literature search strategy",
+                "Key paper analysis",
+                "Research gap identification",
+                "Methodology insights from literature"
+            ],
+            expected_outcomes=[
+                "Literature synthesis report",
+                "Research gap analysis",
+                "Refined research questions",
+                "Methodology recommendations"
+            ]
+        )
+        
+        # Conduct individual meeting with PI for literature review
+        meeting_result = self._conduct_individual_meeting(agenda, research_question, constraints)
+        
+        if meeting_result['success']:
+            # Perform actual literature search
+            try:
+                from literature_retriever import LiteratureRetriever
+                literature_retriever = LiteratureRetriever(config=self.config)
+                search_results = literature_retriever.search(
+                    query=research_question,
+                    max_results=20,
+                    sources=['pubmed', 'arxiv', 'semantic_scholar', 'google_scholar']
+                )
+                
+                # Analyze literature with PI
+                literature_analysis = self._analyze_literature_with_pi(
+                    search_results, research_question, session_id
+                )
+                
+                # Extract key insights and gaps
+                literature_synthesis = self._synthesize_literature_findings(
+                    literature_analysis, search_results
+                )
+                
+                return {
+                    'success': True,
+                    'meeting_record': meeting_result['meeting_record'],
+                    'literature_search_results': search_results,
+                    'literature_analysis': literature_analysis,
+                    'literature_synthesis': literature_synthesis,
+                    'research_gaps': literature_synthesis.get('gaps', []),
+                    'refined_questions': literature_synthesis.get('refined_questions', [])
+                }
+            except Exception as e:
+                logger.error(f"Literature search failed: {e}")
+                return {
+                    'success': False,
+                    'error': f'Literature search failed: {str(e)}',
+                    'meeting_record': meeting_result['meeting_record']
+                }
+        
+        return meeting_result
+
+    def _analyze_literature_with_pi(self, search_results: List[Dict], research_question: str, session_id: str) -> Dict:
+        """Complete literature analysis with PI agent."""
+        
+        # Format literature for PI analysis
+        literature_summary = self._format_literature_for_analysis(search_results)
+        
+        analysis_prompt = f"""
+        As the Principal Investigator, analyze this literature for our research:
+        
+        Research Question: {research_question}
+        
+        Literature Summary:
+        {literature_summary}
+        
+        Please provide:
+        1. KEY_FINDINGS: Main insights from literature
+        2. RESEARCH_GAPS: Gaps in current research
+        3. METHODOLOGY_INSIGHTS: Relevant methods and approaches
+        4. REFINED_QUESTIONS: How to refine our research questions
+        5. RELEVANT_PAPERS: Most important papers for our work
+        6. CITATION_STRATEGY: How to cite and build on this work
+        """
+        
+        pi_response = self.pi_agent.generate_response(analysis_prompt, {
+            'research_question': research_question,
+            'literature_results': search_results,
+            'session_id': session_id
+        })
+        
+        return self._parse_literature_analysis_response(pi_response)
+
+    def _synthesize_literature_findings(self, analysis: Dict, search_results: List[Dict]) -> Dict:
+        """Complete literature synthesis with critic evaluation."""
+        
+        synthesis_prompt = f"""
+        Synthesize these literature findings:
+        
+        Analysis: {analysis}
+        Papers: {len(search_results)} papers analyzed
+        
+        Provide:
+        1. MAIN_INSIGHTS: Key insights from literature
+        2. RESEARCH_GAPS: Identified gaps in current research
+        3. REFINED_QUESTIONS: How to refine research questions
+        4. METHODOLOGY_RECOMMENDATIONS: Recommended approaches
+        5. CITATION_PLAN: How to cite and build on this work
+        """
+        
+        synthesis_response = self.pi_agent.generate_response(synthesis_prompt, {
+            'analysis': analysis,
+            'search_results': search_results
+        })
+        
+        return self._parse_literature_synthesis_response(synthesis_response)
+
+    def _format_literature_for_analysis(self, search_results: List[Dict]) -> str:
+        """Format literature search results for analysis."""
+        if not search_results:
+            return "No literature found for analysis."
+        
+        formatted_papers = []
+        for i, paper in enumerate(search_results[:10], 1):  # Limit to top 10 papers
+            title = paper.get('title', 'Unknown Title')
+            authors = ', '.join(paper.get('authors', ['Unknown Authors']))
+            year = paper.get('year', 'Unknown Year')
+            abstract = paper.get('abstract', 'No abstract available')
+            
+            formatted_paper = f"""
+            Paper {i}:
+            Title: {title}
+            Authors: {authors}
+            Year: {year}
+            Abstract: {abstract[:300]}{'...' if len(abstract) > 300 else ''}
+            """
+            formatted_papers.append(formatted_paper)
+        
+        return "\n".join(formatted_papers)
+
+    def _parse_literature_analysis_response(self, response: str) -> Dict:
+        """Parse PI's literature analysis response."""
+        try:
+            # Extract structured information from response
+            analysis = {
+                'key_findings': [],
+                'research_gaps': [],
+                'methodology_insights': [],
+                'refined_questions': [],
+                'relevant_papers': [],
+                'citation_strategy': ''
+            }
+            
+            # Simple parsing - in production, use more robust parsing
+            lines = response.split('\n')
+            current_section = None
+            
+            for line in lines:
+                line = line.strip()
+                if 'KEY_FINDINGS:' in line.upper():
+                    current_section = 'key_findings'
+                elif 'RESEARCH_GAPS:' in line.upper():
+                    current_section = 'research_gaps'
+                elif 'METHODOLOGY_INSIGHTS:' in line.upper():
+                    current_section = 'methodology_insights'
+                elif 'REFINED_QUESTIONS:' in line.upper():
+                    current_section = 'refined_questions'
+                elif 'RELEVANT_PAPERS:' in line.upper():
+                    current_section = 'relevant_papers'
+                elif 'CITATION_STRATEGY:' in line.upper():
+                    current_section = 'citation_strategy'
+                elif line and current_section and line.startswith('-'):
+                    item = line[1:].strip()
+                    if current_section in analysis and isinstance(analysis[current_section], list):
+                        analysis[current_section].append(item)
+                    elif current_section == 'citation_strategy':
+                        analysis['citation_strategy'] += line + '\n'
+            
+            return analysis
+        except Exception as e:
+            logger.error(f"Failed to parse literature analysis: {e}")
+            return {
+                'key_findings': ['Analysis parsing failed'],
+                'research_gaps': [],
+                'methodology_insights': [],
+                'refined_questions': [],
+                'relevant_papers': [],
+                'citation_strategy': 'Parsing failed'
+            }
+
+    def _parse_literature_synthesis_response(self, response: str) -> Dict:
+        """Parse literature synthesis response."""
+        try:
+            synthesis = {
+                'main_insights': [],
+                'gaps': [],
+                'refined_questions': [],
+                'methodology_recommendations': [],
+                'citation_plan': ''
+            }
+            
+            lines = response.split('\n')
+            current_section = None
+            
+            for line in lines:
+                line = line.strip()
+                if 'MAIN_INSIGHTS:' in line.upper():
+                    current_section = 'main_insights'
+                elif 'RESEARCH_GAPS:' in line.upper():
+                    current_section = 'gaps'
+                elif 'REFINED_QUESTIONS:' in line.upper():
+                    current_section = 'refined_questions'
+                elif 'METHODOLOGY_RECOMMENDATIONS:' in line.upper():
+                    current_section = 'methodology_recommendations'
+                elif 'CITATION_PLAN:' in line.upper():
+                    current_section = 'citation_plan'
+                elif line and current_section and line.startswith('-'):
+                    item = line[1:].strip()
+                    if current_section in synthesis and isinstance(synthesis[current_section], list):
+                        synthesis[current_section].append(item)
+                    elif current_section == 'citation_plan':
+                        synthesis['citation_plan'] += line + '\n'
+            
+            return synthesis
+        except Exception as e:
+            logger.error(f"Failed to parse literature synthesis: {e}")
+            return {
+                'main_insights': ['Synthesis parsing failed'],
+                'gaps': [],
+                'refined_questions': [],
+                'methodology_recommendations': [],
+                'citation_plan': 'Parsing failed'
+            }
     
     def _phase_project_specification(self, session_id: str, research_question: str,
                                    constraints: Dict[str, Any]) -> Dict[str, Any]:
@@ -865,15 +1112,45 @@ class VirtualLabMeetingSystem:
                 success=True
             )
             
+            # Always include critic evaluation
+            meeting_output = meeting_record.outcomes.get('meeting_output', '')
+            
+            critique_result = self.scientific_critic.critique_research_output(
+                output_content=meeting_output,
+                output_type=f"team_meeting_{agenda.phase.value}",
+                context={
+                    'research_question': research_question,
+                    'constraints': constraints,
+                    'participants': agenda.participants,
+                    'phase': agenda.phase.value
+                }
+            )
+            
+            # Integrate critic feedback into meeting outcomes
+            enhanced_outcomes = meeting_record.outcomes.copy()
+            enhanced_outcomes['critic_evaluation'] = critique_result
+            enhanced_outcomes['quality_score'] = critique_result.get('overall_score', 0)
+            enhanced_outcomes['improvement_suggestions'] = critique_result.get('suggestions', [])
+            
+            # Update meeting record with critic feedback
+            meeting_record.outcomes = enhanced_outcomes
+            
+            # Add critic feedback to decisions
+            if critique_result.get('critical_issues'):
+                meeting_record.decisions.append(
+                    f"Critic identified issues: {', '.join(critique_result['critical_issues'])}"
+                )
+            
             # Store meeting
             self.meeting_history.append(meeting_record)
             
-            logger.info(f"Team meeting {agenda.meeting_id} completed successfully")
+            logger.info(f"Team meeting {agenda.meeting_id} completed successfully with critic evaluation")
             
             return {
                 'success': True,
                 'meeting_record': meeting_record,
-                'duration': meeting_record.end_time - meeting_record.start_time
+                'duration': meeting_record.end_time - meeting_record.start_time,
+                'critic_evaluation': critique_result
             }
             
         except Exception as e:
@@ -967,15 +1244,45 @@ class VirtualLabMeetingSystem:
                 success=True
             )
             
+            # Always include critic evaluation
+            meeting_output = meeting_record.outcomes.get('analysis', '')
+            
+            critique_result = self.scientific_critic.critique_research_output(
+                output_content=meeting_output,
+                output_type=f"individual_meeting_{agenda.phase.value}",
+                context={
+                    'research_question': research_question,
+                    'constraints': constraints,
+                    'participant': agenda.participants[0] if agenda.participants else 'unknown',
+                    'phase': agenda.phase.value
+                }
+            )
+            
+            # Integrate critic feedback
+            enhanced_outcomes = meeting_record.outcomes.copy()
+            enhanced_outcomes['critic_evaluation'] = critique_result
+            enhanced_outcomes['quality_score'] = critique_result.get('overall_score', 0)
+            enhanced_outcomes['improvement_suggestions'] = critique_result.get('suggestions', [])
+            
+            # Update meeting record
+            meeting_record.outcomes = enhanced_outcomes
+            
+            # Add critic feedback to decisions
+            if critique_result.get('critical_issues'):
+                meeting_record.decisions.append(
+                    f"Critic identified issues: {', '.join(critique_result['critical_issues'])}"
+                )
+            
             # Store meeting
             self.meeting_history.append(meeting_record)
             
-            logger.info(f"Individual meeting {agenda.meeting_id} completed successfully")
+            logger.info(f"Individual meeting {agenda.meeting_id} completed successfully with critic evaluation")
             
             return {
                 'success': True,
                 'meeting_record': meeting_record,
-                'duration': meeting_record.end_time - meeting_record.start_time
+                'duration': meeting_record.end_time - meeting_record.start_time,
+                'critic_evaluation': critique_result
             }
             
         except Exception as e:

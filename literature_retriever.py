@@ -8,7 +8,8 @@ Integrates with multiple databases and provides advanced search capabilities.
 import json
 import time
 import requests
-from typing import List, Dict, Optional
+import os
+from typing import List, Dict, Optional, Any
 from urllib.parse import quote
 from datetime import datetime
 import logging
@@ -56,6 +57,9 @@ class LiteratureRetriever:
         
         # Citation tracking
         self.search_history = []
+        
+        # Validate API keys on initialization
+        self.api_key_validation = self._validate_api_keys()
         
     def search(self, query: str, max_results: int = 10, sources: List[str] = None) -> List[Dict]:
         """
@@ -130,6 +134,141 @@ class LiteratureRetriever:
         
         # Limit to max_results
         return ranked_papers[:max_results]
+    
+    def _validate_api_keys(self) -> Dict[str, Any]:
+        """Complete API key validation with real testing."""
+        
+        validation_results = {
+            'valid_keys': [],
+            'missing_keys': [],
+            'invalid_keys': [],
+            'warnings': [],
+            'recommendations': []
+        }
+        
+        # Check OpenAI API key
+        if self.config.get('openai_api_key') or os.getenv('OPENAI_API_KEY'):
+            if self._test_openai_api():
+                validation_results['valid_keys'].append('openai')
+            else:
+                validation_results['invalid_keys'].append('openai')
+                validation_results['warnings'].append('OpenAI API key is invalid or expired')
+        else:
+            validation_results['missing_keys'].append('openai')
+            validation_results['warnings'].append('OpenAI API key missing - AI features will use mock responses')
+        
+        # Check Google Search API key
+        if self.config.get('google_search_api_key') or os.getenv('GOOGLE_SEARCH_API_KEY'):
+            if self._test_google_search_api():
+                validation_results['valid_keys'].append('google_search')
+            else:
+                validation_results['invalid_keys'].append('google_search')
+                validation_results['warnings'].append('Google Search API key is invalid')
+        else:
+            validation_results['missing_keys'].append('google_search')
+            validation_results['warnings'].append('Google Search API key missing - web search will use mock data')
+        
+        # Check other API keys
+        api_keys_to_check = [
+            ('serpapi_key', 'serpapi', 'Google Scholar search'),
+            ('semantic_scholar_api_key', 'semantic_scholar', 'Semantic Scholar search'),
+            ('openalex_email', 'openalex', 'OpenAlex search'),
+            ('core_api_key', 'core', 'CORE repository search')
+        ]
+        
+        for config_key, service_name, description in api_keys_to_check:
+            if self.config.get(config_key) or os.getenv(config_key.upper()):
+                if self._test_api_key(service_name, config_key):
+                    validation_results['valid_keys'].append(service_name)
+                else:
+                    validation_results['invalid_keys'].append(service_name)
+                    validation_results['warnings'].append(f'{description} API key is invalid')
+            else:
+                validation_results['missing_keys'].append(service_name)
+                validation_results['warnings'].append(f'{description} API key missing')
+        
+        # Generate recommendations
+        if validation_results['missing_keys']:
+            validation_results['recommendations'].append(
+                'Consider adding API keys for enhanced functionality'
+            )
+        
+        if validation_results['invalid_keys']:
+            validation_results['recommendations'].append(
+                'Check and update invalid API keys'
+            )
+        
+        # Log validation results
+        if validation_results['warnings']:
+            for warning in validation_results['warnings']:
+                logger.warning(warning)
+        
+        return validation_results
+
+    def _test_openai_api(self) -> bool:
+        """Test OpenAI API key functionality."""
+        try:
+            import openai
+            client = openai.OpenAI(api_key=self.config.get('openai_api_key') or os.getenv('OPENAI_API_KEY'))
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": "Test"}],
+                max_tokens=5
+            )
+            return True
+        except Exception as e:
+            logger.error(f"OpenAI API test failed: {e}")
+            return False
+
+    def _test_google_search_api(self) -> bool:
+        """Test Google Search API key functionality."""
+        try:
+            api_key = self.config.get('google_search_api_key') or os.getenv('GOOGLE_SEARCH_API_KEY')
+            engine_id = self.config.get('google_search_engine_id') or os.getenv('GOOGLE_SEARCH_ENGINE_ID')
+            
+            if not api_key or not engine_id:
+                return False
+            
+            test_url = f"{self.google_search_url}?key={api_key}&cx={engine_id}&q=test"
+            response = requests.get(test_url, timeout=10)
+            return response.status_code == 200
+        except Exception as e:
+            logger.error(f"Google Search API test failed: {e}")
+            return False
+
+    def _test_api_key(self, service_name: str, config_key: str) -> bool:
+        """Test API key functionality for various services."""
+        try:
+            api_key = self.config.get(config_key) or os.getenv(config_key.upper())
+            if not api_key:
+                return False
+            
+            # Service-specific tests
+            if service_name == 'semantic_scholar':
+                test_url = f"{self.semantic_scholar_url}?query=test&limit=1"
+                headers = {'x-api-key': api_key} if api_key else {}
+                response = requests.get(test_url, headers=headers, timeout=10)
+                return response.status_code == 200
+            
+            elif service_name == 'openalex':
+                test_url = f"{self.openalex_url}?search=test&per_page=1"
+                response = requests.get(test_url, timeout=10)
+                return response.status_code == 200
+            
+            elif service_name == 'core':
+                test_url = f"{self.core_url}"
+                headers = {'Authorization': f'Bearer {api_key}'}
+                response = requests.post(test_url, headers=headers, json={'q': 'test', 'limit': 1}, timeout=10)
+                return response.status_code == 200
+            
+            return True
+        except Exception as e:
+            logger.error(f"{service_name} API test failed: {e}")
+            return False
+
+    def get_api_key_status(self) -> Dict[str, Any]:
+        """Get current API key validation status."""
+        return self.api_key_validation
     
     def _search_pubmed(self, query: str, max_results: int) -> List[Dict]:
         """
