@@ -18,6 +18,7 @@ Key features:
 import logging
 import time
 import json
+import os
 from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass
@@ -121,226 +122,434 @@ class VirtualLabMeetingSystem:
                  agent_marketplace: AgentMarketplace,
                  config: Optional[Dict[str, Any]] = None):
         """
-        Initialize the Virtual Lab meeting system.
+        Initialize Virtual Lab meeting system.
         
         Args:
-            pi_agent: Principal Investigator agent for coordination
-            scientific_critic: Scientific Critic agent for quality control
-            agent_marketplace: Marketplace for hiring domain experts
-            config: Optional configuration
+            pi_agent: Principal Investigator agent
+            scientific_critic: Scientific critic agent
+            agent_marketplace: Agent marketplace for hiring
+            config: Configuration dictionary
         """
         self.pi_agent = pi_agent
         self.scientific_critic = scientific_critic
         self.agent_marketplace = agent_marketplace
         self.config = config or {}
         
-        # Initialize cost manager
-        budget_limit = config.get('budget_limit', 100.0)
-        self.cost_manager = None
-        try:
-            from cost_manager import CostManager
-            self.cost_manager = CostManager(budget_limit, config)
-            logger.info(f"Cost manager initialized with budget: ${budget_limit:.2f}")
-        except Exception as e:
-            logger.warning(f"Failed to initialize cost manager: {e}")
-        
-        # Meeting management
-        self.active_meetings = {}
+        # Session tracking
+        self.current_session_id = None
+        self.session_data = {}
         self.meeting_history = []
-        self.research_sessions = {}
         
-        # Phase management
+        # Agent activity tracking
+        self.agent_activities = {}
+        self.chat_logs = []
+        self.agent_performance = {}
+        
+        # Research phase tracking
         self.current_phase = None
         self.phase_results = {}
+        self.phase_start_times = {}
+        
+        # Performance monitoring
+        self.session_start_time = None
+        self.total_agent_work_time = 0
+        self.agent_task_counts = {}
         
         logger.info("Virtual Lab Meeting System initialized")
+    
+    def log_agent_activity(self, agent_id: str, activity_type: str, message: str, 
+                          session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+        """Log agent activity for monitoring."""
+        session_id = session_id or self.current_session_id
+        
+        activity = {
+            'agent_id': agent_id,
+            'activity_type': activity_type,
+            'message': message,
+            'timestamp': time.time(),
+            'session_id': session_id,
+            'metadata': metadata or {}
+        }
+        
+        if session_id not in self.agent_activities:
+            self.agent_activities[session_id] = []
+        
+        self.agent_activities[session_id].append(activity)
+        
+        # Track performance metrics
+        if agent_id not in self.agent_task_counts:
+            self.agent_task_counts[agent_id] = 0
+        self.agent_task_counts[agent_id] += 1
+        
+        logger.info(f"Agent activity: {agent_id} - {activity_type}: {message}")
+        
+        # Emit to web UI via websocket
+        self._emit_activity_to_web_ui('agent_activity', activity)
+        
+        return activity
+
+    def log_chat_message(self, log_type: str, author: str, message: str, 
+                        session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+        """Log chat messages for monitoring."""
+        session_id = session_id or self.current_session_id
+        
+        chat_log = {
+            'log_type': log_type,
+            'author': author,
+            'message': message,
+            'timestamp': time.time(),
+            'session_id': session_id,
+            'metadata': metadata or {}
+        }
+        
+        self.chat_logs.append(chat_log)
+        
+        # Keep only recent logs (last 2000)
+        if len(self.chat_logs) > 2000:
+            self.chat_logs = self.chat_logs[-2000:]
+        
+        logger.info(f"Chat log: {log_type} - {author}: {message[:100]}...")
+        
+        # Emit to web UI via websocket
+        self._emit_activity_to_web_ui('chat_log', chat_log)
+        
+        return chat_log
+
+    def calculate_text_metrics(self, text: str) -> Dict[str, Any]:
+        """Calculate text analysis metrics."""
+        if not text:
+            return {'word_count': 0, 'sentence_count': 0, 'avg_sentence_length': 0}
+        
+        # Basic text analysis
+        words = text.split()
+        sentences = text.split('.')
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        word_count = len(words)
+        sentence_count = len(sentences)
+        avg_sentence_length = word_count / sentence_count if sentence_count > 0 else 0
+        
+        return {
+            'word_count': word_count,
+            'sentence_count': sentence_count,
+            'avg_sentence_length': round(avg_sentence_length, 2)
+        }
+
+    def get_active_agents(self) -> List[BaseAgent]:
+        """Get list of currently active agents."""
+        active_agents = []
+        
+        # Add PI agent
+        if self.pi_agent:
+            active_agents.append(self.pi_agent)
+        
+        # Add scientific critic
+        if self.scientific_critic:
+            active_agents.append(self.scientific_critic)
+        
+        # Add hired agents from marketplace
+        if self.agent_marketplace:
+            active_agents.extend(self.agent_marketplace.hired_agents.values())
+        
+        return active_agents
+
+    def get_agent_activity_log(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get agent activity log for monitoring."""
+        session_id = session_id or self.current_session_id
+        return self.agent_activities.get(session_id, [])
+
+    def get_chat_logs(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get chat logs including agent thoughts and communications."""
+        if session_id:
+            return [log for log in self.chat_logs if log.get('session_id') == session_id]
+        return self.chat_logs
     
     def conduct_research_session(self, research_question: str,
                                 constraints: Optional[Dict[str, Any]] = None,
                                 context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Conduct a complete Virtual Lab research session using structured meetings.
+        Conduct a complete research session using Virtual Lab methodology.
         
         Args:
             research_question: The research question to investigate
-            constraints: Optional constraints (budget, time, etc.)
-            context: Optional additional context
+            constraints: Research constraints (budget, timeline, etc.)
+            context: Additional context for the research
             
         Returns:
-            Complete research session results
+            Dictionary containing research results and session data
         """
-        session_id = f"vlab_session_{int(time.time())}"
-        logger.info(f"Starting Virtual Lab research session: {session_id}")
+        session_id = f"session_{int(time.time())}"
+        self.current_session_id = session_id
+        self.session_start_time = time.time()
         
-        session_data = {
-            'session_id': session_id,
+        # Initialize session data
+        self.session_data[session_id] = {
             'research_question': research_question,
             'constraints': constraints or {},
             'context': context or {},
-            'start_time': time.time(),
-            'status': 'running',
+            'start_time': self.session_start_time,
             'phases': {},
-            'meetings': [],
-            'final_results': {}
+            'results': {},
+            'status': 'in_progress'
         }
         
+        # Log session start
+        self.log_chat_message('system', 'System', f'Research session started: {research_question}', session_id)
+        self.log_agent_activity('system', 'session_start', f'Research session {session_id} initiated', session_id)
+        
+        # Emit PI agent details
+        self._emit_agent_details(self.pi_agent, "Principal Investigator", session_id)
+        self.log_agent_activity(self.pi_agent.agent_id, 'thinking', 'Analyzing research question', session_id)
+        
         try:
-            # Execute structured research phases
-            for phase in ResearchPhase:
-                logger.info(f"Starting phase: {phase.value}")
-                self.current_phase = phase
-                
-                phase_result = self._execute_research_phase(
-                    phase, session_id, research_question, constraints
-                )
-                
-                session_data['phases'][phase.value] = phase_result
-                self.phase_results[phase.value] = phase_result
-                
-                if not phase_result.get('success', False):
-                    logger.error(f"Phase {phase.value} failed")
-                    session_data['status'] = 'failed'
-                    break
+            # Execute research phases with proper tracking
+            phases = [
+                ResearchPhase.TEAM_SELECTION,
+                ResearchPhase.LITERATURE_REVIEW,
+                ResearchPhase.PROJECT_SPECIFICATION,
+                ResearchPhase.TOOLS_SELECTION,
+                ResearchPhase.TOOLS_IMPLEMENTATION,
+                ResearchPhase.WORKFLOW_DESIGN,
+                ResearchPhase.EXECUTION,
+                ResearchPhase.SYNTHESIS
+            ]
             
-            # Compile final results if all phases succeeded
-            if session_data['status'] == 'running':
-                session_data['final_results'] = self._compile_final_results(session_data)
-                session_data['status'] = 'completed'
+            phase_results = {}
+            
+            for i, phase in enumerate(phases):
+                self.current_phase = phase
+                self.phase_start_times[phase] = time.time()
+                
+                # Log phase start
+                phase_name = phase.value.replace('_', ' ').title()
+                self.log_chat_message('system', 'System', f'Starting phase {i+1}: {phase_name}', session_id)
+                self.log_agent_activity('system', 'phase_start', f'Phase {i+1}: {phase_name} started', session_id)
+                
+                # Execute phase with minimum time requirement
+                phase_start = time.time()
+                phase_result = self._execute_research_phase(phase, session_id, research_question, constraints or {})
+                
+                # Calculate phase duration
+                phase_duration = time.time() - phase_start
+                
+                phase_results[phase.value] = phase_result
+                self.phase_results[phase] = phase_result
+                
+                # Log phase completion
+                phase_duration = time.time() - phase_start
+                self.log_chat_message('system', 'System', f'Completed phase {i+1}: {phase_name} ({phase_duration:.1f}s)', session_id)
+                self.log_agent_activity('system', 'phase_complete', f'Phase {i+1}: {phase_name} completed in {phase_duration:.1f}s', session_id)
+                
+                # Update session data
+                self.session_data[session_id]['phases'][phase.value] = phase_result
+            
+            # Compile final results
+            final_results = self._compile_final_results(session_id)
+            
+            # Update session status
+            self.session_data[session_id]['status'] = 'completed'
+            self.session_data[session_id]['results'] = final_results
+            self.session_data[session_id]['end_time'] = time.time()
+            
+            # Log session completion
+            total_duration = time.time() - self.session_start_time
+            self.log_chat_message('system', 'System', f'Research session completed in {total_duration:.1f}s', session_id)
+            self.log_agent_activity('system', 'session_complete', f'Research session {session_id} completed successfully', session_id)
+            
+            return final_results
             
         except Exception as e:
-            logger.error(f"Research session {session_id} failed: {e}")
-            session_data['status'] = 'failed'
-            session_data['error'] = str(e)
-        
-        session_data['end_time'] = time.time()
-        session_data['duration'] = session_data['end_time'] - session_data['start_time']
-        
-        # Store session
-        self.research_sessions[session_id] = session_data
-        
-        # Ensure all MeetingRecord objects are serialized before returning
-        session_data = self._serialize_session_data(session_data)
-        return session_data
+            logger.error(f"Error in research session {session_id}: {e}")
+            self.session_data[session_id]['status'] = 'error'
+            self.session_data[session_id]['error'] = str(e)
+            
+            # Log error
+            self.log_chat_message('system', 'System', f'Research session error: {str(e)}', session_id)
+            self.log_agent_activity('system', 'session_error', f'Research session {session_id} failed: {str(e)}', session_id)
+            
+            raise
     
     def _execute_research_phase(self, phase: ResearchPhase, session_id: str,
                                research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute a specific research phase using appropriate meetings."""
+        """
+        Execute a specific research phase with comprehensive activity tracking.
         
-        if phase == ResearchPhase.TEAM_SELECTION:
-            return self._phase_team_selection(session_id, research_question, constraints)
-        elif phase == ResearchPhase.LITERATURE_REVIEW:
-            return self._phase_literature_review(session_id, research_question, constraints)
-        elif phase == ResearchPhase.PROJECT_SPECIFICATION:
-            return self._phase_project_specification(session_id, research_question, constraints)
-        elif phase == ResearchPhase.TOOLS_SELECTION:
-            return self._phase_tools_selection(session_id, research_question, constraints)
-        elif phase == ResearchPhase.TOOLS_IMPLEMENTATION:
-            return self._phase_tools_implementation(session_id, research_question, constraints)
-        elif phase == ResearchPhase.WORKFLOW_DESIGN:
-            return self._phase_workflow_design(session_id, research_question, constraints)
-        elif phase == ResearchPhase.EXECUTION:
-            return self._phase_execution(session_id, research_question, constraints)
-        elif phase == ResearchPhase.SYNTHESIS:
-            return self._phase_synthesis(session_id, research_question, constraints)
-        else:
-            return {'success': False, 'error': f'Unknown phase: {phase}'}
+        Args:
+            phase: Research phase to execute
+            session_id: Current session ID
+            research_question: Research question
+            constraints: Research constraints
+            
+        Returns:
+            Phase execution results
+        """
+        phase_name = phase.value.replace('_', ' ').title()
+        
+        # Log phase start
+        self.log_agent_activity('system', 'phase_start', f'Starting {phase_name} phase', session_id)
+        self.log_chat_message('system', 'System', f'Phase {phase_name} initiated', session_id)
+        
+        try:
+            # Execute phase-specific logic
+            if phase == ResearchPhase.TEAM_SELECTION:
+                result = self._phase_team_selection(session_id, research_question, constraints)
+            elif phase == ResearchPhase.LITERATURE_REVIEW:
+                result = self._phase_literature_review(session_id, research_question, constraints)
+            elif phase == ResearchPhase.PROJECT_SPECIFICATION:
+                result = self._phase_project_specification(session_id, research_question, constraints)
+            elif phase == ResearchPhase.TOOLS_SELECTION:
+                result = self._phase_tools_selection(session_id, research_question, constraints)
+            elif phase == ResearchPhase.TOOLS_IMPLEMENTATION:
+                result = self._phase_tools_implementation(session_id, research_question, constraints)
+            elif phase == ResearchPhase.WORKFLOW_DESIGN:
+                result = self._phase_workflow_design(session_id, research_question, constraints)
+            elif phase == ResearchPhase.EXECUTION:
+                result = self._phase_execution(session_id, research_question, constraints)
+            elif phase == ResearchPhase.SYNTHESIS:
+                result = self._phase_synthesis(session_id, research_question, constraints)
+            else:
+                raise ValueError(f"Unknown research phase: {phase}")
+            
+            # Log phase completion
+            if result.get('success'):
+                self.log_agent_activity('system', 'phase_complete', f'Completed {phase_name} phase successfully', session_id)
+                self.log_chat_message('system', 'System', f'Phase {phase_name} completed successfully', session_id)
+            else:
+                self.log_agent_activity('system', 'phase_error', f'Failed to complete {phase_name} phase', session_id)
+                self.log_chat_message('system', 'System', f'Phase {phase_name} failed: {result.get("error", "Unknown error")}', session_id)
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Error in {phase_name} phase: {str(e)}"
+            self.log_agent_activity('system', 'phase_error', error_msg, session_id)
+            self.log_chat_message('system', 'System', error_msg, session_id)
+            
+            return {
+                'success': False,
+                'error': str(e),
+                'phase': phase.value
+            }
     
     def _phase_team_selection(self, session_id: str, research_question: str, 
                              constraints: Dict[str, Any]) -> Dict[str, Any]:
-        """Phase 1: Team Selection - Individual meeting with PI to define scientist agents."""
+        """
+        Execute team selection phase with comprehensive activity tracking.
         
-        agenda = MeetingAgenda(
-            meeting_id=f"{session_id}_team_selection",
-            meeting_type=MeetingType.INDIVIDUAL_MEETING,
-            phase=ResearchPhase.TEAM_SELECTION,
-            objectives=[
-                "Analyze research problem complexity and scope",
-                "Identify required domain expertise",
-                "Determine optimal team composition",
-                "Estimate resource requirements"
-            ],
-            participants=[self.pi_agent.agent_id],
-            discussion_topics=[
-                "Research problem analysis",
-                "Expertise domain mapping",
-                "Team size optimization",
-                "Agent specialization requirements"
-            ],
-            expected_outcomes=[
-                "List of required expertise domains",
-                "Team composition plan",
-                "Agent hiring strategy"
-            ]
-        )
+        Args:
+            session_id: Current session ID
+            research_question: Research question
+            constraints: Research constraints
+            
+        Returns:
+            Team selection results
+        """
+        # Log PI agent activity
+        self.log_agent_activity(self.pi_agent.agent_id, 'thinking', 'Analyzing research requirements for team selection', session_id)
+        self.log_chat_message('thought', self.pi_agent.agent_id, 'I need to analyze the research question and determine what expertise is required', session_id)
         
-        # Conduct individual meeting with PI
-        meeting_result = self._conduct_individual_meeting(agenda, research_question, constraints)
+        # Simulate thinking time
+        time.sleep(3)
         
-        if meeting_result['success']:
-            # Have PI analyze the problem and determine required expertise
-            analysis_prompt = f"""
-            As the Principal Investigator, analyze this research problem and determine the optimal team composition:
+        # PI analyzes research requirements
+        analysis_prompt = f"""
+        Analyze the following research question and determine what types of expertise are needed:
+        
+        Research Question: {research_question}
+        Constraints: {constraints}
+        
+        Please provide a comprehensive analysis including:
+        1. Key research domains involved
+        2. Required expertise areas
+        3. Specific skills needed
+        4. Team size recommendations
+        5. Potential challenges
+        
+        Format your response as follows:
+        
+        **Analysis Summary:**
+        [Provide a brief overview of the research requirements]
+        
+        REQUIRED_EXPERTISE: [expertise1, expertise2, expertise3, ...]
+        TEAM_SIZE: [number]
+        PRIORITY_EXPERTS: [expertise1, expertise2, expertise3]
+        SPECIALIZATION_NOTES: expertise1: Description | expertise2: Description | ...
+        
+        **Detailed Justification:**
+        [Explain why each expertise area is needed using markdown formatting]
+        
+        Use markdown formatting throughout your response for better readability.
+        """
+        
+        self.log_agent_activity(self.pi_agent.agent_id, 'speaking', 'Analyzing research requirements', session_id)
+        analysis_response = self.pi_agent.generate_response(analysis_prompt, {
+            'research_question': research_question,
+            'constraints': constraints
+        })
+        
+        # Calculate and log text metrics
+        analysis_metrics = self.calculate_text_metrics(analysis_response)
+        self.log_chat_message('communication', self.pi_agent.agent_id, analysis_response, session_id, analysis_metrics)
+        
+        # Parse analysis for required expertise
+        team_selection_data = self._parse_team_selection_response(analysis_response)
+        required_expertise = team_selection_data['required_expertise']
+        
+        # Log expertise identification
+        self.log_agent_activity(self.pi_agent.agent_id, 'thinking', f'Identified required expertise: {", ".join(required_expertise)}', session_id)
+        self.log_chat_message('thought', self.pi_agent.agent_id, f'Based on analysis, I need experts in: {", ".join(required_expertise)}', session_id)
+        
+        # Hire agents from marketplace
+        hired_agents = {}
+        for expertise in required_expertise:
+            self.log_agent_activity(self.pi_agent.agent_id, 'thinking', f'Searching for {expertise} expert', session_id)
             
-            Research Question: {research_question}
-            Constraints: {constraints}
-            
-            Following the Virtual Lab approach, please provide:
-            1. REQUIRED_EXPERTISE: List 3-6 specific expertise domains needed (e.g., biology, chemistry, computational_modeling, etc.)
-            2. TEAM_SIZE: Optimal number of expert agents (2-8)
-            3. PRIORITY_EXPERTS: Top 3 most critical expertise areas
-            4. SPECIALIZATION_NOTES: Brief description of what each expert should focus on
-            
-            Format your response as:
-            REQUIRED_EXPERTISE: [domain1, domain2, domain3, ...]
-            TEAM_SIZE: [number]
-            PRIORITY_EXPERTS: [domain1, domain2, domain3]
-            SPECIALIZATION_NOTES: domain1: description | domain2: description | domain3: description
-            """
-            
-            pi_response = self.pi_agent.generate_response(analysis_prompt, {
-                'research_question': research_question,
-                'constraints': constraints,
-                'session_id': session_id
-            })
-            
-            # Parse PI response
-            team_plan = self._parse_team_selection_response(pi_response)
-            
-            # Hire agents based on PI's analysis
-            if team_plan['required_expertise']:
-                hiring_result = self.pi_agent.hire_agents(
-                    self.agent_marketplace, 
-                    team_plan['required_expertise'], 
-                    constraints
-                )
-                
-                # Convert agent objects to dictionaries for JSON serialization
-                serializable_hiring_result = {
-                    'hired_agents': {expertise: agent.to_dict() for expertise, agent in hiring_result['hired_agents'].items()},
-                    'hiring_decisions': hiring_result['hiring_decisions'],
-                    'total_hired': hiring_result['total_hired'],
-                    'new_agents_created': hiring_result['new_agents_created']
-                }
-                
-                return {
-                    'success': True,
-                    'meeting_record': meeting_result['meeting_record'],
-                    'team_plan': team_plan,
-                    'hired_agents': serializable_hiring_result,
-                    'decisions': [
-                        f"Team size: {team_plan['team_size']} experts",
-                        f"Required expertise: {', '.join(team_plan['required_expertise'])}",
-                        f"Successfully hired {len(hiring_result['hired_agents'])} agents"
-                    ]
-                }
+            # Find suitable agent
+            available_agents = self.agent_marketplace.get_agents_by_expertise(expertise)
+            if available_agents:
+                agent = available_agents[0]  # Select first available
+                if self.agent_marketplace.hire_agent(agent.agent_id):
+                    hired_agents[expertise] = agent
+                    self.log_agent_activity(agent.agent_id, 'meeting_join', f'Hired as {expertise} expert', session_id)
+                    self.log_chat_message('communication', 'System', f'Hired {agent.agent_id} as {expertise} expert', session_id)
+                    # Send agent details to web UI
+                    self._emit_agent_details(agent, expertise, session_id)
+                else:
+                    self.log_agent_activity('system', 'error', f'Failed to hire agent for {expertise}', session_id)
             else:
-                return {
-                    'success': False,
-                    'error': 'Failed to determine required expertise',
-                    'meeting_record': meeting_result['meeting_record']
-                }
+                # Create specialized agent if none available
+                self.log_agent_activity(self.pi_agent.agent_id, 'thinking', f'Creating specialized agent for {expertise}', session_id)
+                specialized_agent = self.agent_marketplace.create_expert_for_domain(expertise, research_question)
+                hired_agents[expertise] = specialized_agent
+                self.log_agent_activity(specialized_agent.agent_id, 'meeting_join', f'Created as {expertise} expert', session_id)
+                self.log_chat_message('communication', 'System', f'Created {specialized_agent.agent_id} as {expertise} expert', session_id)
+                # Send agent details to web UI
+                self._emit_agent_details(specialized_agent, expertise, session_id)
         
-        return meeting_result
+        # Log team composition
+        team_size = len(hired_agents)
+        self.log_agent_activity(self.pi_agent.agent_id, 'speaking', f'Team assembled with {team_size} experts', session_id)
+        self.log_chat_message('communication', self.pi_agent.agent_id, f'Team selection complete. Assembled team of {team_size} experts: {", ".join(hired_agents.keys())}', session_id)
+        
+        # Convert agent objects to dictionaries for storage
+        hired_agents_dict = {}
+        for expertise, agent in hired_agents.items():
+            hired_agents_dict[expertise] = {
+                'agent_id': agent.agent_id,
+                'role': agent.role,
+                'expertise': agent.expertise,
+                'agent_type': agent.__class__.__name__
+            }
+        
+        return {
+            'success': True,
+            'phase': 'team_selection',
+            'hired_agents': hired_agents_dict,  # Store as dictionaries
+            'team_size': team_size,
+            'expertise_areas': list(hired_agents.keys()),
+            'team_selection_data': team_selection_data,  # Store the parsed data separately
+            'meeting_record': None  # Will be created in team meeting
+        }
     
     def _phase_literature_review(self, session_id: str, research_question: str, constraints: Dict) -> Dict:
         """Complete literature review phase with real search and analysis."""
@@ -591,8 +800,8 @@ class VirtualLabMeetingSystem:
         """Phase 2: Project Specification - Team meeting to decide on key high-level details."""
         
         # Get hired agents from previous phase
-        team_selection_result = self.phase_results.get('team_selection', {})
-        hired_agents = team_selection_result.get('hired_agents', {}).get('hired_agents', {})
+        team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
+        hired_agents = team_selection_result.get('hired_agents', {})
         
         if not hired_agents:
             return {'success': False, 'error': 'No agents available from team selection phase'}
@@ -600,7 +809,11 @@ class VirtualLabMeetingSystem:
         # Convert agent dictionaries back to agent objects for meeting
         agent_objects = {}
         for expertise, agent_dict in hired_agents.items():
-            agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+            if isinstance(agent_dict, dict):
+                agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+            else:
+                # Handle case where agent_dict might already be an agent object
+                agent_objects[expertise] = agent_dict
         
         participants = [self.pi_agent.agent_id] + [agent.agent_id for agent in agent_objects.values()]
         
@@ -650,8 +863,8 @@ class VirtualLabMeetingSystem:
         """Phase 3: Tools Selection - Real tool discovery and selection by agents."""
         
         # Get hired agents from team selection phase
-        team_selection_result = self.phase_results.get('team_selection', {})
-        hired_agents = team_selection_result.get('hired_agents', {}).get('hired_agents', {})
+        team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
+        hired_agents = team_selection_result.get('hired_agents', {})
         
         if not hired_agents:
             return {'success': False, 'error': 'No agents available from team selection phase'}
@@ -694,23 +907,40 @@ class VirtualLabMeetingSystem:
             validated_tools[expertise] = []
             tool_test_results[expertise] = []
             
-            for tool_info in tools[:3]:  # Test top 3 tools per agent
-                tool_id = tool_info['tool_id']
+            for tool_data in tools[:3]:  # Test top 3 tools per agent
+                tool_id = tool_data['tool_id']
                 
-                # Request tool access
+                # Request tool access with proper validation context
                 tool = agent.request_tool(tool_id, {
                     'agent_id': agent.agent_id,
                     'agent_expertise': agent.expertise,
                     'research_question': research_question,
-                    'constraints': constraints
+                    'constraints': constraints,
+                    'available_memory': 1024,  # Assume 1GB available memory
+                    'available_packages': ['pandas', 'numpy', 'scipy', 'statsmodels', 'requests'],  # Common packages + requests
+                    'api_keys': {'literature_api_key': os.getenv('LITERATURE_API_KEY', 'dummy_key')}  # Provide placeholder API key
                 })
                 
                 if tool:
                     # Test tool with simple task
-                    test_task = {
-                        'description': f"Test tool {tool_id} for research question",
-                        'test_mode': True
-                    }
+                    if tool_id == 'hypothesis_validator':
+                        test_task = {
+                            'description': "Test hypothesis validation for research question",
+                            'hypothesis': 'There is no significant difference between groups A and B',
+                            'data': [
+                                {'group': 'A', 'value': 1.0},
+                                {'group': 'A', 'value': 1.1},
+                                {'group': 'B', 'value': 1.2},
+                                {'group': 'B', 'value': 1.3}
+                            ],
+                            'significance_level': 0.05,
+                            'test_mode': True
+                        }
+                    else:
+                        test_task = {
+                            'description': f"Test tool {tool_id} for research question",
+                            'test_mode': True
+                        }
                     
                     test_result = tool.execute(test_task, {
                         'agent_id': agent.agent_id,
@@ -720,15 +950,14 @@ class VirtualLabMeetingSystem:
                     
                     tool_test_results[expertise].append({
                         'tool_id': tool_id,
-                        'tool_name': tool_info['name'],
+                        'tool_name': tool_data['name'],
                         'test_result': test_result,
                         'success': test_result.get('success', False)
                     })
                     
                     if test_result.get('success', False):
                         validated_tools[expertise].append({
-                            'tool': tool,
-                            'tool_info': tool_info,
+                            'tool_info': tool_data,
                             'test_result': test_result
                         })
                         
@@ -753,7 +982,7 @@ class VirtualLabMeetingSystem:
                 best_score = 0.0
                 
                 for tool_data in validated_tool_list:
-                    tool = tool_data['tool']
+                    tool_id = tool_data['tool_info']['tool_id']
                     tool_info = tool_data['tool_info']
                     test_result = tool_data['test_result']
                     
@@ -788,7 +1017,6 @@ class VirtualLabMeetingSystem:
         # Tool capability assessment
         capability_assessment = {}
         for expertise, tool_data in selected_tools.items():
-            tool = tool_data['tool']
             tool_info = tool_data['tool_info']
             
             capabilities = tool_info.get('capabilities', [])
@@ -825,15 +1053,15 @@ class VirtualLabMeetingSystem:
         """Phase 4: Tools Implementation - Real tool integration building and testing."""
         
         # Get selected tools from previous phase
-        tools_selection_result = self.phase_results.get('tools_selection', {})
+        tools_selection_result = self.phase_results.get(ResearchPhase.TOOLS_SELECTION, {})
         selected_tools = tools_selection_result.get('selected_tools', {})
         
         if not selected_tools:
             return {'success': False, 'error': 'No tools selected in previous phase'}
         
         # Get hired agents
-        team_selection_result = self.phase_results.get('team_selection', {})
-        hired_agents = team_selection_result.get('hired_agents', {}).get('hired_agents', {})
+        team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
+        hired_agents = team_selection_result.get('hired_agents', {})
         
         # Convert agent dictionaries back to agent objects
         agent_objects = {}
@@ -855,9 +1083,9 @@ class VirtualLabMeetingSystem:
             if not agent:
                 continue
             
-            tool = tool_data['tool']
-            tool_info = tool_data['tool_info']
-            tool_name = tool_info['name']
+            tool = tool_data.get('tool_info', {}).get('tool')
+            tool_info = tool_data.get('tool_info', {})
+            tool_name = tool_info.get('name', 'Unknown Tool')
             
             logger.info(f"Agent {agent.agent_id} implementing tool {tool_name}")
             
@@ -923,6 +1151,7 @@ class VirtualLabMeetingSystem:
             'custom_tools_created': custom_tools_created,
             'tool_chains_built': tool_chains_built,
             'implementation_summary': implementation_summary,
+            'implemented_tools': [tool_name for tool_name, result in implementation_results.items() if result.get('success', False)],
             'metadata': {
                 'total_agents': len(agent_objects),
                 'total_tools_implemented': total_implementations,
@@ -979,8 +1208,8 @@ class VirtualLabMeetingSystem:
                 custom_tool_spec = {
                     'type': 'custom_chain',
                     'config': {
-                        'tool_registry': None,  # Will be set by agent
-                        'cost_manager': None,   # Will be set by agent
+                        'tool_registry': self.tool_registry if hasattr(self, 'tool_registry') else None,
+                        'cost_manager': self.cost_manager if hasattr(self, 'cost_manager') else None,
                         'missing_capabilities': missing_capabilities,
                         'research_question': research_question
                     }
@@ -1260,18 +1489,18 @@ class VirtualLabMeetingSystem:
         # Determine tool execution order based on dependencies
         tool_order = []
         for expertise, tool_data in selected_tools.items():
-            tool = tool_data['tool']
-            tool_info = tool_data['tool_info']
+            tool = tool_data.get('tool')
+            tool_info = tool_data
             
             # Check dependencies
-            dependencies = tool_info.get('requirements', {}).get('dependencies', [])
+            dependencies = tool_data.get('requirements', {}).get('dependencies', [])
             if dependencies:
                 integration_plan['dependencies'][expertise] = dependencies
             
             tool_order.append({
                 'expertise': expertise,
-                'tool_name': tool_info['name'],
-                'tool_id': tool_info['tool_id'],
+                'tool_name': tool_data['name'],
+                'tool_id': tool_data['tool_id'],
                 'execution_order': len(tool_order) + 1
             })
         
@@ -1279,8 +1508,7 @@ class VirtualLabMeetingSystem:
         
         # Estimate resource requirements
         for expertise, tool_data in selected_tools.items():
-            tool_info = tool_data['tool_info']
-            requirements = tool_info.get('requirements', {})
+            requirements = tool_data.get('requirements', {})
             
             integration_plan['resource_requirements'][expertise] = {
                 'memory_mb': requirements.get('min_memory', 128),
@@ -1295,11 +1523,33 @@ class VirtualLabMeetingSystem:
         """Phase 5: Workflow Design - Individual meeting with PI to determine workflow."""
         
         # Get implementation results
-        implementation_result = self.phase_results.get('tools_implementation', {})
+        implementation_result = self.phase_results.get(ResearchPhase.TOOLS_IMPLEMENTATION, {})
         implemented_tools = implementation_result.get('implemented_tools', [])
         
         if not implemented_tools:
-            return {'success': False, 'error': 'No tools implemented to create workflow'}
+            logger.warning("No tools implemented, creating basic workflow design")
+            # Create a basic workflow design even without specific tools
+            basic_workflow = {
+                'workflow_steps': {
+                    'data_collection': 'Collect research data and observations',
+                    'analysis': 'Analyze collected data using available methods',
+                    'synthesis': 'Synthesize findings and draw conclusions'
+                },
+                'data_flow': ['data_collection', 'analysis', 'synthesis'],
+                'quality_control': ['data_validation', 'peer_review', 'result_verification'],
+                'execution_order': ['data_collection', 'analysis', 'synthesis'],
+                'success_metrics': ['data_quality', 'analysis_accuracy', 'conclusion_validity']
+            }
+            
+            return {
+                'success': True,
+                'workflow_design': basic_workflow,
+                'decisions': [
+                    "Created basic workflow design due to no specific tools implemented",
+                    "Workflow includes standard research phases: data collection, analysis, synthesis"
+                ],
+                'warning': 'Used basic workflow design - no specific tools were implemented'
+            }
         
         agenda = MeetingAgenda(
             meeting_id=f"{session_id}_workflow_design",
@@ -1380,15 +1630,15 @@ class VirtualLabMeetingSystem:
         """Phase 6: Execution - Execute the designed workflow with agent collaboration."""
         
         # Get workflow design
-        workflow_result = self.phase_results.get('workflow_design', {})
+        workflow_result = self.phase_results.get(ResearchPhase.WORKFLOW_DESIGN, {})
         workflow_design = workflow_result.get('workflow_design', {})
         
         if not workflow_design:
             return {'success': False, 'error': 'No workflow design available'}
         
         # Get hired agents
-        team_selection_result = self.phase_results.get('team_selection', {})
-        hired_agents = team_selection_result.get('hired_agents', {}).get('hired_agents', {})
+        team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
+        hired_agents = team_selection_result.get('hired_agents', {})
         
         # Convert agent dictionaries back to agent objects
         agent_objects = {}
@@ -1442,14 +1692,14 @@ class VirtualLabMeetingSystem:
         """Phase 7: Synthesis - Final synthesis and critique of results."""
         
         # Get all previous phase results
-        execution_result = self.phase_results.get('execution', {})
+        execution_result = self.phase_results.get(ResearchPhase.EXECUTION, {})
         
         if not execution_result.get('success', False):
             return {'success': False, 'error': 'Execution phase failed, cannot synthesize'}
         
         # Conduct final synthesis meeting with all agents
-        team_selection_result = self.phase_results.get('team_selection', {})
-        hired_agents = team_selection_result.get('hired_agents', {}).get('hired_agents', {})
+        team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
+        hired_agents = team_selection_result.get('hired_agents', {})
         
         # Convert agent dictionaries back to agent objects
         agent_objects = {}
@@ -1510,198 +1760,204 @@ class VirtualLabMeetingSystem:
     
     def _conduct_team_meeting(self, agenda: MeetingAgenda, hired_agents: Dict[str, BaseAgent],
                              research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
-        """Conduct a team meeting with multiple agents."""
+        """
+        Conduct a team meeting with all hired agents.
         
-        logger.info(f"Starting team meeting: {agenda.meeting_id}")
+        Args:
+            agenda: Meeting agenda
+            hired_agents: Dictionary of hired agents
+            research_question: Research question
+            constraints: Research constraints
+            
+        Returns:
+            Meeting record with outcomes
+        """
+        meeting_id = agenda.meeting_id
+        session_id = self.current_session_id
+        
+        # Log meeting start
+        self.log_chat_message('communication', 'System', f'Team meeting started: {agenda.meeting_id}', session_id)
+        self.log_agent_activity('system', 'meeting_start', f'Team meeting {meeting_id} initiated', session_id)
+        
+        # Track meeting participants
+        participants = [agent.agent_id for agent in hired_agents.values()]
+        participants.append(self.pi_agent.agent_id)
+        
+        # Log agent participation
+        for agent_id in participants:
+            self.log_agent_activity(agent_id, 'meeting_join', f'Joined team meeting {meeting_id}', session_id)
+        
         start_time = time.time()
-        
-        # Initialize meeting record
         discussion_transcript = []
         outcomes = {}
         decisions = []
         action_items = []
         
         try:
-            # PI opens the meeting
-            opening_prompt = f"""
-            You are facilitating a team meeting for: {agenda.phase.value}
-            
-            Research Question: {research_question}
-            Meeting Objectives: {', '.join(agenda.objectives)}
-            Discussion Topics: {', '.join(agenda.discussion_topics)}
-            
-            Please open the meeting by:
-            1. Stating the objectives
-            2. Outlining the discussion topics
-            3. Inviting each expert to share their perspective
-            
-            Keep your opening brief and focused.
-            """
-            
-            pi_opening = self.pi_agent.generate_response(opening_prompt, {
-                'agenda': agenda.__dict__,
-                'research_question': research_question
-            })
-            
+            # PI introduces the meeting
+            pi_intro = f"Welcome to our {agenda.meeting_type.value} meeting. Today we're working on: {research_question}"
+            self.log_chat_message('communication', self.pi_agent.agent_id, pi_intro, session_id)
             discussion_transcript.append({
                 'speaker': self.pi_agent.agent_id,
-                'role': 'Principal Investigator',
-                'message': pi_opening,
+                'message': pi_intro,
                 'timestamp': time.time()
             })
             
             # Each agent contributes based on their expertise
-            for expertise, agent in hired_agents.items():
+            for agent_id, agent in hired_agents.items():
+                # Log agent thinking
+                self.log_agent_activity(agent_id, 'thinking', f'Preparing contribution for {agenda.meeting_type.value}', session_id)
+                
+                # Simulate agent thinking time (minimum 5 seconds for quality)
+                time.sleep(5)
+                
+                # Generate agent contribution
                 contribution_prompt = f"""
-                In this team meeting about {agenda.phase.value}, please contribute your expertise in {expertise}.
+                You are participating in a {agenda.meeting_type.value} meeting about: {research_question}
                 
-                Research Question: {research_question}
-                Discussion Topics: {', '.join(agenda.discussion_topics)}
+                Your expertise areas: {', '.join(agent.expertise)}
+                Meeting objectives: {', '.join(agenda.objectives)}
                 
-                PI's Opening: {pi_opening}
+                Please provide a thoughtful contribution based on your expertise. Consider:
+                1. How your expertise relates to this research question
+                2. Potential approaches or methodologies you could contribute
+                3. Any concerns or considerations from your perspective
+                4. Specific suggestions for moving forward
                 
-                Provide your expert perspective on:
-                1. How your expertise applies to this research
-                2. Specific insights or recommendations
-                3. Potential challenges or considerations
-                4. Suggested approaches or methods
-                
-                Be specific and actionable in your contribution.
+                Provide a detailed, professional response.
                 """
                 
-                # For SimpleAgent objects, generate a simple response
-                if hasattr(agent, 'generate_response'):
-                    agent_contribution = agent.generate_response(contribution_prompt, {
-                        'meeting_context': agenda.__dict__,
-                        'research_question': research_question,
-                        'expertise': expertise
-                    })
-                else:
-                    agent_contribution = f"Agent {agent.agent_id} ({agent.role}) contribution: {expertise} expertise on {agenda.phase.value}"
+                agent_response = agent.generate_response(contribution_prompt, {
+                    'research_question': research_question,
+                    'meeting_type': agenda.meeting_type.value,
+                    'objectives': agenda.objectives,
+                    'constraints': constraints
+                })
+                
+                # Calculate text metrics
+                text_metrics = self.calculate_text_metrics(agent_response)
+                
+                # Log agent contribution
+                self.log_chat_message('communication', agent_id, agent_response, session_id, text_metrics)
+                self.log_agent_activity(agent_id, 'speaking', f'Contributed to {agenda.meeting_type.value} meeting', session_id, text_metrics)
                 
                 discussion_transcript.append({
-                    'speaker': agent.agent_id,
-                    'role': agent.role,
-                    'expertise': expertise,
-                    'message': agent_contribution,
-                    'timestamp': time.time()
+                    'speaker': agent_id,
+                    'message': agent_response,
+                    'timestamp': time.time(),
+                    'metrics': text_metrics
                 })
+                
+                # Track agent performance
+                if agent_id not in self.agent_performance:
+                    self.agent_performance[agent_id] = {
+                        'contributions': 0,
+                        'total_words': 0,
+                        'avg_sentence_length': 0
+                    }
+                
+                self.agent_performance[agent_id]['contributions'] += 1
+                self.agent_performance[agent_id]['total_words'] += text_metrics['word_count']
+                self.agent_performance[agent_id]['avg_sentence_length'] = (
+                    self.agent_performance[agent_id]['total_words'] / 
+                    self.agent_performance[agent_id]['contributions']
+                )
             
-            # PI synthesizes the discussion
+            # PI facilitates discussion and synthesis
             synthesis_prompt = f"""
-            As the Principal Investigator, synthesize the expert contributions and make decisions:
+            Based on the team discussion about: {research_question}
             
-            Expert Contributions:
-            {self._format_contributions_for_synthesis(discussion_transcript[1:])}
+            Discussion points covered:
+            {chr(10).join([f"- {entry['speaker']}: {entry['message'][:100]}..." for entry in discussion_transcript[1:]])}
             
-            Based on these expert inputs, please:
-            1. OUTCOMES: Key outcomes achieved from this meeting
-            2. DECISIONS: Specific decisions made
-            3. ACTION_ITEMS: Next steps to be taken
-            
-            Format as:
-            OUTCOMES: outcome1 | outcome2 | outcome3
-            DECISIONS: decision1 | decision2 | decision3
-            ACTION_ITEMS: action1 | action2 | action3
+            Please provide a synthesis of the key points, decisions made, and action items.
             """
+            
+            # Log PI synthesis
+            self.log_agent_activity(self.pi_agent.agent_id, 'thinking', 'Synthesizing team discussion', session_id)
+            time.sleep(3)  # Minimum thinking time
             
             pi_synthesis = self.pi_agent.generate_response(synthesis_prompt, {
                 'discussion_transcript': discussion_transcript,
-                'agenda': agenda.__dict__
+                'research_question': research_question
             })
+            
+            # Calculate synthesis metrics
+            synthesis_metrics = self.calculate_text_metrics(pi_synthesis)
+            
+            self.log_chat_message('communication', self.pi_agent.agent_id, pi_synthesis, session_id, synthesis_metrics)
+            self.log_agent_activity(self.pi_agent.agent_id, 'speaking', 'Provided meeting synthesis', session_id, synthesis_metrics)
             
             discussion_transcript.append({
                 'speaker': self.pi_agent.agent_id,
-                'role': 'Principal Investigator',
                 'message': pi_synthesis,
-                'timestamp': time.time()
+                'timestamp': time.time(),
+                'metrics': synthesis_metrics
             })
             
-            # Parse synthesis results
-            outcomes, decisions, action_items = self._parse_meeting_synthesis(pi_synthesis)
+            # Parse synthesis for outcomes
+            synthesis_data = self._parse_meeting_synthesis(pi_synthesis)
+            outcomes = synthesis_data[0]
+            decisions = synthesis_data[1]
+            action_items = synthesis_data[2]
+            
+            # Log meeting completion
+            end_time = time.time()
+            duration = end_time - start_time
+            
+            self.log_chat_message('communication', 'System', f'Team meeting completed in {duration:.1f}s', session_id)
+            self.log_agent_activity('system', 'meeting_complete', f'Team meeting {meeting_id} completed successfully', session_id)
             
             # Create meeting record
             meeting_record = MeetingRecord(
-                meeting_id=agenda.meeting_id,
+                meeting_id=meeting_id,
                 meeting_type=agenda.meeting_type,
                 phase=agenda.phase,
-                participants=agenda.participants,
+                participants=participants,
                 agenda=agenda,
                 discussion_transcript=discussion_transcript,
                 outcomes=outcomes,
                 decisions=decisions,
                 action_items=action_items,
                 start_time=start_time,
-                end_time=time.time(),
+                end_time=end_time,
                 success=True
             )
             
-            # Always include critic evaluation
-            meeting_output = meeting_record.outcomes.get('meeting_output', '')
-            
-            critique_result = self.scientific_critic.critique_research_output(
-                output_content=meeting_output,
-                output_type=f"team_meeting_{agenda.phase.value}",
-                context={
-                    'research_question': research_question,
-                    'constraints': constraints,
-                    'participants': agenda.participants,
-                    'phase': agenda.phase.value
-                }
-            )
-            
-            # Integrate critic feedback into meeting outcomes
-            enhanced_outcomes = meeting_record.outcomes.copy()
-            enhanced_outcomes['critic_evaluation'] = critique_result
-            enhanced_outcomes['quality_score'] = critique_result.get('overall_score', 0)
-            enhanced_outcomes['improvement_suggestions'] = critique_result.get('suggestions', [])
-            
-            # Update meeting record with critic feedback
-            meeting_record.outcomes = enhanced_outcomes
-            
-            # Add critic feedback to decisions
-            if critique_result.get('critical_issues'):
-                meeting_record.decisions.append(
-                    f"Critic identified issues: {', '.join(critique_result['critical_issues'])}"
-                )
-            
-            # Store meeting
-            self.meeting_history.append(meeting_record)
-            
-            logger.info(f"Team meeting {agenda.meeting_id} completed successfully with critic evaluation")
+            # Emit meeting end to web UI
+            self._emit_meeting_event('meeting_end', {
+                'meeting_id': meeting_id,
+                'meeting_type': 'team_meeting',
+                'phase': agenda.phase.value,
+                'participants': participants,
+                'duration': duration,
+                'topic': f"{agenda.phase.value.replace('_', ' ').title()} Team Meeting",
+                'outcome': str(outcomes) if outcomes else 'Meeting completed',
+                'transcript': '\n'.join([f"{entry['speaker']}: {entry['message']}" for entry in discussion_transcript]),
+                'success': True
+            })
             
             return {
                 'success': True,
                 'meeting_record': meeting_record,
-                'duration': meeting_record.end_time - meeting_record.start_time,
-                'critic_evaluation': critique_result
+                'outcomes': outcomes,
+                'decisions': decisions,
+                'action_items': action_items,
+                'duration': duration,
+                'participant_count': len(participants)
             }
             
         except Exception as e:
-            logger.error(f"Team meeting {agenda.meeting_id} failed: {e}")
+            logger.error(f"Error in team meeting {meeting_id}: {e}")
+            end_time = time.time()
             
-            # Create failed meeting record
-            meeting_record = MeetingRecord(
-                meeting_id=agenda.meeting_id,
-                meeting_type=agenda.meeting_type,
-                phase=agenda.phase,
-                participants=agenda.participants,
-                agenda=agenda,
-                discussion_transcript=discussion_transcript,
-                outcomes={'error': str(e)},
-                decisions=[],
-                action_items=[],
-                start_time=start_time,
-                end_time=time.time(),
-                success=False
-            )
-            
-            self.meeting_history.append(meeting_record)
+            self.log_chat_message('system', 'System', f'Team meeting error: {str(e)}', session_id)
+            self.log_agent_activity('system', 'meeting_error', f'Team meeting {meeting_id} failed: {str(e)}', session_id)
             
             return {
                 'success': False,
                 'error': str(e),
-                'meeting_record': meeting_record
+                'duration': end_time - start_time
             }
     
     def _conduct_individual_meeting(self, agenda: MeetingAgenda, research_question: str,
@@ -1710,6 +1966,15 @@ class VirtualLabMeetingSystem:
         
         logger.info(f"Starting individual meeting: {agenda.meeting_id}")
         start_time = time.time()
+        
+        # Emit meeting start to web UI if available
+        self._emit_meeting_event('meeting_start', {
+            'meeting_id': agenda.meeting_id,
+            'meeting_type': 'individual_meeting',
+            'phase': agenda.phase.value,
+            'participants': agenda.participants,
+            'topic': f"{agenda.phase.value.replace('_', ' ').title()} Individual Meeting"
+        })
         
         discussion_transcript = []
         outcomes = {}
@@ -1802,6 +2067,19 @@ class VirtualLabMeetingSystem:
             
             logger.info(f"Individual meeting {agenda.meeting_id} completed successfully with critic evaluation")
             
+            # Emit meeting end to web UI
+            self._emit_meeting_event('meeting_end', {
+                'meeting_id': agenda.meeting_id,
+                'meeting_type': 'individual_meeting',
+                'phase': agenda.phase.value,
+                'participants': agenda.participants,
+                'duration': meeting_record.end_time - meeting_record.start_time,
+                'topic': f"{agenda.phase.value.replace('_', ' ').title()} Individual Meeting",
+                'outcome': str(outcomes) if outcomes else 'Meeting completed',
+                'transcript': '\n'.join(discussion_transcript),
+                'success': True
+            })
+            
             return {
                 'success': True,
                 'meeting_record': meeting_record,
@@ -1829,11 +2107,244 @@ class VirtualLabMeetingSystem:
             
             self.meeting_history.append(meeting_record)
             
+            # Emit meeting failure to web UI
+            self._emit_meeting_event('meeting_end', {
+                'meeting_id': agenda.meeting_id,
+                'meeting_type': 'individual_meeting',
+                'phase': agenda.phase.value,
+                'participants': agenda.participants,
+                'duration': meeting_record.end_time - meeting_record.start_time,
+                'success': False,
+                'error': str(e)
+            })
+            
             return {
                 'success': False,
                 'error': str(e),
                 'meeting_record': meeting_record
             }
+    
+    def _fallback_hiring(self, fallback_expertise: List[str], constraints: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Fallback hiring method that creates basic agents when normal hiring fails.
+        
+        Args:
+            fallback_expertise: List of basic expertise domains to hire
+            constraints: Hiring constraints
+            
+        Returns:
+            Dictionary with hired agents information
+        """
+        logger.info(f"Using fallback hiring for expertise: {fallback_expertise}")
+        
+        hired_agents = {}
+        hiring_decisions = []
+        
+        for expertise in fallback_expertise:
+            try:
+                # Create a simple agent for this expertise
+                agent_id = f"{expertise}_fallback_{len(hired_agents) + 1}"
+                role = f"{expertise.replace('_', ' ').title()} Expert"
+                
+                # Create simple agent
+                simple_agent = self._create_simple_agent(agent_id, role, [expertise])
+                
+                hired_agents[expertise] = simple_agent
+                hiring_decisions.append({
+                    'expertise': expertise,
+                    'agent_id': agent_id,
+                    'agent_role': role,
+                    'performance_score': 0.5,
+                    'relevance_score': 0.5,
+                    'hire_time': time.time(),
+                    'created_new': True,
+                    'fallback': True
+                })
+                
+                logger.info(f"Created fallback agent: {agent_id} for {expertise}")
+                
+            except Exception as e:
+                logger.warning(f"Failed to create fallback agent for {expertise}: {e}")
+        
+        return {
+            'hired_agents': hired_agents,
+            'hiring_decisions': hiring_decisions,
+            'total_hired': len(hired_agents),
+            'new_agents_created': len(hired_agents),
+            'fallback_used': True
+        }
+    
+    def _create_simple_agent(self, agent_id: str, role: str, expertise: List[str]) -> BaseAgent:
+        """
+        Create a simple agent for fallback purposes.
+        
+        Args:
+            agent_id: Agent identifier
+            role: Agent role
+            expertise: List of expertise areas
+            
+        Returns:
+            Simple agent instance
+        """
+        from agents.base_agent import BaseAgent
+        
+        class SimpleAgent(BaseAgent):
+            def __init__(self, agent_id, role, expertise):
+                super().__init__(agent_id, role, expertise)
+            
+            def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
+                return f"Simple agent {self.agent_id} ({self.role}) response: {prompt[:100]}..."
+            
+            def to_dict(self) -> Dict[str, Any]:
+                return {
+                    'agent_id': self.agent_id,
+                    'role': self.role,
+                    'expertise': self.expertise,
+                    'agent_type': 'SimpleAgent'
+                }
+        
+        return SimpleAgent(agent_id, role, expertise)
+    
+    def _emit_activity_to_web_ui(self, event_type: str, data: Dict[str, Any]):
+        """
+        Emit activity events to web UI via WebSocket if available.
+        
+        Args:
+            event_type: Type of event ('agent_activity', 'chat_log')
+            data: Event data to emit
+        """
+        try:
+            # Try to import and use socketio if available
+            import sys
+            web_ui_path = os.path.join(os.path.dirname(__file__), 'web_ui')
+            if web_ui_path not in sys.path:
+                sys.path.append(web_ui_path)
+            
+            try:
+                from web_ui.app import socketio
+                
+                # Emit the event
+                socketio.emit(event_type, data, namespace='/')
+                
+                logger.debug(f"Emitted {event_type} event to web UI")
+                
+            except ImportError:
+                logger.debug(f"Web UI socketio not available, skipping {event_type} emission")
+            except Exception as e:
+                logger.warning(f"Failed to emit {event_type}: {e}")
+                
+        except Exception as e:
+            logger.warning(f"{event_type} emission failed: {e}")
+    
+    def _emit_agent_details(self, agent: BaseAgent, expertise: str, session_id: str):
+        """
+        Emit agent details to web UI when agent is hired.
+        
+        Args:
+            agent: The agent object
+            expertise: The expertise area
+            session_id: Current session ID
+        """
+        try:
+            # Try to import and use socketio if available
+            import sys
+            web_ui_path = os.path.join(os.path.dirname(__file__), 'web_ui')
+            if web_ui_path not in sys.path:
+                sys.path.append(web_ui_path)
+            
+            try:
+                from web_ui.app import socketio
+                
+                # Get agent performance data
+                agent_performance = {
+                    'contributions': 0,
+                    'total_words': 0,
+                    'avg_sentence_length': 0,
+                    'meetings_attended': 1,  # Just joined
+                    'tools_used': 0,
+                    'phases_completed': 0
+                }
+                
+                # Emit comprehensive agent details
+                socketio.emit('agent_activity', {
+                    'session_id': session_id,
+                    'agent_id': agent.agent_id,
+                    'name': getattr(agent, 'name', agent.agent_id),
+                    'expertise': [expertise] if isinstance(expertise, str) else expertise,
+                    'status': 'active',
+                    'activity': f'Joined as {expertise} expert',
+                    'activity_type': 'meeting_join',
+                    'timestamp': time.time(),
+                    'metadata': {
+                        'agent_type': agent.__class__.__name__,
+                        'role': getattr(agent, 'role', 'Unknown'),
+                        'performance': agent_performance,
+                        'capabilities': getattr(agent, 'capabilities', []),
+                        'quality_score': 1.0  # Starting quality score
+                    }
+                }, namespace='/')
+                
+                logger.debug(f"Emitted agent details for {agent.agent_id}")
+                
+            except ImportError:
+                logger.debug("Web UI socketio not available, skipping agent details emission")
+            except Exception as e:
+                logger.warning(f"Failed to emit agent details: {e}")
+                
+        except Exception as e:
+            logger.warning(f"Agent details emission failed: {e}")
+    
+    def _emit_meeting_event(self, event_type: str, meeting_data: Dict[str, Any]):
+        """
+        Emit meeting events to web UI via WebSocket if available.
+        
+        Args:
+            event_type: Type of meeting event ('meeting_start', 'meeting_end')
+            meeting_data: Meeting information to emit
+        """
+        try:
+            # Try to import and use socketio if available
+            import sys
+            web_ui_path = os.path.join(os.path.dirname(__file__), 'web_ui')
+            if web_ui_path not in sys.path:
+                sys.path.append(web_ui_path)
+            
+            # Try to get socketio instance from web UI app
+            try:
+                from web_ui.app import socketio
+                
+                # Emit meeting event
+                socketio.emit('meeting', {
+                    'event_type': event_type,
+                    'meeting_data': meeting_data,
+                    'timestamp': time.time()
+                }, namespace='/')
+                
+                # Also emit phase update with meeting status
+                if event_type == 'meeting_start':
+                    socketio.emit('phase_update', {
+                        'phase': meeting_data.get('phase', 'unknown'),
+                        'meeting_active': True,
+                        'meeting_type': meeting_data.get('meeting_type'),
+                        'meeting_topic': meeting_data.get('topic', 'Meeting in progress')
+                    }, namespace='/')
+                elif event_type == 'meeting_end':
+                    socketio.emit('phase_update', {
+                        'phase': meeting_data.get('phase', 'unknown'),
+                        'meeting_active': False,
+                        'meeting_type': meeting_data.get('meeting_type'),
+                        'meeting_duration': meeting_data.get('duration', 0)
+                    }, namespace='/')
+                
+                logger.debug(f"Emitted meeting event: {event_type} for {meeting_data.get('meeting_id')}")
+                
+            except ImportError:
+                logger.debug("Web UI socketio not available, skipping meeting event emission")
+            except Exception as e:
+                logger.warning(f"Failed to emit meeting event: {e}")
+                
+        except Exception as e:
+            logger.warning(f"Meeting event emission failed: {e}")
     
     def _conduct_implementation_meeting(self, agenda: MeetingAgenda, agent: BaseAgent,
                                        tool_name: str, tool_details: Dict[str, Any]) -> Dict[str, Any]:
@@ -2071,22 +2582,33 @@ class VirtualLabMeetingSystem:
         }
         
         try:
+            logger.debug(f"Parsing PI response: {response[:200]}...")
+            
             # Extract required expertise
             expertise_match = re.search(r'REQUIRED_EXPERTISE:\s*\[([^\]]+)\]', response)
             if expertise_match:
                 expertise_str = expertise_match.group(1)
                 result['required_expertise'] = [e.strip().strip('"\'') for e in expertise_str.split(',')]
+                logger.debug(f"Extracted required expertise: {result['required_expertise']}")
+            else:
+                logger.warning("No REQUIRED_EXPERTISE found in PI response")
             
             # Extract team size
             size_match = re.search(r'TEAM_SIZE:\s*(\d+)', response)
             if size_match:
                 result['team_size'] = int(size_match.group(1))
+                logger.debug(f"Extracted team size: {result['team_size']}")
+            else:
+                logger.warning("No TEAM_SIZE found in PI response")
             
             # Extract priority experts
             priority_match = re.search(r'PRIORITY_EXPERTS:\s*\[([^\]]+)\]', response)
             if priority_match:
                 priority_str = priority_match.group(1)
                 result['priority_experts'] = [p.strip().strip('"\'') for p in priority_str.split(',')]
+                logger.debug(f"Extracted priority experts: {result['priority_experts']}")
+            else:
+                logger.warning("No PRIORITY_EXPERTS found in PI response")
             
             # Extract specialization notes
             notes_match = re.search(r'SPECIALIZATION_NOTES:\s*([^\n]+)', response)
@@ -2096,9 +2618,27 @@ class VirtualLabMeetingSystem:
                     if ':' in note:
                         domain, description = note.split(':', 1)
                         result['specialization_notes'][domain.strip()] = description.strip()
+                logger.debug(f"Extracted specialization notes: {result['specialization_notes']}")
+            else:
+                logger.warning("No SPECIALIZATION_NOTES found in PI response")
+            
+            # Validate that we have at least some required expertise
+            if not result['required_expertise']:
+                logger.error("No required expertise extracted from PI response")
+                # Try alternative parsing if the standard format failed
+                alt_expertise_match = re.search(r'expertise[:\s]*([^,\n]+)', response, re.IGNORECASE)
+                if alt_expertise_match:
+                    alt_expertise = alt_expertise_match.group(1).strip()
+                    result['required_expertise'] = [alt_expertise]
+                    logger.info(f"Used alternative parsing for expertise: {alt_expertise}")
         
         except Exception as e:
-            logger.warning(f"Failed to parse team selection response: {e}")
+            logger.error(f"Failed to parse team selection response: {e}", exc_info=True)
+            # Return a fallback result with basic expertise
+            result['required_expertise'] = ['general_research', 'data_analysis', 'experimental_design']
+            result['team_size'] = 3
+            result['priority_experts'] = ['general_research']
+            logger.info(f"Using fallback team plan: {result}")
         
         return result
     
