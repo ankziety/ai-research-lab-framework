@@ -120,7 +120,8 @@ class VirtualLabMeetingSystem:
     def __init__(self, pi_agent: PrincipalInvestigatorAgent, 
                  scientific_critic: ScientificCriticAgent,
                  agent_marketplace: AgentMarketplace,
-                 config: Optional[Dict[str, Any]] = None):
+                 config: Optional[Dict[str, Any]] = None,
+                 cost_manager=None):
         """
         Initialize Virtual Lab meeting system.
         
@@ -129,11 +130,13 @@ class VirtualLabMeetingSystem:
             scientific_critic: Scientific critic agent
             agent_marketplace: Agent marketplace for hiring
             config: Configuration dictionary
+            cost_manager: Optional cost manager for tracking API usage
         """
         self.pi_agent = pi_agent
         self.scientific_critic = scientific_critic
         self.agent_marketplace = agent_marketplace
         self.config = config or {}
+        self.cost_manager = cost_manager
         
         # Session tracking
         self.current_session_id = None
@@ -266,7 +269,8 @@ class VirtualLabMeetingSystem:
     
     def conduct_research_session(self, research_question: str,
                                 constraints: Optional[Dict[str, Any]] = None,
-                                context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                context: Optional[Dict[str, Any]] = None,
+                                session_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Conduct a complete research session using Virtual Lab methodology.
         
@@ -274,11 +278,14 @@ class VirtualLabMeetingSystem:
             research_question: The research question to investigate
             constraints: Research constraints (budget, timeline, etc.)
             context: Additional context for the research
+            session_id: Optional session ID to use (if not provided, will generate one)
             
         Returns:
             Dictionary containing research results and session data
         """
-        session_id = f"session_{int(time.time())}"
+        if session_id is None:
+            session_id = f"session_{int(time.time())}"
+        
         self.current_session_id = session_id
         self.session_start_time = time.time()
         
@@ -344,7 +351,7 @@ class VirtualLabMeetingSystem:
                 self.session_data[session_id]['phases'][phase.value] = phase_result
             
             # Compile final results
-            final_results = self._compile_final_results(session_id)
+            final_results = self._compile_final_results(self.session_data[session_id])
             
             # Update session status
             self.session_data[session_id]['status'] = 'completed'
@@ -583,7 +590,7 @@ class VirtualLabMeetingSystem:
         # Conduct individual meeting with PI for literature review
         meeting_result = self._conduct_individual_meeting(agenda, research_question, constraints)
         
-        if meeting_result['success']:
+        if isinstance(meeting_result, dict) and meeting_result.get('success'):
             # Perform actual literature search
             try:
                 from literature_retriever import LiteratureRetriever
@@ -845,7 +852,7 @@ class VirtualLabMeetingSystem:
         # Conduct team meeting
         meeting_result = self._conduct_team_meeting(agenda, agent_objects, research_question, constraints)
         
-        if meeting_result['success']:
+        if isinstance(meeting_result, dict) and meeting_result.get('success'):
             # Extract project specification from meeting outcomes
             project_spec = self._extract_project_specification(meeting_result['meeting_record'])
             
@@ -869,10 +876,24 @@ class VirtualLabMeetingSystem:
         if not hired_agents:
             return {'success': False, 'error': 'No agents available from team selection phase'}
         
-        # Convert agent dictionaries back to agent objects
+        # Convert agent dictionaries back to agent objects with proper error handling
         agent_objects = {}
-        for expertise, agent_dict in hired_agents.items():
-            agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+        try:
+            # Check if hired_agents is actually a dictionary
+            if isinstance(hired_agents, dict):
+                for expertise, agent_dict in hired_agents.items():
+                    if isinstance(agent_dict, dict):
+                        agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+                    else:
+                        logger.warning(f"Invalid agent_dict type for {expertise}: {type(agent_dict)}")
+            else:
+                logger.warning(f"hired_agents is not a dictionary: {type(hired_agents)}")
+                # Create fallback agents if needed
+                agent_objects = self._create_fallback_agents()
+        except Exception as e:
+            logger.error(f"Error processing hired agents: {e}")
+            # Create fallback agents
+            agent_objects = self._create_fallback_agents()
         
         # Initialize cost manager if available
         cost_manager = None
@@ -1063,10 +1084,24 @@ class VirtualLabMeetingSystem:
         team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
         hired_agents = team_selection_result.get('hired_agents', {})
         
-        # Convert agent dictionaries back to agent objects
+        # Convert agent dictionaries back to agent objects with proper error handling
         agent_objects = {}
-        for expertise, agent_dict in hired_agents.items():
-            agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+        try:
+            # Check if hired_agents is actually a dictionary
+            if isinstance(hired_agents, dict):
+                for expertise, agent_dict in hired_agents.items():
+                    if isinstance(agent_dict, dict):
+                        agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+                    else:
+                        logger.warning(f"Invalid agent_dict type for {expertise}: {type(agent_dict)}")
+            else:
+                logger.warning(f"hired_agents is not a dictionary: {type(hired_agents)}")
+                # Create fallback agents if needed
+                agent_objects = self._create_fallback_agents()
+        except Exception as e:
+            logger.error(f"Error processing hired agents: {e}")
+            # Create fallback agents
+            agent_objects = self._create_fallback_agents()
         
         # Initialize cost manager if available
         cost_manager = None
@@ -1579,7 +1614,7 @@ class VirtualLabMeetingSystem:
         # Conduct individual meeting with PI for workflow design
         meeting_result = self._conduct_individual_meeting(agenda, research_question, constraints)
         
-        if meeting_result['success']:
+        if isinstance(meeting_result, dict) and meeting_result.get('success'):
             # Have PI design the workflow
             workflow_prompt = f"""
             As the Principal Investigator, design a comprehensive research workflow using the implemented tools:
@@ -1640,10 +1675,24 @@ class VirtualLabMeetingSystem:
         team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
         hired_agents = team_selection_result.get('hired_agents', {})
         
-        # Convert agent dictionaries back to agent objects
+        # Convert agent dictionaries back to agent objects with proper error handling
         agent_objects = {}
-        for expertise, agent_dict in hired_agents.items():
-            agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+        try:
+            # Check if hired_agents is actually a dictionary
+            if isinstance(hired_agents, dict):
+                for expertise, agent_dict in hired_agents.items():
+                    if isinstance(agent_dict, dict):
+                        agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+                    else:
+                        logger.warning(f"Invalid agent_dict type for {expertise}: {type(agent_dict)}")
+            else:
+                logger.warning(f"hired_agents is not a dictionary: {type(hired_agents)}")
+                # Create fallback agents if needed
+                agent_objects = self._create_fallback_agents()
+        except Exception as e:
+            logger.error(f"Error processing hired agents: {e}")
+            # Create fallback agents
+            agent_objects = self._create_fallback_agents()
         
         execution_results = {}
         
@@ -1701,10 +1750,24 @@ class VirtualLabMeetingSystem:
         team_selection_result = self.phase_results.get(ResearchPhase.TEAM_SELECTION, {})
         hired_agents = team_selection_result.get('hired_agents', {})
         
-        # Convert agent dictionaries back to agent objects
+        # Convert agent dictionaries back to agent objects with proper error handling
         agent_objects = {}
-        for expertise, agent_dict in hired_agents.items():
-            agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+        try:
+            # Check if hired_agents is actually a dictionary
+            if isinstance(hired_agents, dict):
+                for expertise, agent_dict in hired_agents.items():
+                    if isinstance(agent_dict, dict):
+                        agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
+                    else:
+                        logger.warning(f"Invalid agent_dict type for {expertise}: {type(agent_dict)}")
+            else:
+                logger.warning(f"hired_agents is not a dictionary: {type(hired_agents)}")
+                # Create fallback agents if needed
+                agent_objects = self._create_fallback_agents()
+        except Exception as e:
+            logger.error(f"Error processing hired agents: {e}")
+            # Create fallback agents
+            agent_objects = self._create_fallback_agents()
         
         participants = [self.pi_agent.agent_id, self.scientific_critic.agent_id] + \
                       [agent.agent_id for agent in agent_objects.values()]
@@ -1737,7 +1800,7 @@ class VirtualLabMeetingSystem:
         # Conduct final synthesis meeting
         meeting_result = self._conduct_team_meeting(agenda, agent_objects, research_question, constraints)
         
-        if meeting_result['success']:
+        if isinstance(meeting_result, dict) and meeting_result.get('success'):
             # Generate comprehensive scientific critique
             critique_result = self.scientific_critic.critique_research_output(
                 output_content=str(meeting_result['meeting_record'].outcomes),
@@ -1757,6 +1820,23 @@ class VirtualLabMeetingSystem:
             }
         
         return meeting_result
+    
+    def _create_fallback_agents(self) -> Dict[str, BaseAgent]:
+        """Create fallback agents when hired_agents data is corrupted."""
+        fallback_agents = {}
+        try:
+            # Create basic fallback agents
+            fallback_expertise = ['general_research', 'data_analysis', 'methodology']
+            for expertise in fallback_expertise:
+                agent = self._create_simple_agent(
+                    agent_id=f"fallback_{expertise}",
+                    role=f"{expertise.replace('_', ' ').title()} Expert",
+                    expertise=[expertise]
+                )
+                fallback_agents[expertise] = agent
+        except Exception as e:
+            logger.error(f"Error creating fallback agents: {e}")
+        return fallback_agents
     
     def _conduct_team_meeting(self, agenda: MeetingAgenda, hired_agents: Dict[str, BaseAgent],
                              research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:

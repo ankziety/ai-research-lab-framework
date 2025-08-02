@@ -23,6 +23,9 @@ from memory import VectorDatabase, ContextManager, KnowledgeRepository
 # Import Virtual Lab meeting system
 from virtual_lab import VirtualLabMeetingSystem
 
+# Import cost management
+from cost_manager import CostManager
+
 # Import original framework components for backward compatibility
 from manuscript_drafter import draft as draft_manuscript
 from literature_retriever import LiteratureRetriever
@@ -140,13 +143,13 @@ class MultiAgentResearchFramework:
             # Memory configuration
             'vector_db_path': 'memory/vector_memory.db',
             'embedding_model': 'all-MiniLM-L6-v2',
-            'max_context_length': 4000,
+            'max_context_length': 100000,
             
             # LLM API configuration for AI agents
             'openai_api_key': None,
             'anthropic_api_key': None,
             'default_llm_provider': 'openai',  # 'openai', 'anthropic', or 'local'
-            'default_model': 'gpt-4',
+            'default_model': 'gpt-4o',
             
             # Agent configuration
             'max_agents_per_research': config.get('max_agents_per_research', 8),
@@ -207,42 +210,16 @@ class MultiAgentResearchFramework:
             'openai_api_key': self.config.get('openai_api_key'),
             'anthropic_api_key': self.config.get('anthropic_api_key'),
             'default_llm_provider': self.config.get('default_llm_provider', 'openai'),
-            'default_model': self.config.get('default_model', 'gpt-4')
+            'default_model': self.config.get('default_model', 'gpt-4o')
         }
         
-        # Initialize agent marketplace with LLM configuration
-        self.agent_marketplace = AgentMarketplace(llm_config=llm_config)
-        
-        # Initialize Principal Investigator with LLM configuration
-        pi_model_config = self.config.get('pi_model_config', {})
-        pi_model_config.update(llm_config)
-        self.pi_agent = PrincipalInvestigatorAgent(
-            agent_id="PI_main",
-            model_config=pi_model_config
-        )
-        
-        # Initialize Scientific Critic with LLM configuration
-        critic_model_config = self.config.get('critic_model_config', {})
-        critic_model_config.update(llm_config)
-        self.scientific_critic = ScientificCriticAgent(
-            agent_id="critic_main",
-            model_config=critic_model_config
-        )
-        
-        logger.info("Multi-agent system initialized")
-    
-    def _init_virtual_lab(self):
-        """Initialize the Virtual Lab meeting system with cost management."""
-        logger.info("Initializing Virtual Lab meeting system...")
-        
-        # Initialize cost manager configuration
-        budget_limit = self.config.get('budget_limit', 100.0)
-        cost_config = {
-            'budget_limit': budget_limit,
+        # Initialize cost manager
+        self.cost_config = {
+            'budget_limit': self.config.get('budget_limit', 20.0),
             'cost_optimization': self.config.get('cost_optimization', True),
             'enable_dynamic_tools': self.config.get('enable_dynamic_tools', True),
-            'default_model': self.config.get('default_model', 'gpt-3.5-turbo'),
-            'premium_model': self.config.get('premium_model', 'gpt-4'),
+            'default_model': self.config.get('default_model', 'gpt-4o-mini'),
+            'premium_model': self.config.get('premium_model', 'gpt-4o'),
             'web_search_apis': self.config.get('web_search_apis', {}),
             'code_execution': self.config.get('code_execution', {
                 'sandbox_enabled': True,
@@ -251,15 +228,51 @@ class MultiAgentResearchFramework:
             })
         }
         
+        self.cost_manager = CostManager(
+            budget_limit=self.cost_config['budget_limit'],
+            config=self.cost_config
+        )
+        
+        # Initialize agent marketplace with LLM configuration and cost manager
+        self.agent_marketplace = AgentMarketplace(
+            llm_config=llm_config,
+            cost_manager=self.cost_manager
+        )
+        
+        # Initialize Principal Investigator with LLM configuration and cost manager
+        pi_model_config = self.config.get('pi_model_config', {})
+        pi_model_config.update(llm_config)
+        self.pi_agent = PrincipalInvestigatorAgent(
+            agent_id="PI_main",
+            model_config=pi_model_config,
+            cost_manager=self.cost_manager
+        )
+        
+        # Initialize Scientific Critic with LLM configuration and cost manager
+        critic_model_config = self.config.get('critic_model_config', {})
+        critic_model_config.update(llm_config)
+        self.scientific_critic = ScientificCriticAgent(
+            agent_id="critic_main",
+            model_config=critic_model_config,
+            cost_manager=self.cost_manager
+        )
+        
+        logger.info("Multi-agent system initialized")
+    
+    def _init_virtual_lab(self):
+        """Initialize the Virtual Lab meeting system with cost management."""
+        logger.info("Initializing Virtual Lab meeting system...")
+        
         # Initialize Virtual Lab with the multi-agent components and cost management
         self.virtual_lab = VirtualLabMeetingSystem(
             pi_agent=self.pi_agent,
             scientific_critic=self.scientific_critic,
             agent_marketplace=self.agent_marketplace,
-            config=cost_config
+            config=self.cost_config,
+            cost_manager=self.cost_manager
         )
         
-        logger.info(f"Virtual Lab meeting system initialized with budget: ${budget_limit:.2f}")
+        logger.info(f"Virtual Lab meeting system initialized with budget: ${self.config.get('budget_limit', 100.0):.2f}")
     
     def _init_legacy_components(self):
         logger.info("Initializing legacy components...")
@@ -309,7 +322,7 @@ class MultiAgentResearchFramework:
                         constraints: Optional[Dict[str, Any]] = None,
                         context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
-        Conduct a complete multi-agent research session.
+        Conduct research using the multi-agent framework.
         
         Args:
             research_question: The research question to investigate
@@ -321,7 +334,7 @@ class MultiAgentResearchFramework:
         """
         logger.info(f"Starting multi-agent research session: {research_question[:100]}...")
         
-        session_id = f"research_{int(time.time())}"
+        session_id = f"session_{int(time.time())}"
         
         # Store initial research question in context
         if self.config['store_all_interactions']:
@@ -339,7 +352,8 @@ class MultiAgentResearchFramework:
             coordination_result = self.pi_agent.coordinate_research_session(
                 problem_description=research_question,
                 marketplace=self.agent_marketplace,
-                constraints=constraints
+                constraints=constraints,
+                session_id=session_id
             )
             
             # Store coordination results in context
@@ -410,7 +424,8 @@ class MultiAgentResearchFramework:
     
     def conduct_virtual_lab_research(self, research_question: str, 
                                    constraints: Optional[Dict[str, Any]] = None,
-                                   context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                   context: Optional[Dict[str, Any]] = None,
+                                   session_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Conduct research using the Virtual Lab methodology with structured meetings.
         
@@ -421,6 +436,7 @@ class MultiAgentResearchFramework:
             research_question: The research question to investigate
             constraints: Optional constraints (budget, time, etc.)
             context: Optional additional context
+            session_id: Optional session ID to use (if not provided, will generate one)
             
         Returns:
             Complete Virtual Lab research session results
@@ -432,7 +448,8 @@ class MultiAgentResearchFramework:
             vlab_results = self.virtual_lab.conduct_research_session(
                 research_question=research_question,
                 constraints=constraints,
-                context=context
+                context=context,
+                session_id=session_id
             )
             
             # Store results in context manager if enabled
@@ -584,53 +601,64 @@ class MultiAgentResearchFramework:
             return cross_pollination
         
         # Have each agent comment on others' findings
-        for expertise, agent_dict in hired_agents.items():
-            try:
-                # Create a simple agent object for interaction
-                agent = self._create_simple_agent_from_dict(agent_dict)
-                
-                # Filter out this agent's own results
-                other_results = [summary for summary in output_summary 
-                               if not summary.startswith(agent.agent_id)]
-                
-                if other_results:
-                    cross_prompt = f"""
-                    Based on your expertise in {expertise}, analyze these findings from other experts:
+        try:
+            # Check if hired_agents is actually a dictionary
+            if isinstance(hired_agents, dict):
+                for expertise, agent_dict in hired_agents.items():
+                    if not isinstance(agent_dict, dict):
+                        logger.warning(f"Invalid agent_dict type for {expertise}: {type(agent_dict)}")
+                        continue
                     
-                    {chr(10).join(other_results)}
-                    
-                    Provide:
-                    1. CONNECTIONS: How these findings connect to your expertise
-                    2. CONTRADICTIONS: Any contradictions or inconsistencies you observe
-                    3. SYNERGIES: Potential synergies between different findings
-                    4. INSIGHTS: New insights from cross-domain perspective
-                    
-                    Format as:
-                    CONNECTIONS: connection1 | connection2 | connection3
-                    CONTRADICTIONS: contradiction1 | contradiction2
-                    SYNERGIES: synergy1 | synergy2 | synergy3
-                    INSIGHTS: insight1 | insight2 | insight3
-                    """
-                    
-                    # For SimpleAgent objects, generate a simple response
-                    if hasattr(agent, 'generate_response'):
-                        cross_response = agent.generate_response(cross_prompt, {
-                            'session_id': session_id,
-                            'interaction_type': 'cross_pollination',
-                            'other_results': other_results
-                        })
-                    else:
-                        cross_response = f"Agent {agent.agent_id} ({agent.role}) cross-analysis: {expertise} insights on findings"
-                    
-                    cross_pollination['interactions'].append({
-                        'agent_id': agent.agent_id,
-                        'expertise': expertise,
-                        'cross_analysis': cross_response,
-                        'timestamp': time.time()
-                    })
-                    
-            except Exception as e:
-                logger.warning(f"Cross-pollination failed for agent {agent_dict.get('agent_id', 'unknown')}: {e}")
+                    try:
+                        # Create a simple agent object for interaction
+                        agent = self._create_simple_agent_from_dict(agent_dict)
+                        
+                        # Filter out this agent's own results
+                        other_results = [summary for summary in output_summary 
+                                       if not summary.startswith(agent.agent_id)]
+                        
+                        if other_results:
+                            cross_prompt = f"""
+                            Based on your expertise in {expertise}, analyze these findings from other experts:
+                            
+                            {chr(10).join(other_results)}
+                            
+                            Provide:
+                            1. CONNECTIONS: How these findings connect to your expertise
+                            2. CONTRADICTIONS: Any contradictions or inconsistencies you observe
+                            3. SYNERGIES: Potential synergies between different findings
+                            4. INSIGHTS: New insights from cross-domain perspective
+                            
+                            Format as:
+                            CONNECTIONS: connection1 | connection2 | connection3
+                            CONTRADICTIONS: contradiction1 | contradiction2
+                            SYNERGIES: synergy1 | synergy2 | synergy3
+                            INSIGHTS: insight1 | insight2 | insight3
+                            """
+                            
+                            # For SimpleAgent objects, generate a simple response
+                            if hasattr(agent, 'generate_response'):
+                                cross_response = agent.generate_response(cross_prompt, {
+                                    'session_id': session_id,
+                                    'interaction_type': 'cross_pollination',
+                                    'other_results': other_results
+                                })
+                            else:
+                                cross_response = f"Agent {agent.agent_id} ({agent.role}) cross-analysis: {expertise} insights on findings"
+                            
+                            cross_pollination['interactions'].append({
+                                'agent_id': agent.agent_id,
+                                'expertise': expertise,
+                                'cross_analysis': cross_response,
+                                'timestamp': time.time()
+                            })
+                            
+                    except Exception as e:
+                        logger.warning(f"Cross-pollination failed for agent {agent_dict.get('agent_id', 'unknown')}: {e}")
+            else:
+                logger.warning(f"hired_agents is not a dictionary: {type(hired_agents)}")
+        except Exception as e:
+            logger.error(f"Error processing hired agents in cross-pollination: {e}")
         
         return cross_pollination
     
