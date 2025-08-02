@@ -19,12 +19,259 @@ class AIResearchLabApp {
     }
     
     init() {
-        this.initializeUI();
-        this.initializeWebSocket();
-        this.loadConfiguration();
-        this.startSystemMonitoring();
+        try {
+            // Add a simple status indicator to show the app is working
+            this.addStatusIndicator();
+            
+            this.initializeUI();
+            this.initializeWebSocket();
+            this.loadConfiguration();
+            this.startSystemMonitoring();
+            
+            // Load initial data
+            this.loadInitialData();
+            
+            console.log('AI Research Lab Interface initialized');
+        } catch (error) {
+            console.error('Error initializing AI Research Lab Interface:', error);
+            this.showNotification('error', 'Initialization Error', 'Failed to initialize the interface');
+        }
+    }
+    
+    addStatusIndicator() {
+        // Add a simple status indicator to the header
+        const headerControls = document.querySelector('.header-controls');
+        if (headerControls) {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'status-indicator';
+            statusDiv.id = 'appStatus';
+            statusDiv.innerHTML = `
+                <div class="status-dot online"></div>
+                <span>App Ready</span>
+            `;
+            headerControls.appendChild(statusDiv);
+        }
+    }
+    
+    async loadInitialData() {
+        try {
+            // Load historical data from persistent storage
+            await this.loadHistoricalData();
+            
+            // Load initial chat logs
+            await this.loadChatLogs();
+            
+            // Load initial meetings
+            await this.loadMeetings();
+            
+            // Load initial agent activity
+            await this.refreshAgents();
+            
+            // Load metrics
+            await this.loadMetrics();
+            
+            // Show welcome notification
+            this.showNotification('success', 'Welcome', 'AI Research Lab Interface loaded successfully');
+            
+        } catch (error) {
+            console.error('Error loading initial data:', error);
+            this.showNotification('error', 'Data Load Error', 'Some data failed to load. Check console for details.');
+        }
+    }
+    
+    async loadHistoricalData() {
+        try {
+            const response = await fetch('/api/data/history');
+            const data = await response.json();
+            
+            if (data.error) {
+                console.warn('Could not load historical data:', data.error);
+                return;
+            }
+            
+            console.log('Loaded historical data:', {
+                sessions: data.total_sessions,
+                chatLogs: data.total_chat_logs,
+                agentActivity: data.total_agent_activities,
+                meetings: data.total_meetings
+            });
+            
+            // Load recent sessions into the UI
+            if (data.sessions && data.sessions.length > 0) {
+                this.loadSessionsIntoUI(data.sessions);
+            }
+            
+            // Load recent chat logs
+            if (data.chat_logs && data.chat_logs.length > 0) {
+                this.loadChatLogsIntoUI(data.chat_logs);
+            }
+            
+            // Load recent agent activity
+            if (data.agent_activity && data.agent_activity.length > 0) {
+                this.loadAgentActivityIntoUI(data.agent_activity);
+            }
+            
+            // Load recent meetings
+            if (data.meetings && data.meetings.length > 0) {
+                this.loadMeetingsIntoUI(data.meetings);
+            }
+            
+            // Handle active sessions
+            if (data.active_sessions && data.active_sessions.length > 0) {
+                this.handleActiveSessions(data.active_sessions);
+            }
+            
+        } catch (error) {
+            console.error('Error loading historical data:', error);
+        }
+    }
+    
+    loadSessionsIntoUI(sessions) {
+        // Update session list if it exists
+        const sessionList = document.getElementById('sessionList');
+        if (sessionList) {
+            sessions.forEach(session => {
+                const sessionElement = this.createSessionElement(session);
+                sessionList.appendChild(sessionElement);
+            });
+        }
+    }
+    
+    createSessionElement(session) {
+        const div = document.createElement('div');
+        div.className = 'session-item';
+        div.innerHTML = `
+            <div class="session-header">
+                <span class="session-id">${session.id}</span>
+                <span class="session-status ${session.status}">${session.status}</span>
+            </div>
+            <div class="session-question">${session.research_question || 'No question'}</div>
+            <div class="session-date">${new Date(session.created_at).toLocaleString()}</div>
+        `;
+        return div;
+    }
+    
+    loadChatLogsIntoUI(chatLogs) {
+        const chatContainer = document.getElementById('chatLogs');
+        if (chatContainer) {
+            chatLogs.forEach(log => {
+                this.addChatLogEntry(log);
+            });
+        }
+    }
+    
+    loadAgentActivityIntoUI(activities) {
+        activities.forEach(activity => {
+            this.updateAgentActivity(activity);
+        });
+    }
+    
+    loadMeetingsIntoUI(meetings) {
+        const meetingsContainer = document.getElementById('meetingsList');
+        if (meetingsContainer) {
+            meetings.forEach(meeting => {
+                this.createMeetingEntry(meeting);
+            });
+        }
+    }
+    
+    handleActiveSessions(activeSessions) {
+        if (activeSessions.length > 0) {
+            // If there are active sessions, show a notification
+            this.showNotification('info', 'Active Sessions Found', 
+                `Found ${activeSessions.length} active research session(s). You can continue from where you left off.`);
+        }
+    }
+    
+    async loadMetrics() {
+        try {
+            const response = await fetch('/api/metrics');
+            const data = await response.json();
+            
+            if (data.current) {
+                this.updateSystemMetrics(data.current);
+            }
+            
+            if (data.session_stats) {
+                const totalSessions = document.getElementById('totalSessions');
+                const successfulSessions = document.getElementById('successfulSessions');
+                
+                if (totalSessions) {
+                    totalSessions.textContent = data.session_stats.total_sessions || 0;
+                }
+                if (successfulSessions) {
+                    successfulSessions.textContent = data.session_stats.successful_sessions || 0;
+                }
+            }
+            
+        } catch (error) {
+            console.error('Error loading metrics:', error);
+        }
+    }
+    
+    showSkeletonLoading(containerId, type = 'default') {
+        const container = document.getElementById(containerId);
+        if (!container) return;
         
-        console.log('AI Research Lab Interface initialized');
+        const skeletonTemplates = {
+            'activity': `
+                <div class="skeleton-item">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-content">
+                        <div class="skeleton-line skeleton-title"></div>
+                        <div class="skeleton-line skeleton-text"></div>
+                    </div>
+                </div>
+            `,
+            'chat': `
+                <div class="skeleton-chat-item">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-content">
+                        <div class="skeleton-line skeleton-header"></div>
+                        <div class="skeleton-line skeleton-message"></div>
+                    </div>
+                </div>
+            `,
+            'meeting': `
+                <div class="skeleton-meeting-item">
+                    <div class="skeleton-line skeleton-title"></div>
+                    <div class="skeleton-line skeleton-info"></div>
+                    <div class="skeleton-line skeleton-status"></div>
+                </div>
+            `,
+            'agent': `
+                <div class="skeleton-agent-item">
+                    <div class="skeleton-avatar"></div>
+                    <div class="skeleton-content">
+                        <div class="skeleton-line skeleton-name"></div>
+                        <div class="skeleton-line skeleton-expertise"></div>
+                    </div>
+                </div>
+            `,
+            'metric': `
+                <div class="skeleton-metric-item">
+                    <div class="skeleton-line skeleton-value"></div>
+                    <div class="skeleton-line skeleton-label"></div>
+                </div>
+            `
+        };
+        
+        const template = skeletonTemplates[type] || skeletonTemplates['default'];
+        const skeletonCount = type === 'metric' ? 4 : 5;
+        
+        container.innerHTML = '';
+        for (let i = 0; i < skeletonCount; i++) {
+            container.innerHTML += template;
+        }
+    }
+    
+    hideSkeletonLoading(containerId) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        
+        // Remove skeleton elements
+        const skeletons = container.querySelectorAll('.skeleton-item, .skeleton-chat-item, .skeleton-meeting-item, .skeleton-agent-item, .skeleton-metric-item');
+        skeletons.forEach(skeleton => skeleton.remove());
     }
     
     // ========================================
@@ -32,6 +279,8 @@ class AIResearchLabApp {
     // ========================================
     
     initializeWebSocket() {
+        console.log('Initializing WebSocket connection...');
+        
         this.socket = io({
             timeout: 60000,           // 60 second connection timeout
             reconnection: true,       // Enable reconnection
@@ -41,6 +290,8 @@ class AIResearchLabApp {
             forceNew: false,         // Don't force new connection if one exists
             transports: ['websocket', 'polling'] // Allow both transports
         });
+        
+        console.log('WebSocket object created, setting up event handlers...');
         this.setupWebSocketEventHandlers();
     }
 
@@ -132,15 +383,57 @@ class AIResearchLabApp {
     // ========================================
     
     initializeUI() {
-        this.initializeNavigation();
-        this.initializeResearchConfig();
-        this.initializeAgentVisualization();
-        this.initializeProgressTracking();
-        this.initializeActivityLog();
-        this.initializeChatLogs();
-        this.initializeMeetings();
-        this.initializeSettings();
-        this.initializeConstraints();
+        console.log('Initializing UI components...');
+        
+        try {
+            // Check if required elements exist
+            const requiredElements = [
+                'researchQuestion',
+                'startResearchBtn',
+                'agentsContainer',
+                'activityStream',
+                'chatStream',
+                'notificationsContainer'
+            ];
+            
+            const missingElements = requiredElements.filter(id => !document.getElementById(id));
+            if (missingElements.length > 0) {
+                console.error('Missing required elements:', missingElements);
+                throw new Error(`Missing required elements: ${missingElements.join(', ')}`);
+            }
+            
+            this.initializeNavigation();
+            console.log('Navigation initialized');
+            
+            this.initializeResearchConfig();
+            console.log('Research config initialized');
+            
+            this.initializeAgentVisualization();
+            console.log('Agent visualization initialized');
+            
+            this.initializeProgressTracking();
+            console.log('Progress tracking initialized');
+            
+            this.initializeActivityLog();
+            console.log('Activity log initialized');
+            
+            this.initializeChatLogs();
+            console.log('Chat logs initialized');
+            
+            this.initializeMeetings();
+            console.log('Meetings initialized');
+            
+            this.initializeSettings();
+            console.log('Settings initialized');
+            
+            this.initializeConstraints();
+            console.log('Constraints initialized');
+            
+            console.log('All UI components initialized successfully');
+        } catch (error) {
+            console.error('Error initializing UI components:', error);
+            this.showNotification('error', 'UI Error', 'Failed to initialize some UI components: ' + error.message);
+        }
     }
     
     initializeNavigation() {
@@ -188,6 +481,81 @@ class AIResearchLabApp {
         this.agentsContainer = document.getElementById('agentsContainer');
         this.agentsList = document.getElementById('agentsList');
         this.meetingIndicator = document.querySelector('.meeting-indicator');
+        
+        // Add refresh button event handler
+        const refreshBtn = document.getElementById('refreshAgentsBtn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                this.refreshAgents();
+            });
+        }
+    }
+    
+    async refreshAgents() {
+        try {
+            // Show loading state
+            const refreshBtn = document.getElementById('refreshAgentsBtn');
+            const icon = refreshBtn.querySelector('i');
+            icon.className = 'fas fa-spinner fa-spin';
+            
+            // Show skeleton loading for agents list
+            this.showSkeletonLoading('agentsList', 'agent');
+            
+            // Fetch current agent activity
+            const response = await fetch('/api/agent-activity');
+            const data = await response.json();
+            
+            // Hide skeleton loading
+            this.hideSkeletonLoading('agentsList');
+            
+            if (data.activities && data.activities.length > 0) {
+                // Clear existing agents
+                this.agents.clear();
+                this.agentsContainer.innerHTML = '';
+                
+                // Process each activity to rebuild agent list
+                data.activities.forEach(activity => {
+                    this.updateAgentActivity({
+                        agent_id: activity.agent_id,
+                        name: activity.agent_id,
+                        expertise: 'Research Agent',
+                        status: activity.status || 'idle',
+                        activity: activity.message || '',
+                        type: activity.activity_type
+                    });
+                });
+            } else {
+                // Show empty state
+                const agentsList = document.getElementById('agentsList');
+                if (agentsList) {
+                    agentsList.innerHTML = '<div class="empty-state">No agents available</div>';
+                }
+                const agentsContainer = document.getElementById('agentsContainer');
+                if (agentsContainer) {
+                    agentsContainer.innerHTML = '<div class="empty-state">No agents active</div>';
+                }
+            }
+            
+            // Reset button state
+            icon.className = 'fas fa-sync-alt';
+            this.showNotification('success', 'Agents Refreshed', 'Agent list updated successfully');
+            
+        } catch (error) {
+            console.error('Error refreshing agents:', error);
+            this.hideSkeletonLoading('agentsList');
+            this.showNotification('error', 'Refresh Error', 'Failed to refresh agents');
+            
+            // Reset button state
+            const refreshBtn = document.getElementById('refreshAgentsBtn');
+            const icon = refreshBtn.querySelector('i');
+            icon.className = 'fas fa-sync-alt';
+            
+            // Show error state
+            const agentsList = document.getElementById('agentsList');
+            if (agentsList) {
+                agentsList.innerHTML = '<div class="empty-state">Failed to load agents</div>';
+            }
+        }
     }
     
     initializeProgressTracking() {
@@ -494,12 +862,17 @@ class AIResearchLabApp {
         const centerX = containerRect.width / 2;
         const centerY = containerRect.height / 2;
         const radius = 150;
-        
-        // Calculate position around circle
-        const angle = (agentId * 2 * Math.PI) / 6; // Assuming max 6 agents
+
+        // Determine this agent's index among currently known agents to place them evenly in a circle
+        const agentIds = Array.from(this.agents.keys());
+        const index = agentIds.indexOf(agentId);
+        const total = agentIds.length || 1;
+
+        // Calculate position around circle based on index (avoids NaN for string IDs)
+        const angle = (index * 2 * Math.PI) / total;
         const x = centerX + radius * Math.cos(angle) - 30; // 30 = half avatar width
         const y = centerY + radius * Math.sin(angle) - 30; // 30 = half avatar height
-        
+
         avatar.style.left = `${x}px`;
         avatar.style.top = `${y}px`;
     }
@@ -509,13 +882,16 @@ class AIResearchLabApp {
         let agent = this.agents.get(agentId);
         
         if (!agent) {
-            // Create new agent
+            // Create new agent with better naming
+            const agentName = this.getAgentDisplayName(agentId);
+            const agentExpertise = this.getAgentExpertise(agentId);
+            
             agent = {
                 id: agentId,
-                name: data.name || `Agent ${agentId}`,
-                expertise: data.expertise || 'General',
+                name: agentName,
+                expertise: agentExpertise,
                 status: data.status || 'idle',
-                activity: data.activity || ''
+                activity: data.activity || data.type || ''
             };
             this.agents.set(agentId, agent);
             
@@ -528,7 +904,7 @@ class AIResearchLabApp {
         } else {
             // Update existing agent
             agent.status = data.status || agent.status;
-            agent.activity = data.activity || agent.activity;
+            agent.activity = data.activity || data.type || agent.activity;
         }
         
         // Update avatar appearance
@@ -546,6 +922,32 @@ class AIResearchLabApp {
             message: data.activity || data.message,
             timestamp: Date.now() / 1000
         });
+    }
+    
+    getAgentDisplayName(agentId) {
+        const nameMap = {
+            'principal_investigator': 'Principal Investigator',
+            'test_agent': 'Research Assistant',
+            'scientific_critic': 'Scientific Critic',
+            'domain_expert': 'Domain Expert',
+            'data_analyst': 'Data Analyst',
+            'literature_reviewer': 'Literature Reviewer'
+        };
+        
+        return nameMap[agentId] || `Agent ${agentId.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+    }
+    
+    getAgentExpertise(agentId) {
+        const expertiseMap = {
+            'principal_investigator': 'Research Leadership',
+            'test_agent': 'General Research',
+            'scientific_critic': 'Scientific Review',
+            'domain_expert': 'Specialized Knowledge',
+            'data_analyst': 'Data Analysis',
+            'literature_reviewer': 'Literature Reviewer'
+        };
+        
+        return expertiseMap[agentId] || 'Research Support';
     }
     
     updateAgentAvatar(agent) {
@@ -826,16 +1228,33 @@ class AIResearchLabApp {
     
     async loadChatLogs() {
         try {
+            // Show skeleton loading
+            this.showSkeletonLoading('chatStream', 'chat');
+            
             const response = await fetch('/api/chat-logs');
             const data = await response.json();
             
-            if (data.logs) {
+            // Hide skeleton loading
+            this.hideSkeletonLoading('chatStream');
+            
+            if (data.logs && data.logs.length > 0) {
                 data.logs.forEach(log => {
                     this.addChatLogEntry(log);
                 });
+            } else {
+                // Show empty state
+                const chatStream = document.getElementById('chatStream');
+                if (chatStream) {
+                    chatStream.innerHTML = '<div class="empty-state">No chat logs available</div>';
+                }
             }
         } catch (error) {
             console.error('Error loading chat logs:', error);
+            this.hideSkeletonLoading('chatStream');
+            const chatStream = document.getElementById('chatStream');
+            if (chatStream) {
+                chatStream.innerHTML = '<div class="empty-state">Failed to load chat logs</div>';
+            }
         }
     }
     
@@ -936,16 +1355,33 @@ class AIResearchLabApp {
     
     async loadMeetings() {
         try {
+            // Show skeleton loading
+            this.showSkeletonLoading('meetingsList', 'meeting');
+            
             const response = await fetch('/api/meetings');
             const data = await response.json();
             
-            if (data.success) {
+            // Hide skeleton loading
+            this.hideSkeletonLoading('meetingsList');
+            
+            if (data.meetings && data.meetings.length > 0) {
                 this.meetings = data.meetings;
                 this.updateMeetingsList(data.meetings);
                 this.updateMeetingsStats(data.meetings);
+            } else {
+                // Show empty state
+                const meetingsList = document.getElementById('meetingsList');
+                if (meetingsList) {
+                    meetingsList.innerHTML = '<div class="empty-state">No meetings recorded yet</div>';
+                }
             }
         } catch (error) {
             console.error('Error loading meetings:', error);
+            this.hideSkeletonLoading('meetingsList');
+            const meetingsList = document.getElementById('meetingsList');
+            if (meetingsList) {
+                meetingsList.innerHTML = '<div class="empty-state">Failed to load meetings</div>';
+            }
         }
     }
     
@@ -955,7 +1391,7 @@ class AIResearchLabApp {
         
         meetingsList.innerHTML = '';
         
-        if (meetings.length === 0) {
+        if (!meetings || meetings.length === 0) {
             meetingsList.innerHTML = '<div class="empty-state">No meetings recorded yet</div>';
             return;
         }
@@ -1017,6 +1453,30 @@ class AIResearchLabApp {
         const duration = this.formatDuration(meeting.duration);
         const timestamp = new Date(meeting.timestamp * 1000).toLocaleString();
         
+        // Safely parse JSON data with error handling
+        let outcomeContent = 'No outcomes recorded';
+        let transcriptContent = 'No transcript available';
+        
+        try {
+            if (meeting.outcome && meeting.outcome !== '') {
+                const parsedOutcome = JSON.parse(meeting.outcome);
+                outcomeContent = typeof parsedOutcome === 'object' ? 
+                    JSON.stringify(parsedOutcome, null, 2) : parsedOutcome;
+            }
+        } catch (e) {
+            outcomeContent = meeting.outcome || 'No outcomes recorded';
+        }
+        
+        try {
+            if (meeting.transcript && meeting.transcript !== '') {
+                const parsedTranscript = JSON.parse(meeting.transcript);
+                transcriptContent = typeof parsedTranscript === 'object' ? 
+                    JSON.stringify(parsedTranscript, null, 2) : parsedTranscript;
+            }
+        } catch (e) {
+            transcriptContent = meeting.transcript || 'No transcript available';
+        }
+        
         detailsContainer.innerHTML = `
             <h3>${meeting.topic}</h3>
             <div class="meeting-detail-info">
@@ -1027,13 +1487,13 @@ class AIResearchLabApp {
             <div class="meeting-outcome-details">
                 <h4>Outcomes</h4>
                 <div class="outcome-content">
-                    ${meeting.outcome ? JSON.parse(meeting.outcome) : 'No outcomes recorded'}
+                    ${outcomeContent}
                 </div>
             </div>
             <div class="meeting-transcript">
                 <h4>Discussion</h4>
                 <div class="transcript-content">
-                    ${meeting.transcript ? JSON.parse(meeting.transcript) : 'No transcript available'}
+                    ${transcriptContent}
                 </div>
             </div>
         `;
@@ -1543,7 +2003,32 @@ class AIResearchLabApp {
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-    window.aiResearchLab = new AIResearchLabApp();
+    console.log('DOM loaded, initializing AI Research Lab App...');
+    
+    try {
+        window.aiResearchLab = new AIResearchLabApp();
+        console.log('AI Research Lab App initialized successfully');
+    } catch (error) {
+        console.error('Error initializing AI Research Lab App:', error);
+        
+        // Show error notification
+        const container = document.getElementById('notificationsContainer');
+        if (container) {
+            const notification = document.createElement('div');
+            notification.className = 'notification error';
+            notification.innerHTML = `
+                <div class="notification-header">
+                    <span class="notification-title">Initialization Error</span>
+                    <button class="notification-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-message">Failed to initialize the application: ${error.message}</div>
+            `;
+            container.appendChild(notification);
+            setTimeout(() => notification.classList.add('show'), 100);
+        }
+    }
 });
 
 // Demo functions for testing
