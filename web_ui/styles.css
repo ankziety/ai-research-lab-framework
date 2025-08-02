@@ -237,7 +237,7 @@ body {
 .panel-header {
     display: flex;
     align-items: center;
-    justify-content: between;
+    justify-content: space-between;
     margin-bottom: var(--space-xl);
     gap: var(--space-lg);
 }
