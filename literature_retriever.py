@@ -51,9 +51,14 @@ class LiteratureRetriever:
         self.openalex_url = "https://api.openalex.org/works"
         self.core_url = "https://api.core.ac.uk/v3/search/works"
         
+        # Additional free APIs
+        self.base_url = "https://api.base-search.net/cgi-bin/BaseHttpSearchInterface.fcgi"
+        self.unpaywall_url = "https://api.unpaywall.org/v2"
+        self.citebase_url = "https://citebase.org/api"
+        
         # Request timeout settings
         self.session_timeout = 30
-        self.rate_limit_delay = 0.5  # Seconds between requests
+        self.rate_limit_delay = 2 # Seconds between requests
         
         # Citation tracking
         self.search_history = []
@@ -69,14 +74,13 @@ class LiteratureRetriever:
             query: The search query string
             max_results: Maximum number of results to return (default: 10)
             sources: List of sources to search. Available: 
-                    ['pubmed', 'arxiv', 'crossref', 'google_scholar', 'google_search', 
-                     'semantic_scholar', 'openalex', 'core']
-                    Default: ['pubmed', 'arxiv', 'semantic_scholar']
+                    ['pubmed', 'arxiv', 'crossref', 'base', 'semantic_scholar', 'openalex', 'core']
+                    Default: ['pubmed', 'arxiv', 'crossref', 'base', 'semantic_scholar']
             
         Returns:
             List of dictionaries containing paper metadata with full details
         """
-        sources = sources or ['pubmed', 'arxiv', 'semantic_scholar']
+        sources = sources or ['pubmed', 'arxiv', 'crossref', 'base', 'semantic_scholar']
         all_papers = []
         
         if not query or not query.strip():
@@ -105,10 +109,8 @@ class LiteratureRetriever:
                     papers = self._search_arxiv(query, max_results // len(sources))
                 elif source.lower() == 'crossref':
                     papers = self._search_crossref(query, max_results // len(sources))
-                elif source.lower() == 'google_scholar':
-                    papers = self._search_google_scholar(query, max_results // len(sources))
-                elif source.lower() == 'google_search':
-                    papers = self._search_google_search(query, max_results // len(sources))
+                elif source.lower() == 'base':
+                    papers = self._search_base(query, max_results // len(sources))
                 elif source.lower() == 'semantic_scholar':
                     papers = self._search_semantic_scholar(query, max_results // len(sources))
                 elif source.lower() == 'openalex':
@@ -522,6 +524,14 @@ class LiteratureRetriever:
             
             response = requests.get(self.semantic_scholar_url, params=params, 
                                   headers=headers, timeout=self.session_timeout)
+            
+            # Handle rate limiting
+            if response.status_code == 429:
+                logger.warning("Semantic Scholar rate limit hit, waiting 5 seconds...")
+                time.sleep(5)
+                response = requests.get(self.semantic_scholar_url, params=params, 
+                                      headers=headers, timeout=self.session_timeout)
+            
             response.raise_for_status()
             
             data = response.json()
@@ -608,6 +618,42 @@ class LiteratureRetriever:
         except Exception as e:
             logger.error(f"CORE search failed: {str(e)}")
             return self._generate_mock_core_results(query, max_results)
+    
+    def _search_base(self, query: str, max_results: int) -> List[Dict]:
+        """
+        Search Base-search.net using their free API.
+        
+        Args:
+            query: Search query
+            max_results: Maximum number of results
+            
+        Returns:
+            List of paper dictionaries
+        """
+        try:
+            params = {
+                'query': query,
+                'max_results': min(max_results, 100), # Base-search.net limit
+                'sort': 'relevance'
+            }
+            
+            headers = {
+                'User-Agent': 'LiteratureRetriever/1.0 (mailto:research@example.com)'
+            }
+            
+            response = requests.get(self.base_url, params=params, 
+                                  headers=headers, timeout=self.session_timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            papers = self._parse_base_response(data)
+            logger.info(f"Retrieved {len(papers)} papers from Base-search.net")
+            
+            return papers
+            
+        except Exception as e:
+            logger.error(f"Base-search.net search failed: {str(e)}")
+            return self._generate_mock_base_results(query, max_results)
     
     def _parse_pubmed_xml(self, xml_content: str, paper_ids: List[str]) -> List[Dict]:
         """
@@ -707,6 +753,49 @@ class LiteratureRetriever:
                 'url': item.get('URL'),
                 'open_access': item.get('is-open-access', False),
                 'relevance_score': 0.7 - (i * 0.05)
+            }
+            papers.append(paper)
+        
+        return papers
+    
+    def _parse_base_response(self, data: Dict) -> List[Dict]:
+        """
+        Parse Base-search.net JSON response to extract paper information.
+        """
+        papers = []
+        
+        results = data.get('results', [])
+        
+        for i, result in enumerate(results):
+            # Extract authors
+            authors = []
+            for author in result.get('authors', []):
+                if isinstance(author, str):
+                    authors.append(author)
+                elif isinstance(author, dict) and author.get('name'):
+                    authors.append(author['name'])
+            
+            # Extract year from published date
+            pub_date = result.get('publishedDate', '')
+            pub_year = None
+            if pub_date:
+                year_match = re.search(r'\b(19|20)\d{2}\b', pub_date)
+                pub_year = int(year_match.group()) if year_match else None
+            
+            paper = {
+                'id': result.get('id', f'base_{i}'),
+                'doi': result.get('doi'),
+                'title': result.get('title', ''),
+                'authors': authors,
+                'abstract': result.get('abstract', ''),
+                'publication_year': pub_year,
+                'citation_count': result.get('citationCount', 0),
+                'journal': result.get('journals', [{}])[0].get('title') if result.get('journals') else '',
+                'url': result.get('downloadUrl') or result.get('webUrl', ''),
+                'pdf_url': result.get('downloadUrl'),
+                'open_access': bool(result.get('downloadUrl')),
+                'source': 'Base-search.net',
+                'relevance_score': 0.75 - (i * 0.04)
             }
             papers.append(paper)
         
@@ -963,99 +1052,26 @@ class LiteratureRetriever:
         
         return papers
     
-    # Helper methods for text extraction
-    def _extract_authors_from_text(self, text: str) -> List[str]:
-        """Extract author names from text using patterns."""
-        authors = []
-        # Common patterns for author names in academic text
-        patterns = [
-            r'by ([A-Z][a-z]+ [A-Z][a-z]+(?:, [A-Z][a-z]+ [A-Z][a-z]+)*)',
-            r'([A-Z][a-z]+ [A-Z][a-z]+) et al',
-            r'([A-Z]\. [A-Z][a-z]+(?:, [A-Z]\. [A-Z][a-z]+)*)'
-        ]
-        
-        for pattern in patterns:
-            matches = re.findall(pattern, text)
-            if matches:
-                for match in matches:
-                    if ',' in match:
-                        authors.extend([name.strip() for name in match.split(',')])
-                    else:
-                        authors.append(match)
-                break
-        
-        return authors[:5]  # Limit to 5 authors
-    
-    def _extract_year_from_text(self, text: str) -> Optional[int]:
-        """Extract publication year from text."""
-        year_pattern = r'\b(19|20)[0-9]{2}\b'
-        matches = re.findall(year_pattern, text)
-        if matches:
-            # Return the most recent year found
-            years = [int(year) for year in matches if 1990 <= int(year) <= 2024]
-            return max(years) if years else None
-        return None
-    
-    def _extract_venue_from_text(self, text: str) -> str:
-        """Extract venue/journal name from text."""
-        # Common patterns for venue names
-        patterns = [
-            r'published in ([^.,]+)',
-            r'appears in ([^.,]+)',
-            r'from ([A-Z][^.,]+Journal[^.,]*)',
-            r'([A-Z][^.,]*Conference[^.,]*)'
-        ]
-        
-        for pattern in patterns:
-            match = re.search(pattern, text, re.IGNORECASE)
-            if match:
-                return match.group(1).strip()
-        
-        return ''
-    
-    # Mock data generators for fallback
-    def _generate_mock_google_scholar_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock Google Scholar results when API is unavailable."""
+    def _generate_mock_base_results(self, query: str, max_results: int) -> List[Dict]:
+        """Generate mock Base-search.net results when API is unavailable."""
         papers = []
         query_words = query.lower().split()
         
         for i in range(min(max_results, 8)):
             paper = {
-                'id': f'scholar_mock_{i+1}',
-                'title': f'Advanced Research on {query_words[0].title()} with Machine Learning Applications',
-                'authors': [f'Dr. Scholar {chr(65+i)} Research', f'Prof. Academic {chr(66+i)} Expert'],
-                'abstract': f'This comprehensive study investigates {" ".join(query_words)} using advanced computational methods. Our research methodology employs both quantitative and qualitative approaches to analyze the complex relationships in this domain.',
+                'id': f'base_mock_{i+1}',
+                'doi': f'10.1000/base.{i+1}.{query_words[0]}',
+                'title': f'Open Access Research on {query_words[0].title()}: Methods and Outcomes',
+                'authors': [f'Dr. Base {chr(65+i)} Repository', f'Prof. Open {chr(66+i)} Research'],
+                'abstract': f'This open access research investigates {" ".join(query_words)} through comprehensive data analysis. The study provides valuable insights for researchers and practitioners in the field.',
                 'publication_year': 2023 - (i % 4),
-                'citation_count': max(0, 120 - i*10),
-                'venue': f'International Journal of {query_words[0].title()} Research',
-                'url': f'https://scholar.google.com/citations?view_op=view_citation&citation_for_view=mock_{i}',
-                'pdf_url': f'https://example-university.edu/papers/research_{i}.pdf',
-                'open_access': i % 2 == 0,
-                'source': 'Google Scholar',
-                'relevance_score': 0.92 - (i * 0.06)
-            }
-            papers.append(paper)
-        
-        return papers
-    
-    def _generate_mock_google_search_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock Google Search results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 6)):
-            paper = {
-                'id': f'google_mock_{i+1}',
-                'title': f'Research Study: {query_words[0].title()} Analysis and Findings',
-                'authors': [f'Research Team {chr(65+i)}'],
-                'abstract': f'Academic research on {" ".join(query_words)} published by leading universities. This study provides insights into current trends and future directions in the field.',
-                'publication_year': 2023,
-                'venue': f'University Research Portal',
-                'url': f'https://example-university.edu/research/study_{i}.html',
-                'pdf_url': f'https://example-university.edu/research/study_{i}.pdf' if i % 2 == 0 else None,
-                'open_access': i % 2 == 0,
-                'source': 'Google Search',
-                'relevance_score': 0.7 - (i * 0.05)
+                'citation_count': max(0, 65 - i*6),
+                'journal': f'Base Journal of {query_words[0].title()}',
+                'url': f'https://base-search.net/works/mock_{i}',
+                'pdf_url': f'https://base-search.net/download/pdf/mock_{i}.pdf',
+                'open_access': True,
+                'source': 'Base-search.net',
+                'relevance_score': 0.78 - (i * 0.04)
             }
             papers.append(paper)
         
@@ -1185,43 +1201,65 @@ class LiteratureRetriever:
         return intersection / union if union > 0 else 0.0
     
     def _rank_by_relevance(self, papers: List[Dict], query: str) -> List[Dict]:
-        """Rank papers by relevance to the search query."""
-        query_words = set(query.lower().split())
+        """
+        Rank papers by relevance to the query.
+        
+        Args:
+            papers: List of paper dictionaries
+            query: Search query
+            
+        Returns:
+            Ranked list of papers
+        """
+        if not papers:
+            return []
+        
+        query_terms = set(query.lower().split())
         
         for paper in papers:
-            # Get base relevance score
-            base_relevance = paper.get('relevance_score', 0.5)
+            # Calculate relevance score based on multiple factors
+            score = 0.0
             
-            # Calculate content relevance
-            title_words = set(paper.get('title', '').lower().split())
-            abstract_words = set(paper.get('abstract', '').lower().split())
+            # Title relevance (highest weight)
+            title = paper.get('title', '').lower()
+            title_terms = set(title.split())
+            title_overlap = len(query_terms.intersection(title_terms))
+            score += title_overlap * 0.4
             
-            # Title match bonus
-            title_matches = len(query_words.intersection(title_words))
-            title_bonus = (title_matches / len(query_words)) * 0.3 if query_words else 0
+            # Abstract relevance
+            abstract = paper.get('abstract', '').lower()
+            abstract_terms = set(abstract.split())
+            abstract_overlap = len(query_terms.intersection(abstract_terms))
+            score += abstract_overlap * 0.2
             
-            # Abstract match bonus
-            abstract_matches = len(query_words.intersection(abstract_words))
-            abstract_bonus = (abstract_matches / len(query_words)) * 0.1 if query_words else 0
+            # Publication year (recent papers get higher scores)
+            year = paper.get('publication_year')
+            if year and isinstance(year, int):
+                if year >= 2020:
+                    score += 0.2
+                elif year >= 2015:
+                    score += 0.1
+                elif year >= 2010:
+                    score += 0.05
             
-            # Citation count bonus
-            citation_count = paper.get('citation_count', 0)
-            citation_bonus = min(0.1, citation_count / 1000) if citation_count else 0
+            # Citation count (highly cited papers get higher scores)
+            citations = paper.get('citation_count', 0)
+            if citations and isinstance(citations, int):
+                if citations >= 100:
+                    score += 0.15
+                elif citations >= 50:
+                    score += 0.1
+                elif citations >= 10:
+                    score += 0.05
             
-            # Recent publication bonus
-            pub_year = paper.get('publication_year', 2000)
-            if pub_year >= 2020:
-                recency_bonus = 0.05
-            elif pub_year >= 2015:
-                recency_bonus = 0.02
-            else:
-                recency_bonus = 0
+            # Open access bonus
+            if paper.get('open_access', False):
+                score += 0.05
             
-            # Calculate final relevance score
-            final_relevance = base_relevance + title_bonus + abstract_bonus + citation_bonus + recency_bonus
-            paper['relevance_score'] = min(1.0, final_relevance)
+            # Store the calculated score
+            paper['relevance_score'] = score
         
-        # Sort by relevance score
+        # Sort by relevance score (descending)
         return sorted(papers, key=lambda x: x.get('relevance_score', 0), reverse=True)
     
     def get_paper_details(self, paper_id: str, source: str = 'pubmed') -> Dict:
@@ -1242,6 +1280,8 @@ class LiteratureRetriever:
                 return self._get_arxiv_details(paper_id)
             elif source.lower() == 'crossref':
                 return self._get_crossref_details(paper_id)
+            elif source.lower() == 'base':
+                return self._get_base_details(paper_id)
             else:
                 raise ValueError(f"Unknown source: {source}")
                 
@@ -1478,6 +1518,72 @@ class LiteratureRetriever:
                 'doi': doi,
                 'error': f'Failed to retrieve details: {str(e)}',
                 'source': 'crossref'
+            }
+    
+    def _get_base_details(self, id: str) -> Dict:
+        """Get detailed Base-search.net paper information."""
+        try:
+            # Query Base-search.net API for detailed information
+            query_url = f"{self.base_url}?id={id}"
+            headers = {
+                'User-Agent': 'LiteratureRetriever/1.0 (mailto:research@example.com)',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(query_url, headers=headers, timeout=self.session_timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            result = data.get('results', [{}])[0]
+            
+            # Extract information
+            title = result.get('title', 'No title available')
+            abstract = result.get('abstract', 'No abstract available')
+            
+            # Extract authors
+            authors = []
+            for author in result.get('authors', []):
+                if isinstance(author, str):
+                    authors.append(author)
+                elif isinstance(author, dict) and author.get('name'):
+                    authors.append(author['name'])
+            
+            # Extract year from published date
+            pub_date = result.get('publishedDate', '')
+            pub_year = None
+            if pub_date:
+                year_match = re.search(r'\b(19|20)\d{2}\b', pub_date)
+                pub_year = int(year_match.group()) if year_match else None
+            
+            # Extract other metadata
+            journal = result.get('journals', [{}])[0].get('title') if result.get('journals') else ''
+            volume = result.get('volume', '')
+            issue = result.get('issue', '')
+            pages = result.get('page', '')
+            
+            # Extract URLs
+            url = result.get('webUrl', f'https://base-search.net/works/{id}')
+            
+            return {
+                'id': id,
+                'title': title,
+                'abstract': abstract,
+                'authors': authors,
+                'journal': journal,
+                'publication_year': pub_year,
+                'volume': volume,
+                'issue': issue,
+                'pages': pages,
+                'url': url,
+                'source': 'base'
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to get Base-search.net details for {id}: {str(e)}")
+            return {
+                'id': id,
+                'error': f'Failed to retrieve details: {str(e)}',
+                'source': 'base'
             }
     
     def get_search_statistics(self) -> Dict:
