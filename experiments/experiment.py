@@ -8,10 +8,13 @@ recording results, and persisting data using SQLite.
 import sqlite3
 import json
 import uuid
-from datetime import datetime
+import threading
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
+# Thread-local storage for database connections
+_thread_local = threading.local()
 
 class ExperimentRunner:
     """
@@ -36,9 +39,15 @@ class ExperimentRunner:
         self.db_path = str(db_path)
         self._init_database()
     
+    def _get_db_connection(self):
+        """Get thread-local database connection."""
+        if not hasattr(_thread_local, 'experiment_db'):
+            _thread_local.experiment_db = sqlite3.connect(self.db_path)
+        return _thread_local.experiment_db
+    
     def _init_database(self) -> None:
         """Initialize the SQLite database with required tables."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute('''
                 CREATE TABLE IF NOT EXISTS experiments (
@@ -57,214 +66,204 @@ class ExperimentRunner:
         Run an experiment with the given parameters.
         
         Args:
-            params: Dictionary containing experiment parameters
+            params: Dictionary of experiment parameters
             
         Returns:
-            Dictionary containing experiment results including experiment_id,
-            status, and any computed results
-            
-        Raises:
-            ValueError: If params is not a valid dictionary
-            TypeError: If params contains non-serializable values
+            Dictionary containing experiment results
         """
-        if not isinstance(params, dict):
-            raise ValueError("Parameters must be a dictionary")
-        
-        # Generate unique experiment ID
         experiment_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
-        
-        try:
-            # Validate that params can be serialized to JSON
-            params_json = json.dumps(params)
-        except (TypeError, ValueError) as e:
-            raise TypeError(f"Parameters must be JSON-serializable: {e}")
+        created_at = datetime.now().isoformat()
         
         # Store experiment in database
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                INSERT INTO experiments (id, parameters, status, created_at)
-                VALUES (?, ?, ?, ?)
-            ''', (experiment_id, params_json, 'running', timestamp))
-            conn.commit()
-        
-        # Simulate experiment execution
-        # In a real implementation, this would contain the actual experiment logic
-        # Simulate experiment execution
-        # Update status to 'running'
-        self._update_experiment_status(experiment_id, 'running')
-        
-        # Simulate a delay for long-running experiments (e.g., using time.sleep)
-        # In a real implementation, this would contain the actual experiment logic
-        computed_results = self._compute_example_results(params)
-        
-        # Update status to 'completed' and record results
-        results = {
-            'experiment_id': experiment_id,
-            'status': 'completed',
-            'parameters': params,
-            'created_at': timestamp,
-            'completed_at': datetime.now().isoformat(),
-            'computed_results': computed_results
-        }
-        self._update_experiment_status(experiment_id, 'completed', results)
-        
-        return results
-    
-    def record_result(self, result: Dict[str, Any]) -> None:
-        """
-        Record the result of an experiment.
-        
-        Args:
-            result: Dictionary containing experiment results.
-                   Must include 'experiment_id' key.
-                   
-        Raises:
-            ValueError: If result is not a valid dictionary or missing experiment_id
-            TypeError: If result contains non-serializable values
-        """
-        if not isinstance(result, dict):
-            raise ValueError("Result must be a dictionary")
-        
-        if 'experiment_id' not in result:
-            raise ValueError("Result must contain 'experiment_id' key")
-        
-        experiment_id = result['experiment_id']
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO experiments (id, parameters, status, created_at)
+            VALUES (?, ?, ?, ?)
+        ''', (experiment_id, json.dumps(params), 'running', created_at))
+        conn.commit()
         
         try:
-            # Validate that result can be serialized to JSON
-            result_json = json.dumps(result)
-        except (TypeError, ValueError) as e:
-            raise TypeError(f"Result must be JSON-serializable: {e}")
-        
-        # Update the experiment with the recorded result
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+            # Execute the experiment (placeholder for actual experiment logic)
+            results = self._execute_experiment(params)
             
-            # Check if experiment exists
-            cursor.execute('SELECT id FROM experiments WHERE id = ?', (experiment_id,))
-            if not cursor.fetchone():
-                raise ValueError(f"Experiment with ID {experiment_id} not found")
-            
-            # Update the experiment results
+            # Update database with results
+            completed_at = datetime.now().isoformat()
             cursor.execute('''
                 UPDATE experiments 
-                SET results = ?, completed_at = ?
+                SET results = ?, status = 'completed', completed_at = ?
                 WHERE id = ?
-            ''', (result_json, datetime.now().isoformat(), experiment_id))
+            ''', (json.dumps(results), completed_at, experiment_id))
             conn.commit()
-    
-    def _compute_example_results(self, params: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Compute example results based on parameters.
-        
-        This is a placeholder for actual experiment computation logic.
-        """
-        results = {}
-        
-        # Example: if parameters contain numerical values, compute some statistics
-        numerical_params = {}
-        string_params = {}
-        
-        for k, v in params.items():
-            if isinstance(v, (int, float)):
-                numerical_params[k] = v
-            elif isinstance(v, str):
-                string_params[k] = v
-        
-        if numerical_params:
-            values = list(numerical_params.values())
-            results['param_sum'] = sum(values)
-            results['param_mean'] = sum(values) / len(values)
-            results['param_count'] = len(values)
-        else:
-            results['param_sum'] = 0
-            results['param_mean'] = 0
-            results['param_count'] = 0
-        
-        # Example: count string parameters
-        string_params = {k: v for k, v in params.items() 
-                        if isinstance(v, str)}
-        results['string_param_count'] = len(string_params)
-        
-        return results
-    
-    def _update_experiment_status(self, experiment_id: str, status: str, 
-                                results: Optional[Dict[str, Any]] = None) -> None:
-        """Update experiment status and optionally results in the database."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
             
-            if results:
-                results_json = json.dumps(results)
-                cursor.execute('''
-                    UPDATE experiments 
-                    SET status = ?, results = ?, completed_at = ?
-                    WHERE id = ?
-                ''', (status, results_json, datetime.now().isoformat(), experiment_id))
-            else:
-                cursor.execute('''
-                    UPDATE experiments 
-                    SET status = ?
-                    WHERE id = ?
-                ''', (status, experiment_id))
+            return {
+                'experiment_id': experiment_id,
+                'status': 'completed',
+                'results': results,
+                'created_at': created_at,
+                'completed_at': completed_at
+            }
             
+        except Exception as e:
+            # Update database with error
+            cursor.execute('''
+                UPDATE experiments 
+                SET status = 'failed', results = ?
+                WHERE id = ?
+            ''', (json.dumps({'error': str(e)}), experiment_id))
             conn.commit()
+            
+            raise
+    
+    def _execute_experiment(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute the actual experiment logic.
+        
+        This is a placeholder method. In a real implementation, this would
+        contain the actual computational experiment logic.
+        
+        Args:
+            params: Experiment parameters
+            
+        Returns:
+            Experiment results
+        """
+        # Placeholder implementation
+        return {
+            'message': 'Experiment executed successfully',
+            'parameters_used': params,
+            'timestamp': datetime.now().isoformat()
+        }
     
     def get_experiment(self, experiment_id: str) -> Optional[Dict[str, Any]]:
         """
-        Retrieve an experiment by ID.
+        Retrieve experiment results by ID.
         
         Args:
-            experiment_id: The unique experiment identifier
+            experiment_id: The experiment ID
             
         Returns:
-            Dictionary containing experiment data or None if not found
+            Experiment data or None if not found
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                SELECT id, parameters, results, status, created_at, completed_at
-                FROM experiments WHERE id = ?
-            ''', (experiment_id,))
-            
-            row = cursor.fetchone()
-            if not row:
-                return None
-            
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, parameters, results, status, created_at, completed_at
+            FROM experiments
+            WHERE id = ?
+        ''', (experiment_id,))
+        
+        row = cursor.fetchone()
+        if row:
             return {
-                'experiment_id': row[0],
+                'id': row[0],
                 'parameters': json.loads(row[1]),
                 'results': json.loads(row[2]) if row[2] else None,
                 'status': row[3],
                 'created_at': row[4],
                 'completed_at': row[5]
             }
+        return None
     
-    def list_experiments(self) -> list[Dict[str, Any]]:
+    def list_experiments(self, status: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
         """
-        List all experiments.
+        List experiments with optional filtering.
         
+        Args:
+            status: Filter by status ('running', 'completed', 'failed')
+            limit: Maximum number of experiments to return
+            
         Returns:
-            List of dictionaries containing experiment data
+            List of experiment data
         """
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        
+        if status:
             cursor.execute('''
                 SELECT id, parameters, results, status, created_at, completed_at
-                FROM experiments ORDER BY created_at DESC
-            ''')
+                FROM experiments
+                WHERE status = ?
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (status, limit))
+        else:
+            cursor.execute('''
+                SELECT id, parameters, results, status, created_at, completed_at
+                FROM experiments
+                ORDER BY created_at DESC
+                LIMIT ?
+            ''', (limit,))
+        
+        experiments = []
+        for row in cursor.fetchall():
+            experiments.append({
+                'id': row[0],
+                'parameters': json.loads(row[1]),
+                'results': json.loads(row[2]) if row[2] else None,
+                'status': row[3],
+                'created_at': row[4],
+                'completed_at': row[5]
+            })
+        
+        return experiments
+    
+    def delete_experiment(self, experiment_id: str) -> bool:
+        """
+        Delete an experiment from the database.
+        
+        Args:
+            experiment_id: The experiment ID to delete
             
-            experiments = []
-            for row in cursor.fetchall():
-                experiments.append({
-                    'experiment_id': row[0],
-                    'parameters': json.loads(row[1]),
-                    'results': json.loads(row[2]) if row[2] else None,
-                    'status': row[3],
-                    'created_at': row[4],
-                    'completed_at': row[5]
-                })
-            
-            return experiments
+        Returns:
+            True if deleted, False if not found
+        """
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM experiments WHERE id = ?', (experiment_id,))
+        conn.commit()
+        
+        return cursor.rowcount > 0
+    
+    def get_experiment_stats(self) -> Dict[str, Any]:
+        """
+        Get statistics about stored experiments.
+        
+        Returns:
+            Dictionary with experiment statistics
+        """
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        
+        # Total experiments
+        cursor.execute('SELECT COUNT(*) FROM experiments')
+        total_experiments = cursor.fetchone()[0]
+        
+        # Experiments by status
+        cursor.execute('''
+            SELECT status, COUNT(*) 
+            FROM experiments 
+            GROUP BY status
+        ''')
+        status_counts = dict(cursor.fetchall())
+        
+        # Recent experiments (last 30 days)
+        thirty_days_ago = (datetime.now() - timedelta(days=30)).isoformat()
+        cursor.execute('''
+            SELECT COUNT(*) 
+            FROM experiments 
+            WHERE created_at >= ?
+        ''', (thirty_days_ago,))
+        recent_experiments = cursor.fetchone()[0]
+        
+        return {
+            'total_experiments': total_experiments,
+            'status_counts': status_counts,
+            'recent_experiments': recent_experiments
+        }
+    
+    def close(self):
+        """Close database connections."""
+        if hasattr(_thread_local, 'experiment_db'):
+            _thread_local.experiment_db.close()
+            delattr(_thread_local, 'experiment_db')
