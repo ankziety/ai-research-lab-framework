@@ -119,7 +119,18 @@ class AgentMarketplace:
             'psychology': ['Psychology Expert'],
             'neuroscience': ['Neuroscience Expert'], 
             'ophthalmology': ['Ophthalmology Expert'],
-            'critic': ['Scientific Critic', 'Critical Analysis Expert']
+            'critic': ['Scientific Critic', 'Critical Analysis Expert'],
+            # Additional domain mappings for common research areas
+            'biomedical_engineering': ['Biomedical Engineering Expert', 'General Research Expert'],
+            'materials_science': ['Materials Science Expert', 'General Research Expert'],
+            'signal_processing': ['Signal Processing Expert', 'Data Science Expert'],
+            'clinical_research': ['Clinical Research Expert', 'General Research Expert'],
+            'engineering': ['Engineering Expert', 'General Research Expert'],
+            'biology': ['Biology Expert', 'General Research Expert'],
+            'chemistry': ['Chemistry Expert', 'General Research Expert'],
+            'physics': ['Physics Expert', 'General Research Expert'],
+            'computer_science': ['Computer Science Expert', 'Data Science Expert'],
+            'mathematics': ['Mathematics Expert', 'Data Science Expert']
         }
         
         target_roles = domain_mapping.get(expertise_domain, [])
@@ -127,6 +138,14 @@ class AgentMarketplace:
         for agent in self.available_agents.values():
             if agent.role in target_roles:
                 matching_agents.append(agent)
+        
+        # If no agents found, try to find agents with similar expertise in their expertise list
+        if not matching_agents:
+            for agent in self.available_agents.values():
+                for expertise in agent.expertise:
+                    if expertise_domain.lower() in expertise.lower() or expertise.lower() in expertise_domain.lower():
+                        matching_agents.append(agent)
+                        break
         
         logger.info(f"Found {len(matching_agents)} agents for expertise: {expertise_domain}")
         return matching_agents

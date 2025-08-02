@@ -82,34 +82,88 @@ class LLMClient:
             logger.info(f"LLM client configured with {len(available_providers)} available providers")
 
     def generate_response(self, prompt: str, context: Dict[str, Any], 
-                         agent_role: str = "AI Assistant") -> str:
+                         agent_role: str = "AI Assistant", cost_manager=None) -> str:
         """
-        Generate a response using the configured LLM provider.
+        Generate a response using the configured LLM provider with cost tracking.
         
         Args:
             prompt: The input prompt
             context: Additional context information
             agent_role: The role/persona of the agent
+            cost_manager: Optional cost manager for tracking
             
         Returns:
             Generated response string
         """
+        start_time = time.time()
+        tokens_input = len(prompt.split())
+        agent_id = context.get('agent_id', 'unknown')
+        task_type = context.get('task_type', 'general')
+        
         try:
+            # Estimate cost before generation
+            estimated_tokens_output = tokens_input * 2  # Rough estimate
+            estimated_cost = 0.0
+            
+            if cost_manager:
+                estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
+                
+                # Check if we can afford this request
+                if not cost_manager.can_afford(estimated_cost):
+                    logger.warning(f"Insufficient budget for LLM request: ${estimated_cost:.4f}")
+                    return f"Budget limit reached. Estimated cost: ${estimated_cost:.4f}"
+            
+            # Generate response
             if self.provider == 'openai' and self.openai_api_key:
-                return self._generate_openai_response(prompt, context, agent_role)
+                response = self._generate_openai_response(prompt, context, agent_role)
             elif self.provider == 'anthropic' and self.anthropic_api_key:
-                return self._generate_anthropic_response(prompt, context, agent_role)
+                response = self._generate_anthropic_response(prompt, context, agent_role)
             elif self.provider == 'gemini' and self.gemini_api_key:
-                return self._generate_gemini_response(prompt, context, agent_role)
+                response = self._generate_gemini_response(prompt, context, agent_role)
             elif self.provider == 'huggingface' and self.huggingface_api_key:
-                return self._generate_huggingface_response(prompt, context, agent_role)
+                response = self._generate_huggingface_response(prompt, context, agent_role)
             elif self.provider == 'ollama':
-                return self._generate_ollama_response(prompt, context, agent_role)
+                response = self._generate_ollama_response(prompt, context, agent_role)
             else:
-                return self._generate_mock_response(prompt, context, agent_role)
+                response = self._generate_mock_response(prompt, context, agent_role)
+            
+            # Track actual usage and cost
+            tokens_output = len(response.split())
+            actual_cost = 0.0
+            
+            if cost_manager:
+                actual_cost = cost_manager.estimate_cost(self.model, tokens_input, tokens_output)
+                cost_manager.track_usage(
+                    model=self.model,
+                    tokens_input=tokens_input,
+                    tokens_output=tokens_output,
+                    actual_cost=actual_cost,
+                    task_type=task_type,
+                    agent_id=agent_id,
+                    success=True
+                )
+            
+            execution_time = time.time() - start_time
+            logger.info(f"LLM response generated: {tokens_input + tokens_output} tokens, ${actual_cost:.4f}, {execution_time:.2f}s")
+            
+            return response
 
         except Exception as e:
             logger.error(f"LLM generation failed: {str(e)}")
+            
+            # Track failure cost
+            if cost_manager:
+                cost_manager.track_usage(
+                    model=self.model,
+                    tokens_input=tokens_input,
+                    tokens_output=0,
+                    actual_cost=estimated_cost,
+                    task_type=task_type,
+                    agent_id=agent_id,
+                    success=False,
+                    error_message=str(e)
+                )
+            
             return self._generate_mock_response(prompt, context, agent_role)
 
     def _generate_openai_response(self, prompt: str, context: Dict[str, Any], 
