@@ -1,7 +1,7 @@
 """
-Virtual Lab Demo - Showcasing the Enhanced Research Framework
+Virtual Lab Demo - Research Framework Demonstration
 
-This demo showcases the Virtual Lab methodology implemented in the AI Research
+This demo demonstrates the Virtual Lab methodology implemented in the AI Research
 Lab Framework, inspired by the paper "The Virtual Lab of AI agents designs new 
 SARS-CoV-2 nanobodies" by Swanson et al.
 
@@ -229,14 +229,14 @@ def demo_virtual_lab_research():
         print()
         print("🎉 Virtual Lab Demo Completed!")
         print()
-        print("Key Features Demonstrated:")
-        print("✅ Meeting-based research coordination")
-        print("✅ Structured 7-phase research methodology")
-        print("✅ Multi-agent collaboration and expertise")
-        print("✅ Cross-agent interaction and critique")
-        print("✅ Scientific quality assessment")
-        print("✅ Automated workflow design and execution")
-        print("✅ Comprehensive results synthesis")
+        print("Features Demonstrated:")
+        print("• Meeting-based research coordination")
+        print("• Structured 7-phase research methodology")
+        print("• Multi-agent collaboration and expertise")
+        print("• Cross-agent interaction and critique")
+        print("• Scientific quality assessment")
+        print("• Automated workflow design and execution")
+        print("• Comprehensive results synthesis")
         
     except Exception as e:
         print(f"❌ Demo failed with error: {e}")
@@ -310,13 +310,11 @@ def demo_comparison():
         print(f"   Virtual Lab phases completed: {vlab_phases}")
         print()
         
-        print("🎯 Virtual Lab Advantages:")
-        print("   ✅ More structured and systematic approach")
-        print("   ✅ Enhanced cross-agent collaboration")
-        print("   ✅ Integrated scientific critique")
-        print("   ✅ Iterative refinement capabilities")
-        print("   ✅ Meeting-based coordination for better coherence")
-        print("   ✅ Comprehensive quality assessment")
+        print("📋 Virtual Lab Method Summary:")
+        print("   • Structured 7-phase research process")
+        print("   • Meeting-based agent coordination") 
+        print("   • Integrated critique and quality control")
+        print("   • Cross-agent collaboration features")
         
     except Exception as e:
         print(f"❌ Comparison demo failed: {e}")
