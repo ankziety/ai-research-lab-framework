@@ -15,6 +15,7 @@ from pathlib import Path
 from agents import (
     PrincipalInvestigatorAgent, AgentMarketplace, ScientificCriticAgent
 )
+from agents.base_agent import BaseAgent
 
 # Import memory management components  
 from memory import VectorDatabase, ContextManager, KnowledgeRepository
@@ -902,6 +903,130 @@ class MultiAgentResearchFramework:
         if hasattr(self, 'experiment_runner'):
             self.experiment_runner.close()
         logger.info("Multi-Agent Research Framework closed")
+
+    def get_active_agents(self) -> List[BaseAgent]:
+        """Get list of currently active agents."""
+        active_agents = []
+        
+        # Get agents from marketplace
+        if hasattr(self, 'agent_marketplace') and self.agent_marketplace:
+            active_agents.extend(self.agent_marketplace.hired_agents.values())
+        
+        # Get PI agent if active
+        if hasattr(self, 'pi_agent') and self.pi_agent:
+            active_agents.append(self.pi_agent)
+        
+        # Get scientific critic if active
+        if hasattr(self, 'scientific_critic') and self.scientific_critic:
+            active_agents.append(self.scientific_critic)
+        
+        return active_agents
+
+    def get_agent_activity_log(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get agent activity log for monitoring."""
+        activity_log = []
+        
+        # Get activity from virtual lab if available
+        if hasattr(self, 'virtual_lab') and self.virtual_lab:
+            activity_log = self.virtual_lab.get_agent_activity_log(session_id)
+        else:
+            # Fallback to in-memory storage
+            if hasattr(self, '_agent_activity_log'):
+                if session_id:
+                    activity_log = [activity for activity in self._agent_activity_log if activity.get('session_id') == session_id]
+                else:
+                    activity_log = self._agent_activity_log.copy()
+        
+        return activity_log
+
+    def log_agent_activity(self, agent_id: str, activity_type: str, message: str, 
+                          session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+        """Log agent activity for web UI monitoring."""
+        activity = {
+            'agent_id': agent_id,
+            'activity_type': activity_type,
+            'message': message,
+            'timestamp': time.time(),
+            'session_id': session_id,
+            'metadata': metadata or {}
+        }
+        
+        # Store in memory for current session
+        if not hasattr(self, '_agent_activity_log'):
+            self._agent_activity_log = []
+        
+        self._agent_activity_log.append(activity)
+        
+        # Keep only recent activities (last 1000)
+        if len(self._agent_activity_log) > 1000:
+            self._agent_activity_log = self._agent_activity_log[-1000:]
+        
+        logger.info(f"Agent activity: {agent_id} - {activity_type}: {message}")
+        
+        return activity
+
+    def get_chat_logs(self, session_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Get chat logs including agent thoughts and communications."""
+        chat_logs = []
+        
+        # Get logs from virtual lab if available
+        if hasattr(self, 'virtual_lab') and self.virtual_lab:
+            chat_logs = self.virtual_lab.get_chat_logs(session_id)
+        else:
+            # Fallback to in-memory storage
+            if hasattr(self, '_chat_logs'):
+                if session_id:
+                    chat_logs = [log for log in self._chat_logs if log.get('session_id') == session_id]
+                else:
+                    chat_logs = self._chat_logs.copy()
+        
+        return chat_logs
+
+    def log_chat_message(self, log_type: str, author: str, message: str, 
+                        session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
+        """Log chat messages for web UI monitoring."""
+        chat_log = {
+            'log_type': log_type,
+            'author': author,
+            'message': message,
+            'timestamp': time.time(),
+            'session_id': session_id,
+            'metadata': metadata or {}
+        }
+        
+        # Store in memory for current session
+        if not hasattr(self, '_chat_logs'):
+            self._chat_logs = []
+        
+        self._chat_logs.append(chat_log)
+        
+        # Keep only recent logs (last 2000)
+        if len(self._chat_logs) > 2000:
+            self._chat_logs = self._chat_logs[-2000:]
+        
+        logger.info(f"Chat log: {log_type} - {author}: {message[:100]}...")
+        
+        return chat_log
+
+    def calculate_text_metrics(self, text: str) -> Dict[str, Any]:
+        """Calculate text analysis metrics for monitoring."""
+        if not text:
+            return {'word_count': 0, 'sentence_count': 0, 'avg_sentence_length': 0}
+        
+        # Basic text analysis
+        words = text.split()
+        sentences = text.split('.')
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        word_count = len(words)
+        sentence_count = len(sentences)
+        avg_sentence_length = word_count / sentence_count if sentence_count > 0 else 0
+        
+        return {
+            'word_count': word_count,
+            'sentence_count': sentence_count,
+            'avg_sentence_length': round(avg_sentence_length, 2)
+        }
 
 
 def create_framework(config: Optional[Dict[str, Any]] = None) -> MultiAgentResearchFramework:
