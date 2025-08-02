@@ -37,10 +37,12 @@ visualizations/
 demo_visualizations/
 output/
 results/
+
+# Web UI
+web_ui/config_backup.json
 web_ui/config.json
 *config.json
 
-# Web UI
 
 # Test files
 test_socket_connection.html
