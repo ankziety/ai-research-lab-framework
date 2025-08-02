@@ -1,62 +1,69 @@
 """
-Vector Database for storing and retrieving embeddings of agent conversations,
-research findings, and contextual information.
+Vector Database for AI Research Lab Memory Management
+
+This module provides a vector database implementation for storing and retrieving
+AI research content with semantic search capabilities. It uses FAISS for vector
+operations and SQLite for metadata storage.
 """
 
 import logging
-import sqlite3
-import numpy as np
-import json
 import time
-from typing import Dict, List, Any, Optional, Tuple
+import json
+import sqlite3
+import threading
+from typing import Dict, List, Any, Optional
 from pathlib import Path
+import numpy as np
 
-logger = logging.getLogger(__name__)
-
+# Try to import FAISS for vector operations
 try:
     import faiss
     FAISS_AVAILABLE = True
 except ImportError:
     FAISS_AVAILABLE = False
-    logger.warning("FAISS not available. Install with: pip install faiss-cpu")
 
+# Try to import sentence transformers for embeddings
 try:
     from sentence_transformers import SentenceTransformer
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
-    logger.warning("SentenceTransformers not available. Install with: pip install sentence-transformers")
 
+logger = logging.getLogger(__name__)
+
+# Thread-local storage for database connections
+_thread_local = threading.local()
 
 class VectorDatabase:
     """
-    Vector database for storing and retrieving embeddings with metadata.
+    Vector database for storing and retrieving AI research content.
+    
+    This class provides semantic search capabilities for research content,
+    including conversations, findings, and other text-based data. It uses
+    FAISS for efficient vector operations and SQLite for metadata storage.
     """
     
     def __init__(self, db_path: str = "memory/vector_memory.db", 
                  embedding_model: str = "all-MiniLM-L6-v2",
                  embedding_dim: int = 384):
         """
-        Initialize vector database.
+        Initialize the vector database.
         
         Args:
-            db_path: Path to SQLite database for metadata
-            embedding_model: Name of the sentence transformer model
-            embedding_dim: Dimension of embeddings
+            db_path: Path to the SQLite database file
+            embedding_model: Name of the sentence transformer model to use
+            embedding_dim: Dimension of the embedding vectors
         """
         self.db_path = Path(db_path)
+        self.embedding_model_name = embedding_model
+        self.embedding_dim = embedding_dim
+        
+        # Ensure the database directory exists
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
-        self.embedding_dim = embedding_dim
-        self.embedding_model_name = embedding_model
-        
-        # Initialize embedding model
+        # Initialize components
         self._init_embedding_model()
-        
-        # Initialize FAISS index
         self._init_faiss_index()
-        
-        # Initialize SQLite database for metadata
         self._init_metadata_db()
         
         logger.info(f"VectorDatabase initialized with model: {embedding_model}")
@@ -66,17 +73,16 @@ class VectorDatabase:
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
                 self.embedding_model = SentenceTransformer(self.embedding_model_name)
-                self.embedding_dim = self.embedding_model.get_sentence_embedding_dimension()
                 logger.info(f"Loaded embedding model: {self.embedding_model_name}")
             except Exception as e:
-                logger.error(f"Failed to load embedding model: {e}")
+                logger.warning(f"Failed to load embedding model: {e}")
                 self.embedding_model = None
         else:
             self.embedding_model = None
-            logger.warning("Using mock embeddings - install sentence-transformers for real embeddings")
+            logger.warning("SentenceTransformers not available - using mock embeddings")
     
     def _init_faiss_index(self):
-        """Initialize FAISS index for vector storage."""
+        """Initialize FAISS vector index."""
         if FAISS_AVAILABLE:
             self.index = faiss.IndexFlatL2(self.embedding_dim)
             self.index_to_id = {}  # Map FAISS index to our IDs
@@ -86,10 +92,16 @@ class VectorDatabase:
             self.mock_vectors = []  # Fallback storage
             logger.warning("Using mock vector storage - install faiss for better performance")
     
+    def _get_db_connection(self):
+        """Get thread-local database connection."""
+        if not hasattr(_thread_local, 'vector_db'):
+            _thread_local.vector_db = sqlite3.connect(str(self.db_path))
+        return _thread_local.vector_db
+    
     def _init_metadata_db(self):
         """Initialize SQLite database for metadata."""
-        self.conn = sqlite3.connect(str(self.db_path))
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
         
         cursor.execute('''
         CREATE TABLE IF NOT EXISTS vector_metadata (
@@ -120,7 +132,7 @@ class VectorDatabase:
         )
         ''')
         
-        self.conn.commit()
+        conn.commit()
         logger.info("Metadata database initialized")
     
     def get_embedding(self, text: str) -> np.ndarray:
@@ -168,7 +180,8 @@ class VectorDatabase:
         import hashlib
         content_hash = hashlib.sha256(content.encode()).hexdigest()
         
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
         
         try:
             # Store in FAISS if available
@@ -177,40 +190,36 @@ class VectorDatabase:
                 self.index.add(embedding.reshape(1, -1))
                 embedding_id = self.index.ntotal - 1
                 self.index_to_id[embedding_id] = None  # Will be updated with DB ID
-            else:
-                # Mock storage
-                embedding_id = len(self.mock_vectors)
-                self.mock_vectors.append((embedding, content))
             
             # Store metadata in SQLite
             cursor.execute('''
-            INSERT OR REPLACE INTO vector_metadata 
+            INSERT OR IGNORE INTO vector_metadata 
             (content_hash, content, content_type, agent_id, session_id, task_id, 
-             timestamp, importance_score, validated, metadata, embedding_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             timestamp, importance_score, metadata, embedding_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                content_hash, content, content_type, agent_id, session_id, 
-                task_id, time.time(), importance_score, False,
-                json.dumps(metadata or {}), embedding_id
+                content_hash, content, content_type, agent_id, session_id, task_id,
+                time.time(), importance_score, json.dumps(metadata) if metadata else None, embedding_id
             ))
             
-            content_id = cursor.lastrowid
+            # Get the inserted ID
+            if cursor.rowcount > 0:
+                content_id = cursor.lastrowid
+                if self.index and embedding_id >= 0:
+                    self.index_to_id[embedding_id] = content_id
+            else:
+                # Content already exists, get existing ID
+                cursor.execute('SELECT id FROM vector_metadata WHERE content_hash = ?', (content_hash,))
+                content_id = cursor.fetchone()[0]
             
-            # Update FAISS mapping
-            if self.index:
-                self.index_to_id[embedding_id] = content_id
-            
-            self.conn.commit()
-            
+            conn.commit()
             logger.debug(f"Stored content with ID: {content_id}")
             return content_id
             
-        except sqlite3.IntegrityError:
-            # Content already exists
-            cursor.execute('SELECT id FROM vector_metadata WHERE content_hash = ?', (content_hash,))
-            existing_id = cursor.fetchone()[0]
-            logger.debug(f"Content already exists with ID: {existing_id}")
-            return existing_id
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error storing content: {e}")
+            raise
     
     def search_similar(self, query: str, limit: int = 5, 
                       content_type: Optional[str] = None,
@@ -220,75 +229,108 @@ class VectorDatabase:
         Search for similar content using semantic similarity.
         
         Args:
-            query: Query text
+            query: Search query
             limit: Maximum number of results
-            content_type: Optional filter by content type
-            session_id: Optional filter by session ID
-            min_importance: Minimum importance score filter
+            content_type: Filter by content type
+            session_id: Filter by session ID
+            min_importance: Minimum importance score
             
         Returns:
-            List of matching content with metadata and similarity scores
+            List of similar content items
         """
+        # Generate query embedding
         query_embedding = self.get_embedding(query)
         
-        if self.index:
-            # Use FAISS for search
-            distances, indices = self.index.search(query_embedding.reshape(1, -1), 
-                                                 min(limit * 3, self.index.ntotal))
+        if self.index and self.index.ntotal > 0:
+            # Use FAISS for vector search
+            query_embedding = query_embedding.reshape(1, -1)
+            distances, indices = self.index.search(query_embedding, min(limit * 2, self.index.ntotal))
             
-            # Convert to content IDs and get metadata
+            # Get metadata for results
             results = []
-            for distance, idx in zip(distances[0], indices[0]):
-                if idx == -1:  # FAISS returns -1 for invalid indices
+            conn = self._get_db_connection()
+            cursor = conn.cursor()
+            
+            for idx in indices[0]:
+                if idx == -1:  # FAISS returns -1 for empty slots
                     continue
-                
+                    
                 content_id = self.index_to_id.get(idx)
                 if content_id:
                     metadata = self._get_content_metadata(content_id)
-                    if metadata:
-                        # Apply filters
-                        if content_type and metadata['content_type'] != content_type:
-                            continue
-                        if session_id and metadata['session_id'] != session_id:
-                            continue
-                        if metadata['importance_score'] < min_importance:
-                            continue
-                        
-                        metadata['similarity_score'] = 1.0 / (1.0 + distance)  # Convert distance to similarity
+                    if metadata and self._matches_filters(metadata, content_type, session_id, min_importance):
                         results.append(metadata)
-                        
                         if len(results) >= limit:
                             break
         else:
-            # Mock search for testing
-            results = []
-            for i, (stored_embedding, stored_content) in enumerate(self.mock_vectors):
-                similarity = np.dot(query_embedding, stored_embedding) / (
-                    np.linalg.norm(query_embedding) * np.linalg.norm(stored_embedding)
-                )
-                
-                if similarity > 0.5:  # Threshold for relevance
-                    results.append({
-                        'id': i,
-                        'content': stored_content,
-                        'similarity_score': similarity,
-                        'content_type': 'mock',
-                        'timestamp': time.time()
-                    })
-            
-            results.sort(key=lambda x: x['similarity_score'], reverse=True)
-            results = results[:limit]
+            # Fallback to mock search
+            results = self._mock_search(query, limit, content_type, session_id, min_importance)
         
-        logger.debug(f"Found {len(results)} similar content items for query")
+        return results
+    
+    def _matches_filters(self, metadata: Dict[str, Any], content_type: Optional[str],
+                        session_id: Optional[str], min_importance: float) -> bool:
+        """Check if metadata matches search filters."""
+        if content_type and metadata.get('content_type') != content_type:
+            return False
+        if session_id and metadata.get('session_id') != session_id:
+            return False
+        if metadata.get('importance_score', 0) < min_importance:
+            return False
+        return True
+    
+    def _mock_search(self, query: str, limit: int, content_type: Optional[str],
+                    session_id: Optional[str], min_importance: float) -> List[Dict[str, Any]]:
+        """Mock search for testing without FAISS."""
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        
+        # Build query with filters
+        sql = '''
+        SELECT id, content, content_type, agent_id, session_id, task_id, 
+               timestamp, importance_score, metadata
+        FROM vector_metadata
+        WHERE importance_score >= ?
+        '''
+        params = [min_importance]
+        
+        if content_type:
+            sql += ' AND content_type = ?'
+            params.append(content_type)
+        if session_id:
+            sql += ' AND session_id = ?'
+            params.append(session_id)
+        
+        sql += ' ORDER BY importance_score DESC LIMIT ?'
+        params.append(limit)
+        
+        cursor.execute(sql, params)
+        results = []
+        for row in cursor.fetchall():
+            results.append({
+                'id': row[0],
+                'content': row[1],
+                'content_type': row[2],
+                'agent_id': row[3],
+                'session_id': row[4],
+                'task_id': row[5],
+                'timestamp': row[6],
+                'importance_score': row[7],
+                'metadata': json.loads(row[8]) if row[8] else {}
+            })
+        
         return results
     
     def _get_content_metadata(self, content_id: int) -> Optional[Dict[str, Any]]:
-        """Get metadata for content by ID."""
-        cursor = self.conn.cursor()
+        """Get metadata for a specific content ID."""
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        
         cursor.execute('''
         SELECT id, content, content_type, agent_id, session_id, task_id, 
-               timestamp, importance_score, validated, metadata
-        FROM vector_metadata WHERE id = ?
+               timestamp, importance_score, metadata
+        FROM vector_metadata
+        WHERE id = ?
         ''', (content_id,))
         
         row = cursor.fetchone()
@@ -302,57 +344,62 @@ class VectorDatabase:
                 'task_id': row[5],
                 'timestamp': row[6],
                 'importance_score': row[7],
-                'validated': bool(row[8]),
-                'metadata': json.loads(row[9]) if row[9] else {}
+                'metadata': json.loads(row[8]) if row[8] else {}
             }
         return None
     
     def update_importance(self, content_id: int, importance_score: float, 
                          validated: bool = False):
         """
-        Update importance score and validation status.
+        Update importance score and validation status for content.
         
         Args:
-            content_id: Content ID to update
-            importance_score: New importance score (0.0-1.0)
+            content_id: ID of content to update
+            importance_score: New importance score
             validated: Whether content has been validated
         """
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        
         cursor.execute('''
         UPDATE vector_metadata 
         SET importance_score = ?, validated = ?
         WHERE id = ?
         ''', (importance_score, validated, content_id))
-        self.conn.commit()
         
-        logger.debug(f"Updated content {content_id}: importance={importance_score}, validated={validated}")
+        conn.commit()
+        logger.debug(f"Updated importance for content {content_id}: {importance_score}")
     
     def store_context_summary(self, session_id: str, summary_text: str,
                             original_length: int, metadata: Optional[Dict[str, Any]] = None) -> int:
         """
-        Store a context summary for overflow management.
+        Store a context summary for a session.
         
         Args:
             session_id: Session ID
-            summary_text: Summarized text
+            summary_text: Summary text
             original_length: Length of original content
             metadata: Additional metadata
             
         Returns:
             Summary ID
         """
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
+        
+        compressed_length = len(summary_text)
+        
         cursor.execute('''
-        INSERT INTO context_summaries
+        INSERT INTO context_summaries 
         (session_id, summary_text, original_length, compressed_length, timestamp, metadata)
         VALUES (?, ?, ?, ?, ?, ?)
         ''', (
-            session_id, summary_text, original_length, len(summary_text),
-            time.time(), json.dumps(metadata or {})
+            session_id, summary_text, original_length, compressed_length, 
+            time.time(), json.dumps(metadata) if metadata else None
         ))
         
         summary_id = cursor.lastrowid
-        self.conn.commit()
+        conn.commit()
         
         # Also store summary in vector database for retrieval
         self.store_content(
@@ -368,7 +415,8 @@ class VectorDatabase:
     
     def get_session_summaries(self, session_id: str) -> List[Dict[str, Any]]:
         """Get all summaries for a session."""
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
         cursor.execute('''
         SELECT id, summary_text, original_length, compressed_length, timestamp, metadata
         FROM context_summaries
@@ -391,7 +439,8 @@ class VectorDatabase:
     
     def get_stats(self) -> Dict[str, Any]:
         """Get database statistics."""
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
         
         # Count total content
         cursor.execute('SELECT COUNT(*) FROM vector_metadata')
@@ -436,20 +485,22 @@ class VectorDatabase:
         """
         cutoff_time = time.time() - (days_old * 24 * 3600)
         
-        cursor = self.conn.cursor()
+        conn = self._get_db_connection()
+        cursor = conn.cursor()
         cursor.execute('''
         DELETE FROM vector_metadata 
         WHERE timestamp < ? AND importance_score < ? AND validated = FALSE
         ''', (cutoff_time, min_importance))
         
         deleted_count = cursor.rowcount
-        self.conn.commit()
+        conn.commit()
         
         logger.info(f"Cleaned up {deleted_count} old content items")
         return deleted_count
     
     def close(self):
         """Close database connections."""
-        if hasattr(self, 'conn'):
-            self.conn.close()
+        if hasattr(_thread_local, 'vector_db'):
+            _thread_local.vector_db.close()
+            delattr(_thread_local, 'vector_db')
         logger.info("VectorDatabase closed")
