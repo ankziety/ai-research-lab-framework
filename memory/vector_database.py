@@ -6,6 +6,10 @@ AI research content with semantic search capabilities. It uses FAISS for vector
 operations and SQLite for metadata storage.
 """
 
+import warnings
+# Suppress encoder_attention_mask deprecation warnings globally
+warnings.filterwarnings("ignore", message=".*encoder_attention_mask.*", category=FutureWarning)
+
 import logging
 import time
 import json
@@ -25,6 +29,39 @@ except ImportError:
 # Try to import sentence transformers for embeddings
 try:
     from sentence_transformers import SentenceTransformer
+    import torch
+    from transformers import AutoTokenizer, AutoModel
+    from contextlib import contextmanager
+    
+    @contextmanager
+    def suppress_encoder_attention_mask_warning():
+        """Context manager to suppress encoder_attention_mask deprecation warning."""
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=".*encoder_attention_mask.*", category=FutureWarning)
+            yield
+    
+    class FixedSentenceTransformer(SentenceTransformer):
+        """
+        Custom SentenceTransformer wrapper that suppresses encoder_attention_mask deprecation warnings.
+        """
+        
+        def __init__(self, model_name_or_path, **kwargs):
+            """Initialize with warning suppression."""
+            with suppress_encoder_attention_mask_warning():
+                super().__init__(model_name_or_path, **kwargs)
+        
+        def encode(self, sentences, batch_size=32, show_progress_bar=False, 
+                  convert_to_numpy=True, convert_to_tensor=False, 
+                  normalize_embeddings=False, device=None, **kwargs):
+            """Encode with warning suppression."""
+            with suppress_encoder_attention_mask_warning():
+                return super().encode(sentences, batch_size=batch_size, 
+                                   show_progress_bar=show_progress_bar,
+                                   convert_to_numpy=convert_to_numpy, 
+                                   convert_to_tensor=convert_to_tensor,
+                                   normalize_embeddings=normalize_embeddings, 
+                                   device=device, **kwargs)
+        
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
@@ -72,7 +109,9 @@ class VectorDatabase:
         """Initialize the embedding model."""
         if SENTENCE_TRANSFORMERS_AVAILABLE:
             try:
-                self.embedding_model = SentenceTransformer(self.embedding_model_name)
+                # Suppress deprecation warnings during model initialization
+                with suppress_encoder_attention_mask_warning():
+                    self.embedding_model = FixedSentenceTransformer(self.embedding_model_name)
                 logger.info(f"Loaded embedding model: {self.embedding_model_name}")
             except Exception as e:
                 logger.warning(f"Failed to load embedding model: {e}")
