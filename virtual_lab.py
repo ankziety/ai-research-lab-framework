@@ -134,6 +134,16 @@ class VirtualLabMeetingSystem:
         self.agent_marketplace = agent_marketplace
         self.config = config or {}
         
+        # Initialize cost manager
+        budget_limit = config.get('budget_limit', 100.0)
+        self.cost_manager = None
+        try:
+            from cost_manager import CostManager
+            self.cost_manager = CostManager(budget_limit, config)
+            logger.info(f"Cost manager initialized with budget: ${budget_limit:.2f}")
+        except Exception as e:
+            logger.warning(f"Failed to initialize cost manager: {e}")
+        
         # Meeting management
         self.active_meetings = {}
         self.meeting_history = []
@@ -208,6 +218,8 @@ class VirtualLabMeetingSystem:
         # Store session
         self.research_sessions[session_id] = session_data
         
+        # Ensure all MeetingRecord objects are serialized before returning
+        session_data = self._serialize_session_data(session_data)
         return session_data
     
     def _execute_research_phase(self, phase: ResearchPhase, session_id: str,
@@ -635,7 +647,7 @@ class VirtualLabMeetingSystem:
     
     def _phase_tools_selection(self, session_id: str, research_question: str,
                               constraints: Dict[str, Any]) -> Dict[str, Any]:
-        """Phase 3: Tools Selection - Team meeting to brainstorm computational tools."""
+        """Phase 3: Tools Selection - Real tool discovery and selection by agents."""
         
         # Get hired agents from team selection phase
         team_selection_result = self.phase_results.get('team_selection', {})
@@ -644,57 +656,173 @@ class VirtualLabMeetingSystem:
         if not hired_agents:
             return {'success': False, 'error': 'No agents available from team selection phase'}
         
-        # Convert agent dictionaries back to agent objects for meeting
+        # Convert agent dictionaries back to agent objects
         agent_objects = {}
         for expertise, agent_dict in hired_agents.items():
             agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
         
-        participants = [self.pi_agent.agent_id] + [agent.agent_id for agent in agent_objects.values()]
+        # Initialize cost manager if available
+        cost_manager = None
+        if hasattr(self, 'cost_manager'):
+            cost_manager = self.cost_manager
         
-        agenda = MeetingAgenda(
-            meeting_id=f"{session_id}_tools_selection",
-            meeting_type=MeetingType.TEAM_MEETING,
-            phase=ResearchPhase.TOOLS_SELECTION,
-            objectives=[
-                "Brainstorm computational and analytical tools",
-                "Evaluate tool suitability for research objectives",
-                "Select optimal tool combination",
-                "Plan tool integration strategy"
-            ],
-            participants=participants,
-            discussion_topics=[
-                "Available computational tools review",
-                "Tool capability assessment",
-                "Integration complexity evaluation",
-                "Alternative tool considerations"
-            ],
-            expected_outcomes=[
-                "Selected tool suite",
-                "Tool integration plan",
-                "Implementation priority order",
-                "Resource requirements per tool"
-            ]
-        )
+        # Real tool discovery by each agent
+        discovered_tools = {}
+        tool_assessments = {}
         
-        # Conduct team meeting focused on tool selection
-        meeting_result = self._conduct_team_meeting(agenda, agent_objects, research_question, constraints)
-        
-        if meeting_result['success']:
-            # Extract tool selection from meeting outcomes
-            tool_selection = self._extract_tool_selection(meeting_result['meeting_record'])
+        for expertise, agent in agent_objects.items():
+            logger.info(f"Agent {agent.agent_id} discovering tools for research question")
             
-            return {
-                'success': True,
-                'meeting_record': meeting_result['meeting_record'],
-                'selected_tools': tool_selection,
-                'decisions': meeting_result['meeting_record'].decisions
+            # Discover tools based on agent's expertise and research question
+            available_tools = agent.discover_available_tools(research_question)
+            
+            if available_tools:
+                discovered_tools[expertise] = available_tools
+                
+                # Optimize tool selection for this agent
+                optimized_tools = agent.optimize_tool_usage(research_question, available_tools)
+                tool_assessments[expertise] = optimized_tools
+                
+                logger.info(f"Agent {agent.agent_id} discovered {len(available_tools)} tools, optimized {len(optimized_tools)}")
+        
+        # Real tool validation and testing
+        validated_tools = {}
+        tool_test_results = {}
+        
+        for expertise, tools in tool_assessments.items():
+            agent = agent_objects[expertise]
+            validated_tools[expertise] = []
+            tool_test_results[expertise] = []
+            
+            for tool_info in tools[:3]:  # Test top 3 tools per agent
+                tool_id = tool_info['tool_id']
+                
+                # Request tool access
+                tool = agent.request_tool(tool_id, {
+                    'agent_id': agent.agent_id,
+                    'agent_expertise': agent.expertise,
+                    'research_question': research_question,
+                    'constraints': constraints
+                })
+                
+                if tool:
+                    # Test tool with simple task
+                    test_task = {
+                        'description': f"Test tool {tool_id} for research question",
+                        'test_mode': True
+                    }
+                    
+                    test_result = tool.execute(test_task, {
+                        'agent_id': agent.agent_id,
+                        'agent_role': agent.role,
+                        'agent_expertise': agent.expertise
+                    })
+                    
+                    tool_test_results[expertise].append({
+                        'tool_id': tool_id,
+                        'tool_name': tool_info['name'],
+                        'test_result': test_result,
+                        'success': test_result.get('success', False)
+                    })
+                    
+                    if test_result.get('success', False):
+                        validated_tools[expertise].append({
+                            'tool': tool,
+                            'tool_info': tool_info,
+                            'test_result': test_result
+                        })
+                        
+                        logger.info(f"Tool {tool_id} validated successfully for agent {agent.agent_id}")
+                    else:
+                        logger.warning(f"Tool {tool_id} validation failed for agent {agent.agent_id}: {test_result.get('error', 'Unknown error')}")
+        
+        # Cost-aware tool selection
+        selected_tools = {}
+        budget_status = None
+        
+        if cost_manager:
+            budget_status = cost_manager.get_budget_status()
+            budget_remaining = budget_status['budget_remaining']
+            
+            logger.info(f"Budget remaining: ${budget_remaining:.2f}")
+        
+        for expertise, validated_tool_list in validated_tools.items():
+            if validated_tool_list:
+                # Select best tool based on cost and performance
+                best_tool = None
+                best_score = 0.0
+                
+                for tool_data in validated_tool_list:
+                    tool = tool_data['tool']
+                    tool_info = tool_data['tool_info']
+                    test_result = tool_data['test_result']
+                    
+                    # Calculate selection score
+                    score = 0.0
+                    
+                    # Confidence score
+                    score += tool_info.get('confidence', 0.0) * 0.4
+                    
+                    # Success rate score
+                    score += tool_info.get('success_rate', 0.0) * 0.3
+                    
+                    # Test result score
+                    if test_result.get('success', False):
+                        score += 0.3
+                    
+                    # Cost consideration
+                    if cost_manager and budget_remaining < 1.0:
+                        # Prefer cheaper tools when budget is low
+                        estimated_cost = cost_manager.estimate_cost('web_search', 100)  # Rough estimate
+                        if estimated_cost < 0.01:
+                            score += 0.2
+                    
+                    if score > best_score:
+                        best_score = score
+                        best_tool = tool_data
+                
+                if best_tool:
+                    selected_tools[expertise] = best_tool
+                    logger.info(f"Selected tool {best_tool['tool_info']['name']} for {expertise}")
+        
+        # Tool capability assessment
+        capability_assessment = {}
+        for expertise, tool_data in selected_tools.items():
+            tool = tool_data['tool']
+            tool_info = tool_data['tool_info']
+            
+            capabilities = tool_info.get('capabilities', [])
+            capability_assessment[expertise] = {
+                'tool_name': tool_info['name'],
+                'capabilities': capabilities,
+                'confidence': tool_info.get('confidence', 0.0),
+                'success_rate': tool_info.get('success_rate', 0.0),
+                'requirements': tool_info.get('requirements', {})
             }
         
-        return meeting_result
+        # Integration planning
+        integration_plan = self._plan_tool_integration(selected_tools, research_question, constraints)
+        
+        return {
+            'success': len(selected_tools) > 0,
+            'discovered_tools': discovered_tools,
+            'validated_tools': validated_tools,
+            'selected_tools': selected_tools,
+            'tool_test_results': tool_test_results,
+            'capability_assessment': capability_assessment,
+            'integration_plan': integration_plan,
+            'budget_status': budget_status,
+            'metadata': {
+                'total_agents': len(agent_objects),
+                'total_discovered_tools': sum(len(tools) for tools in discovered_tools.values()),
+                'total_validated_tools': sum(len(tools) for tools in validated_tools.values()),
+                'total_selected_tools': len(selected_tools)
+            }
+        }
     
     def _phase_tools_implementation(self, session_id: str, research_question: str,
                                    constraints: Dict[str, Any]) -> Dict[str, Any]:
-        """Phase 4: Tools Implementation - Series of individual meetings to implement selected tools."""
+        """Phase 4: Tools Implementation - Real tool integration building and testing."""
         
         # Get selected tools from previous phase
         tools_selection_result = self.phase_results.get('tools_selection', {})
@@ -712,59 +840,455 @@ class VirtualLabMeetingSystem:
         for expertise, agent_dict in hired_agents.items():
             agent_objects[expertise] = self._create_agent_from_dict(agent_dict)
         
-        implementation_results = {}
+        # Initialize cost manager if available
+        cost_manager = None
+        if hasattr(self, 'cost_manager'):
+            cost_manager = self.cost_manager
         
-        # For each selected tool, conduct implementation meetings
-        for tool_name, tool_details in selected_tools.items():
-            # Find best agent for implementing this tool
-            best_agent = self._select_agent_for_tool(tool_name, tool_details, agent_objects)
-            
-            if not best_agent:
-                logger.warning(f"No suitable agent found for tool: {tool_name}")
+        # Real tool integration building
+        implementation_results = {}
+        custom_tools_created = {}
+        tool_chains_built = {}
+        
+        for expertise, tool_data in selected_tools.items():
+            agent = agent_objects.get(expertise)
+            if not agent:
                 continue
             
-            # Conduct individual meeting for tool implementation
-            implementation_agenda = MeetingAgenda(
-                meeting_id=f"{session_id}_implement_{tool_name}",
-                meeting_type=MeetingType.INDIVIDUAL_MEETING,
-                phase=ResearchPhase.TOOLS_IMPLEMENTATION,
-                objectives=[
-                    f"Implement {tool_name} for research objectives",
-                    "Develop tool integration interface",
-                    "Create usage documentation",
-                    "Test tool functionality"
-                ],
-                participants=[best_agent.agent_id, self.scientific_critic.agent_id],
-                discussion_topics=[
-                    f"{tool_name} implementation strategy",
-                    "Integration requirements",
-                    "Testing and validation approach",
-                    "Documentation standards"
-                ],
-                expected_outcomes=[
-                    f"Functional {tool_name} implementation",
-                    "Integration interface",
-                    "Usage documentation",
-                    "Test results"
-                ]
-            )
+            tool = tool_data['tool']
+            tool_info = tool_data['tool_info']
+            tool_name = tool_info['name']
             
-            # Implementation meeting with agent and scientific critic
-            impl_result = self._conduct_implementation_meeting(
-                implementation_agenda, best_agent, tool_name, tool_details
-            )
+            logger.info(f"Agent {agent.agent_id} implementing tool {tool_name}")
             
-            implementation_results[tool_name] = impl_result
+            # Real API connections and testing
+            api_connection_result = self._test_api_connections(tool, agent, research_question)
+            
+            # Custom tool creation for research needs
+            custom_tool_result = self._create_custom_tool_if_needed(tool, agent, research_question, constraints)
+            
+            # Tool chain building and optimization
+            tool_chain_result = self._build_tool_chain(tool, agent, research_question, constraints)
+            
+            # Error handling and fallback mechanisms
+            fallback_result = self._setup_fallback_mechanisms(tool, agent, research_question)
+            
+            # Comprehensive testing
+            test_result = self._comprehensive_tool_testing(tool, agent, research_question, constraints)
+            
+            implementation_result = {
+                'tool_name': tool_name,
+                'agent_id': agent.agent_id,
+                'api_connection': api_connection_result,
+                'custom_tool': custom_tool_result,
+                'tool_chain': tool_chain_result,
+                'fallback_mechanisms': fallback_result,
+                'testing': test_result,
+                'success': all([
+                    api_connection_result.get('success', False),
+                    test_result.get('success', False)
+                ])
+            }
+            
+            implementation_results[expertise] = implementation_result
+            
+            if custom_tool_result.get('success', False):
+                custom_tools_created[expertise] = custom_tool_result
+            
+            if tool_chain_result.get('success', False):
+                tool_chains_built[expertise] = tool_chain_result
         
         # Aggregate implementation results
-        all_successful = all(result.get('success', False) for result in implementation_results.values())
+        successful_implementations = sum(1 for result in implementation_results.values() if result.get('success', False))
+        total_implementations = len(implementation_results)
+        
+        # Generate implementation summary
+        implementation_summary = {
+            'total_tools': total_implementations,
+            'successful_implementations': successful_implementations,
+            'success_rate': successful_implementations / max(1, total_implementations),
+            'custom_tools_created': len(custom_tools_created),
+            'tool_chains_built': len(tool_chains_built),
+            'budget_used': 0.0  # Will be calculated from cost manager
+        }
+        
+        # Calculate budget usage if cost manager available
+        if cost_manager:
+            budget_status = cost_manager.get_budget_status()
+            implementation_summary['budget_used'] = budget_status['current_spending']
         
         return {
-            'success': all_successful,
+            'success': successful_implementations > 0,
             'implementation_results': implementation_results,
-            'implemented_tools': list(implementation_results.keys()),
-            'decisions': [f"Implemented {tool}" for tool in implementation_results.keys()]
+            'custom_tools_created': custom_tools_created,
+            'tool_chains_built': tool_chains_built,
+            'implementation_summary': implementation_summary,
+            'metadata': {
+                'total_agents': len(agent_objects),
+                'total_tools_implemented': total_implementations,
+                'successful_implementations': successful_implementations
+            }
         }
+    
+    def _test_api_connections(self, tool, agent, research_question: str) -> Dict[str, Any]:
+        """Test real API connections for the tool."""
+        try:
+            # Test basic connectivity
+            test_task = {
+                'description': f"Test API connectivity for {tool.tool_id}",
+                'test_mode': True,
+                'api_test': True
+            }
+            
+            test_result = tool.execute(test_task, {
+                'agent_id': agent.agent_id,
+                'agent_role': agent.role,
+                'agent_expertise': agent.expertise
+            })
+            
+            return {
+                'success': test_result.get('success', False),
+                'connection_status': 'connected' if test_result.get('success', False) else 'failed',
+                'error': test_result.get('error', ''),
+                'response_time': test_result.get('metadata', {}).get('execution_time', 0)
+            }
+            
+        except Exception as e:
+            logger.error(f"API connection test failed for tool {tool.tool_id}: {e}")
+            return {
+                'success': False,
+                'connection_status': 'failed',
+                'error': str(e),
+                'response_time': 0
+            }
+    
+    def _create_custom_tool_if_needed(self, tool, agent, research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
+        """Create custom tool if needed for research requirements."""
+        try:
+            # Check if custom tool is needed based on research requirements
+            tool_capabilities = tool.capabilities
+            research_requirements = self._analyze_research_requirements(research_question)
+            
+            missing_capabilities = []
+            for requirement in research_requirements:
+                if requirement not in tool_capabilities:
+                    missing_capabilities.append(requirement)
+            
+            if missing_capabilities:
+                # Create custom tool to fill gaps
+                custom_tool_spec = {
+                    'type': 'custom_chain',
+                    'config': {
+                        'tool_registry': None,  # Will be set by agent
+                        'cost_manager': None,   # Will be set by agent
+                        'missing_capabilities': missing_capabilities,
+                        'research_question': research_question
+                    }
+                }
+                
+                custom_tool = agent.build_custom_tool(custom_tool_spec)
+                
+                if custom_tool:
+                    return {
+                        'success': True,
+                        'custom_tool_created': True,
+                        'tool_id': custom_tool.tool_id,
+                        'missing_capabilities_addressed': missing_capabilities
+                    }
+            
+            return {
+                'success': True,
+                'custom_tool_created': False,
+                'reason': 'No custom tool needed'
+            }
+            
+        except Exception as e:
+            logger.error(f"Custom tool creation failed: {e}")
+            return {
+                'success': False,
+                'custom_tool_created': False,
+                'error': str(e)
+            }
+    
+    def _build_tool_chain(self, tool, agent, research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
+        """Build tool chain for complex research tasks."""
+        try:
+            # Analyze if tool chain is needed
+            task_complexity = self._assess_task_complexity(research_question)
+            
+            if task_complexity in ['complex', 'very_complex']:
+                # Build tool chain
+                workflow_steps = self._design_workflow_steps(research_question, tool)
+                
+                tool_chain_spec = {
+                    'chain_spec': {
+                        'research_question': research_question,
+                        'complexity': task_complexity
+                    },
+                    'workflow_steps': workflow_steps
+                }
+                
+                # Execute tool chain building
+                chain_result = tool.execute(tool_chain_spec, {
+                    'agent_id': agent.agent_id,
+                    'agent_role': agent.role,
+                    'agent_expertise': agent.expertise
+                })
+                
+                return {
+                    'success': chain_result.get('success', False),
+                    'tool_chain_built': True,
+                    'workflow_steps': len(workflow_steps),
+                    'execution_result': chain_result
+                }
+            
+            return {
+                'success': True,
+                'tool_chain_built': False,
+                'reason': 'Task complexity does not require tool chain'
+            }
+            
+        except Exception as e:
+            logger.error(f"Tool chain building failed: {e}")
+            return {
+                'success': False,
+                'tool_chain_built': False,
+                'error': str(e)
+            }
+    
+    def _setup_fallback_mechanisms(self, tool, agent, research_question: str) -> Dict[str, Any]:
+        """Setup fallback mechanisms for tool failures."""
+        try:
+            # Identify potential failure points
+            failure_points = self._identify_failure_points(tool, research_question)
+            
+            # Setup fallbacks
+            fallback_mechanisms = {}
+            for failure_point in failure_points:
+                fallback_tool = self._find_fallback_tool(failure_point, agent)
+                if fallback_tool:
+                    fallback_mechanisms[failure_point] = {
+                        'fallback_tool': fallback_tool.tool_id,
+                        'fallback_strategy': 'automatic_switch'
+                    }
+            
+            return {
+                'success': len(fallback_mechanisms) > 0,
+                'fallback_mechanisms': fallback_mechanisms,
+                'failure_points_identified': len(failure_points)
+            }
+            
+        except Exception as e:
+            logger.error(f"Fallback mechanism setup failed: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _comprehensive_tool_testing(self, tool, agent, research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
+        """Comprehensive testing of tool functionality."""
+        try:
+            test_results = {}
+            
+            # Test 1: Basic functionality
+            basic_test = tool.execute({
+                'description': 'Basic functionality test',
+                'test_type': 'basic'
+            }, {
+                'agent_id': agent.agent_id,
+                'agent_role': agent.role,
+                'agent_expertise': agent.expertise
+            })
+            test_results['basic_functionality'] = basic_test.get('success', False)
+            
+            # Test 2: Research-specific functionality
+            research_test = tool.execute({
+                'description': f'Research-specific test for: {research_question}',
+                'test_type': 'research_specific'
+            }, {
+                'agent_id': agent.agent_id,
+                'agent_role': agent.role,
+                'agent_expertise': agent.expertise
+            })
+            test_results['research_functionality'] = research_test.get('success', False)
+            
+            # Test 3: Performance under constraints
+            constraint_test = tool.execute({
+                'description': 'Performance test under constraints',
+                'test_type': 'constraint_test',
+                'constraints': constraints
+            }, {
+                'agent_id': agent.agent_id,
+                'agent_role': agent.role,
+                'agent_expertise': agent.expertise
+            })
+            test_results['constraint_performance'] = constraint_test.get('success', False)
+            
+            # Calculate overall success
+            successful_tests = sum(1 for result in test_results.values() if result)
+            total_tests = len(test_results)
+            overall_success = successful_tests / max(1, total_tests) >= 0.67  # At least 2/3 tests pass
+            
+            return {
+                'success': overall_success,
+                'test_results': test_results,
+                'successful_tests': successful_tests,
+                'total_tests': total_tests,
+                'success_rate': successful_tests / max(1, total_tests)
+            }
+            
+        except Exception as e:
+            logger.error(f"Comprehensive testing failed: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def _analyze_research_requirements(self, research_question: str) -> List[str]:
+        """Analyze research question to identify required capabilities."""
+        requirements = []
+        
+        question_lower = research_question.lower()
+        
+        if any(word in question_lower for word in ['search', 'find', 'locate']):
+            requirements.append('web_search')
+        
+        if any(word in question_lower for word in ['analyze', 'process', 'compute']):
+            requirements.append('data_analysis')
+        
+        if any(word in question_lower for word in ['code', 'program', 'algorithm']):
+            requirements.append('code_execution')
+        
+        if any(word in question_lower for word in ['model', 'optimize', 'switch']):
+            requirements.append('model_optimization')
+        
+        return requirements
+    
+    def _assess_task_complexity(self, research_question: str) -> str:
+        """Assess the complexity of the research task."""
+        question_length = len(research_question.split())
+        
+        if question_length < 10:
+            return 'simple'
+        elif question_length < 20:
+            return 'medium'
+        elif question_length < 30:
+            return 'complex'
+        else:
+            return 'very_complex'
+    
+    def _design_workflow_steps(self, research_question: str, tool) -> List[Dict[str, Any]]:
+        """Design workflow steps for complex research tasks."""
+        steps = []
+        
+        # Step 1: Information gathering
+        steps.append({
+            'type': 'information_gathering',
+            'description': 'Gather initial information about the research topic',
+            'params': {'query': research_question}
+        })
+        
+        # Step 2: Analysis
+        steps.append({
+            'type': 'analysis',
+            'description': 'Analyze gathered information',
+            'params': {'analysis_type': 'comprehensive'}
+        })
+        
+        # Step 3: Synthesis
+        steps.append({
+            'type': 'synthesis',
+            'description': 'Synthesize findings into coherent results',
+            'params': {'synthesis_type': 'comprehensive'}
+        })
+        
+        return steps
+    
+    def _identify_failure_points(self, tool, research_question: str) -> List[str]:
+        """Identify potential failure points for the tool."""
+        failure_points = []
+        
+        # Check tool requirements
+        if hasattr(tool, 'requirements'):
+            for req_type, req_value in tool.requirements.items():
+                if req_type == 'api_keys' and not req_value:
+                    failure_points.append('missing_api_keys')
+                elif req_type == 'min_memory' and req_value > 512:
+                    failure_points.append('insufficient_memory')
+        
+        # Check tool capabilities vs research requirements
+        research_requirements = self._analyze_research_requirements(research_question)
+        tool_capabilities = getattr(tool, 'capabilities', [])
+        
+        for requirement in research_requirements:
+            if requirement not in tool_capabilities:
+                failure_points.append(f'missing_capability_{requirement}')
+        
+        return failure_points
+    
+    def _find_fallback_tool(self, failure_point: str, agent) -> Optional[Any]:
+        """Find a fallback tool for a specific failure point."""
+        try:
+            # Discover alternative tools
+            available_tools = agent.discover_available_tools(f"Fallback for {failure_point}")
+            
+            for tool_info in available_tools:
+                if tool_info.get('confidence', 0.0) > 0.6:
+                    tool = agent.request_tool(tool_info['tool_id'], {
+                        'agent_id': agent.agent_id,
+                        'fallback_for': failure_point
+                    })
+                    if tool:
+                        return tool
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Fallback tool discovery failed: {e}")
+            return None
+    
+    def _plan_tool_integration(self, selected_tools: Dict[str, Any], research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
+        """Plan tool integration strategy."""
+        integration_plan = {
+            'integration_strategy': 'sequential',
+            'tool_order': [],
+            'dependencies': {},
+            'resource_requirements': {},
+            'timeline': {}
+        }
+        
+        # Determine tool execution order based on dependencies
+        tool_order = []
+        for expertise, tool_data in selected_tools.items():
+            tool = tool_data['tool']
+            tool_info = tool_data['tool_info']
+            
+            # Check dependencies
+            dependencies = tool_info.get('requirements', {}).get('dependencies', [])
+            if dependencies:
+                integration_plan['dependencies'][expertise] = dependencies
+            
+            tool_order.append({
+                'expertise': expertise,
+                'tool_name': tool_info['name'],
+                'tool_id': tool_info['tool_id'],
+                'execution_order': len(tool_order) + 1
+            })
+        
+        integration_plan['tool_order'] = tool_order
+        
+        # Estimate resource requirements
+        for expertise, tool_data in selected_tools.items():
+            tool_info = tool_data['tool_info']
+            requirements = tool_info.get('requirements', {})
+            
+            integration_plan['resource_requirements'][expertise] = {
+                'memory_mb': requirements.get('min_memory', 128),
+                'api_keys_required': requirements.get('api_keys', []),
+                'timeout_seconds': requirements.get('timeout_seconds', 30)
+            }
+        
+        return integration_plan
     
     def _phase_workflow_design(self, session_id: str, research_question: str,
                               constraints: Dict[str, Any]) -> Dict[str, Any]:
@@ -1986,6 +2510,28 @@ class VirtualLabMeetingSystem:
     def get_phase_results(self, phase: ResearchPhase) -> Optional[Dict[str, Any]]:
         """Get results from a specific research phase."""
         return self.phase_results.get(phase.value)
+    
+    def _serialize_session_data(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Serialize session data to ensure all objects are JSON serializable."""
+        def serialize_obj(obj):
+            if hasattr(obj, 'to_dict'):
+                return obj.to_dict()
+            elif isinstance(obj, dict):
+                return {key: serialize_obj(value) for key, value in obj.items()}
+            elif isinstance(obj, (list, tuple)):
+                return [serialize_obj(item) for item in obj]
+            elif isinstance(obj, set):
+                return [serialize_obj(item) for item in obj]
+            elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingRecord':
+                return obj.to_dict()
+            elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingAgenda':
+                return obj.to_dict()
+            elif hasattr(obj, 'value'):
+                return obj.value
+            else:
+                return obj
+        
+        return serialize_obj(session_data)
     
     def get_meeting_statistics(self) -> Dict[str, Any]:
         """Get statistics about meetings conducted."""
