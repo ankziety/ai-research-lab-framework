@@ -66,9 +66,9 @@
                         <i class="fas fa-analytics"></i>
                         <span>Metrics</span>
                     </button>
-                    <button class="nav-item" data-panel="meetings">
+                    <button class="nav-item" data-panel="meetings-stats">
                         <i class="fas fa-users-cog"></i>
-                        <span>Meetings</span>
+                        <span>Meetings Stats</span>
                     </button>
                 </nav>
             </aside>
@@ -87,6 +87,10 @@
                     <button class="btn btn-secondary hidden" id="stopResearchBtn" aria-label="Stop research session">
                         <i class="fas fa-stop" aria-hidden="true"></i>
                         Stop Research
+                    </button>
+                    <button class="btn btn-ghost" id="testBtn" onclick="testWebUI()">
+                        <i class="fas fa-check"></i>
+                        Test UI
                     </button>
                         </div>
                     </div>
@@ -336,7 +340,7 @@
                         </div>
                     </div>
                     
-                    <div class="meetings-list" id="meetingsList">
+                    <div class="meetings-list" id="meetingsStatsList">
                     </div>
                 </section>
 
@@ -363,6 +367,23 @@
                     </div>
                     
                     <div class="history-list" id="historyList">
+                        <div class="session-list" id="sessionList">
+                            <!-- Sessions will be loaded here -->
+                        </div>
+                        <div class="history-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Total Sessions:</span>
+                                <span class="stat-value" id="totalSessionsCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Active Sessions:</span>
+                                <span class="stat-value" id="activeSessionsCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Completed Sessions:</span>
+                                <span class="stat-value" id="completedSessionsCount">0</span>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -437,8 +458,8 @@
                     </div>
                 </section>
 
-                <!-- Meetings Panel -->
-                <section class="panel" id="meetings-panel">
+                <!-- Meetings Stats Panel -->
+                <section class="panel" id="meetings-stats-panel">
                     <div class="panel-header">
                         <h2>Research Meetings</h2>
                         <div class="meetings-stats">
@@ -706,5 +727,56 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="app.js"></script>
+    
+    <!-- Fallback for JavaScript errors -->
+    <script>
+        // Check if the app initialized properly after 5 seconds
+        setTimeout(() => {
+            if (!window.aiResearchLab) {
+                console.error('AI Research Lab App failed to initialize');
+                const container = document.getElementById('notificationsContainer');
+                if (container) {
+                    const notification = document.createElement('div');
+                    notification.className = 'notification error';
+                    notification.innerHTML = `
+                        <div class="notification-header">
+                            <span class="notification-title">Initialization Failed</span>
+                            <button class="notification-close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="notification-message">The application failed to initialize. Please check the browser console for errors.</div>
+                    `;
+                    container.appendChild(notification);
+                    setTimeout(() => notification.classList.add('show'), 100);
+                }
+            }
+        }, 5000);
+        
+        // Test function for web UI
+        function testWebUI() {
+            const container = document.getElementById('notificationsContainer');
+            if (container) {
+                const notification = document.createElement('div');
+                notification.className = 'notification success';
+                notification.innerHTML = `
+                    <div class="notification-header">
+                        <span class="notification-title">UI Test</span>
+                        <button class="notification-close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="notification-message">Web UI is working correctly!</div>
+                `;
+                container.appendChild(notification);
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+        }
+    </script>
 </body>
 </html>

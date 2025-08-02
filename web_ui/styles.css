@@ -2777,7 +2777,300 @@ select:focus-visible {
 }
 
 .activity-text-mini {
-    color: var(--color-text-primary);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+}
+
+/* Skeleton Loading Styles */
+.skeleton-item,
+.skeleton-chat-item,
+.skeleton-meeting-item,
+.skeleton-agent-item,
+.skeleton-metric-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-md);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    margin-bottom: var(--space-sm);
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.skeleton-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(90deg, var(--color-bg-tertiary) 25%, var(--color-border-light) 50%, var(--color-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 2s infinite;
+    flex-shrink: 0;
+}
+
+.skeleton-content {
     flex: 1;
-    line-height: 1.3;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-sm);
+}
+
+.skeleton-line {
+    height: 12px;
+    border-radius: var(--radius-sm);
+    background: linear-gradient(90deg, var(--color-bg-tertiary) 25%, var(--color-border-light) 50%, var(--color-bg-tertiary) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 2s infinite;
+}
+
+.skeleton-title {
+    width: 60%;
+    height: 16px;
+}
+
+.skeleton-text {
+    width: 100%;
+    height: 12px;
+}
+
+.skeleton-header {
+    width: 80%;
+    height: 14px;
+}
+
+.skeleton-message {
+    width: 90%;
+    height: 12px;
+}
+
+.skeleton-name {
+    width: 70%;
+    height: 16px;
+}
+
+.skeleton-expertise {
+    width: 50%;
+    height: 12px;
+}
+
+.skeleton-info {
+    width: 40%;
+    height: 12px;
+}
+
+.skeleton-status {
+    width: 30%;
+    height: 12px;
+}
+
+.skeleton-value {
+    width: 60%;
+    height: 24px;
+    margin-bottom: var(--space-xs);
+}
+
+.skeleton-label {
+    width: 40%;
+    height: 12px;
+}
+
+@keyframes skeleton-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes skeleton-shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* Empty State Styles */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-2xl);
+    text-align: center;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+    border: 2px dashed var(--color-border-light);
+    margin: var(--space-lg);
+}
+
+.empty-state::before {
+    content: '';
+    width: 64px;
+    height: 64px;
+    background: var(--color-border-light);
+    border-radius: 50%;
+    margin-bottom: var(--space-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--color-text-tertiary);
+}
+
+.empty-state::after {
+    content: 'No data available';
+    font-size: var(--font-size-lg);
+    font-weight: 500;
+    margin-top: var(--space-sm);
+}
+
+/* Specific empty state messages */
+#chatStream .empty-state::after {
+    content: 'No chat logs available';
+}
+
+#meetingsList .empty-state::after {
+    content: 'No meetings recorded yet';
+}
+
+#agentsList .empty-state::after {
+    content: 'No agents available';
+}
+
+#activityStream .empty-state::after {
+    content: 'No activity recorded';
+}
+
+/* Loading spinner for buttons */
+.btn .fa-spinner {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Session List Styles */
+.session-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-bottom: var(--space-lg);
+}
+
+.session-item {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-md);
+    padding: var(--space-md);
+    transition: var(--transition-base);
+    cursor: pointer;
+}
+
+.session-item:hover {
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+}
+
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-sm);
+}
+
+.session-id {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    background: var(--color-bg-secondary);
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+}
+
+.session-status {
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.session-status.pending {
+    background: var(--color-warning);
+    color: white;
+}
+
+.session-status.running {
+    background: var(--color-primary);
+    color: white;
+}
+
+.session-status.completed {
+    background: var(--color-success);
+    color: white;
+}
+
+.session-status.failed {
+    background: var(--color-danger);
+    color: white;
+}
+
+.session-status.stopped {
+    background: var(--color-text-tertiary);
+    color: white;
+}
+
+.session-question {
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    color: var(--color-text-primary);
+    margin-bottom: var(--space-sm);
+    line-height: 1.4;
+}
+
+.session-date {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+}
+
+.history-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-md);
+    margin-top: var(--space-lg);
+    padding-top: var(--space-lg);
+    border-top: 1px solid var(--color-border-light);
+}
+
+.stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-md);
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-md);
+}
+
+.stat-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+}
+
+.stat-value {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
 }
