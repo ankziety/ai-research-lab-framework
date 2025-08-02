@@ -111,7 +111,7 @@ def close_db(e=None):
 
 @app.teardown_appcontext
 def close_db(error):
-    close_db()
+    _close_db_connection()
 
 # Configuration management
 def load_system_config():
