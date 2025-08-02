@@ -176,6 +176,65 @@ def close_db_connection():
 def close_db(error):
     close_db_connection()
 
+# Utility functions
+def make_json_serializable(obj):
+    """Recursively convert objects to JSON-serializable format with improved error handling."""
+    try:
+        if obj is None:
+            return None
+        elif hasattr(obj, 'to_dict'):
+            return obj.to_dict()
+        elif isinstance(obj, dict):
+            return {str(key): make_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [make_json_serializable(item) for item in obj]
+        elif isinstance(obj, set):
+            return [make_json_serializable(item) for item in obj]
+        elif isinstance(obj, (str, int, float, bool)):
+            return obj
+        elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingRecord':
+            return {
+                'meeting_id': getattr(obj, 'meeting_id', 'unknown'),
+                'meeting_type': getattr(obj, 'meeting_type', 'unknown'),
+                'phase': getattr(obj, 'phase', 'unknown'),
+                'participants': getattr(obj, 'participants', []),
+                'agenda': make_json_serializable(getattr(obj, 'agenda', {})),
+                'discussion_transcript': getattr(obj, 'discussion_transcript', []),
+                'outcomes': getattr(obj, 'outcomes', {}),
+                'decisions': getattr(obj, 'decisions', []),
+                'action_items': getattr(obj, 'action_items', []),
+                'start_time': getattr(obj, 'start_time', 0.0),
+                'end_time': getattr(obj, 'end_time', 0.0),
+                'success': getattr(obj, 'success', False)
+            }
+        elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingAgenda':
+            return {
+                'meeting_id': getattr(obj, 'meeting_id', 'unknown'),
+                'meeting_type': getattr(obj, 'meeting_type', 'unknown'),
+                'phase': getattr(obj, 'phase', 'unknown'),
+                'objectives': getattr(obj, 'objectives', []),
+                'participants': getattr(obj, 'participants', []),
+                'discussion_topics': getattr(obj, 'discussion_topics', []),
+                'expected_outcomes': getattr(obj, 'expected_outcomes', []),
+                'duration_minutes': getattr(obj, 'duration_minutes', 10)
+            }
+        elif hasattr(obj, '__class__') and obj.__class__.__name__ in ['GeneralExpertAgent', 'BaseAgent', 'SimpleAgent']:
+            return {
+                'agent_id': getattr(obj, 'agent_id', 'unknown'),
+                'role': getattr(obj, 'role', 'unknown'),
+                'expertise': getattr(obj, 'expertise', []),
+                'agent_type': obj.__class__.__name__
+            }
+        elif hasattr(obj, '__dict__'):
+            return {str(key): make_json_serializable(value) for key, value in obj.__dict__.items()}
+        elif hasattr(obj, 'value'):
+            return obj.value
+        else:
+            return str(obj)
+    except Exception as e:
+        logger.warning(f"Failed to serialize object {type(obj)}: {e}")
+        return f"<Serialization failed: {type(obj).__name__}>"
+
 # Configuration management
 def load_system_config():
     """Load system configuration."""
@@ -587,8 +646,13 @@ def start_research():
                     # Call the original method (not the replaced one)
                     results = original_conduct(research_question, constraints, context)
                     
+                    # Check if results is valid
+                    if not isinstance(results, dict):
+                        emit_chat_log('system', 'System', f'Research completed with non-dict results: {type(results)}')
+                        logger.warning(f"Research returned non-dict results: {type(results)} - {str(results)[:200]}")
+                    
                     # Emit phase updates based on actual results
-                    if results and 'phases' in results:
+                    if results and isinstance(results, dict) and 'phases' in results:
                         for i, (phase_name, phase_result) in enumerate(results['phases'].items()):
                             emit_chat_log('thought', 'System', f'Completed phase: {phase_name.replace("_", " ").title()}')
                             socketio.emit('phase_update', {
@@ -609,7 +673,7 @@ def start_research():
                                         )
                     
                     # Extract and store meeting records from results
-                    if results and 'phases' in results:
+                    if results and isinstance(results, dict) and 'phases' in results:
                         for phase_name, phase_result in results['phases'].items():
                             if phase_result and 'meeting_record' in phase_result:
                                 meeting_record = phase_result['meeting_record']
@@ -658,61 +722,6 @@ def start_research():
                 # Restore original method
                 research_framework.conduct_virtual_lab_research = original_conduct
                 
-                # Make results JSON serializable
-                def make_json_serializable(obj):
-                    """Recursively convert objects to JSON-serializable format."""
-                    if hasattr(obj, 'to_dict'):
-                        return obj.to_dict()
-                    elif isinstance(obj, dict):
-                        return {key: make_json_serializable(value) for key, value in obj.items()}
-                    elif isinstance(obj, (list, tuple)):
-                        return [make_json_serializable(item) for item in obj]
-                    elif isinstance(obj, set):
-                        return [make_json_serializable(item) for item in obj]
-                    elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingRecord':
-                        # Handle MeetingRecord objects specifically
-                        return {
-                            'meeting_id': getattr(obj, 'meeting_id', 'unknown'),
-                            'meeting_type': getattr(obj, 'meeting_type', 'unknown'),
-                            'phase': getattr(obj, 'phase', 'unknown'),
-                            'participants': getattr(obj, 'participants', []),
-                            'agenda': make_json_serializable(getattr(obj, 'agenda', {})),
-                            'discussion_transcript': getattr(obj, 'discussion_transcript', []),
-                            'outcomes': getattr(obj, 'outcomes', {}),
-                            'decisions': getattr(obj, 'decisions', []),
-                            'action_items': getattr(obj, 'action_items', []),
-                            'start_time': getattr(obj, 'start_time', 0.0),
-                            'end_time': getattr(obj, 'end_time', 0.0),
-                            'success': getattr(obj, 'success', False)
-                        }
-                    elif hasattr(obj, '__class__') and obj.__class__.__name__ == 'MeetingAgenda':
-                        # Handle MeetingAgenda objects specifically
-                        return {
-                            'meeting_id': getattr(obj, 'meeting_id', 'unknown'),
-                            'meeting_type': getattr(obj, 'meeting_type', 'unknown'),
-                            'phase': getattr(obj, 'phase', 'unknown'),
-                            'objectives': getattr(obj, 'objectives', []),
-                            'participants': getattr(obj, 'participants', []),
-                            'discussion_topics': getattr(obj, 'discussion_topics', []),
-                            'expected_outcomes': getattr(obj, 'expected_outcomes', []),
-                            'duration_minutes': getattr(obj, 'duration_minutes', 10)
-                        }
-                    elif hasattr(obj, '__class__') and obj.__class__.__name__ in ['GeneralExpertAgent', 'BaseAgent', 'SimpleAgent']:
-                        # Handle agent objects that might not have to_dict
-                        return {
-                            'agent_id': getattr(obj, 'agent_id', 'unknown'),
-                            'role': getattr(obj, 'role', 'unknown'),
-                            'expertise': getattr(obj, 'expertise', []),
-                            'agent_type': obj.__class__.__name__
-                        }
-                    elif hasattr(obj, '__dict__'):
-                        return {key: make_json_serializable(value) for key, value in obj.__dict__.items()}
-                    elif hasattr(obj, 'value'):
-                        # Handle Enum objects
-                        return obj.value
-                    else:
-                        return obj
-                
                 # Convert results to JSON serializable format
                 try:
                     serializable_results = make_json_serializable(results)
@@ -725,6 +734,7 @@ def start_research():
                         'raw_results': str(results)
                     }
                 
+                global current_session
                 current_session = {
                     'session_id': session_id,
                     'status': serializable_results.get('status', 'completed'),
@@ -742,7 +752,7 @@ def start_research():
                         VALUES (?, ?, ?, ?, ?)
                     ''', (current_session['session_id'], research_question,
                           json.dumps({'constraints': constraints, 'context': context}),
-                          json.dumps(results), current_session['status']))
+                          json.dumps(serializable_results), current_session['status']))
                     db.commit()
                 
                 # Emit completion
@@ -750,6 +760,20 @@ def start_research():
                 
             except Exception as e:
                 logger.error(f"Research error: {e}")
+                global current_session
+                current_session = {
+                    'session_id': session_id,
+                    'status': 'failed',
+                    'research_question': research_question,
+                    'results': {
+                        'success': False,
+                        'error': str(e),
+                        'research_question': research_question,
+                        'timestamp': time.time()
+                    },
+                    'start_time': time.time(),
+                    'end_time': time.time()
+                }
                 socketio.emit('research_error', {'error': str(e)}, namespace='/')
         
         thread = threading.Thread(target=research_worker)
