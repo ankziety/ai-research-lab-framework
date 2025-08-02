@@ -18,6 +18,7 @@ from typing import Dict, Any, Optional, List
 from flask import Flask, request, jsonify, render_template, session, g
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_wtf.csrf import CSRFProtect
 import sqlite3
 import psutil
 
@@ -42,20 +43,60 @@ app = Flask(__name__,
 # Securely set SECRET_KEY
 secret_key = os.environ.get('SECRET_KEY')
 if not secret_key:
-    # Determine if running in development mode
+    # Check if we're in development mode
     flask_env = os.environ.get('FLASK_ENV', '').lower()
     flask_debug = os.environ.get('FLASK_DEBUG', '').lower()
-    if flask_env in ('development', 'debug') or flask_debug in ('1', 'true', 'yes'):
+    is_development = (
+        flask_env in ('development', 'debug') or 
+        flask_debug in ('1', 'true', 'yes') or
+        os.environ.get('FLASK_APP') is not None or
+        __name__ == '__main__'
+    )
+    
+    if is_development:
         # Generate a random secret key for development
         secret_key = secrets.token_urlsafe(32)
-        logging.warning("SECRET_KEY not set, using a random key for development. Do not use this in production!")
+        logger.warning("SECRET_KEY not set, using a random key for development. Set SECRET_KEY environment variable for production.")
     else:
+        # For production, require SECRET_KEY to be set
+        logger.error("SECRET_KEY environment variable must be set in production.")
+        logger.error("Set it with: export SECRET_KEY='your-secret-key-here'")
+        logger.error("Or generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'")
         raise RuntimeError("SECRET_KEY environment variable must be set in production.")
+
 app.config['SECRET_KEY'] = secret_key
 app.config['SESSION_TYPE'] = 'filesystem'
 
+# Initialize CSRF protection
+csrf = CSRFProtect(app)
+
+# Exempt API routes from CSRF protection
+def exempt_api_routes():
+    """Exempt API routes from CSRF protection."""
+    api_routes = [
+        'start_research', 'stop_research', 'get_research_status',
+        'get_config', 'update_config', 'test_api_key',
+        'get_sessions', 'get_session', 'get_metrics',
+        'send_intervention', 'get_agent_activity', 'get_chat_logs',
+        'add_chat_log', 'add_agent_activity', 'get_meetings',
+        'add_meeting', 'get_agents'
+    ]
+    
+    for route_name in api_routes:
+        if route_name in app.view_functions:
+            csrf.exempt(app.view_functions[route_name])
+
 # SocketIO setup for real-time communication
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    async_mode='threading',
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=1e8,
+    logger=True,
+    engineio_logger=True
+)
 
 # Global state
 research_framework: Optional[MultiAgentResearchFramework] = None
@@ -66,10 +107,25 @@ active_connections: Dict[str, Any] = {}
 # Thread-local storage for database connections
 _thread_local = threading.local()
 
+def get_db_connection():
+    """Get a database connection."""
+    try:
+        conn = sqlite3.connect('research_sessions.db', check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
+    except Exception as e:
+        logger.error(f"Error creating database connection: {e}")
+        return None
+
+def close_db_connections():
+    """Close all database connections."""
+    # No longer needed with new approach
+    pass
+
 # Database setup for persistent storage
 def init_db():
     """Initialize SQLite database for session storage."""
-    conn = sqlite3.connect('research_sessions.db')
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     # Create sessions table
@@ -160,21 +216,30 @@ def init_db():
     conn.close()
 
 def get_db():
-    """Get thread-local database connection."""
-    if not hasattr(_thread_local, 'db'):
-        _thread_local.db = sqlite3.connect('research_sessions.db')
-        _thread_local.db.row_factory = sqlite3.Row
-    return _thread_local.db
+    """Get database connection with proper error handling."""
+    try:
+        conn = get_db_connection()
+        if conn is None:
+            return None
+        return conn
+    except Exception as e:
+        logger.error(f"Error getting database: {e}")
+        return None
 
 def close_db_connection():
-    """Close thread-local database connection."""
-    if hasattr(_thread_local, 'db'):
-        _thread_local.db.close()
-        delattr(_thread_local, 'db')
+    """Close a database connection."""
+    # Connections are now managed individually
+    pass
 
 @app.teardown_appcontext
 def close_db(error):
-    close_db_connection()
+    # Connections are managed by the pool
+    pass
+
+@app.teardown_appcontext
+def cleanup_db(error):
+    """Cleanup database connections on app shutdown."""
+    close_db_connections()
 
 # Configuration management
 def load_system_config():
@@ -303,11 +368,25 @@ def get_system_metrics():
             'timestamp': time.time()
         }
         
-        if research_framework and hasattr(research_framework, 'get_active_agents'):
-            metrics['active_agents'] = len(research_framework.get_active_agents())
+        # Get active agents count from framework
+        active_agents_count = 0
+        if research_framework:
+            if hasattr(research_framework, 'get_active_agents'):
+                active_agents = research_framework.get_active_agents()
+                # Only count agents that are actively working, not just present
+                active_agents_count = len([agent for agent in active_agents 
+                                        if hasattr(agent, 'is_active') and agent.is_active()])
+            elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                active_agents = research_framework.virtual_lab.get_active_agents()
+                # Only count agents that are actively working, not just present
+                active_agents_count = len([agent for agent in active_agents 
+                                        if hasattr(agent, 'is_active') and agent.is_active()])
+            else:
+                active_agents_count = 0
         else:
-            metrics['active_agents'] = 0
+            active_agents_count = 0
             
+        metrics['active_agents'] = active_agents_count
         return metrics
     except Exception as e:
         logger.error(f"Error getting system metrics: {e}")
@@ -319,20 +398,128 @@ def get_system_metrics():
             'timestamp': time.time()
         }
 
+def get_agent_stats(db, current_session):
+    """Get comprehensive agent statistics."""
+    try:
+        if db is None:
+            return {
+                'total_agents': 0,
+                'avg_quality_score': 0.0,
+                'critical_issues': 0,
+                'active_agents': 0
+            }
+        
+        # Get session-specific stats if there's an active session
+        session_id = current_session.get('session_id') if current_session else None
+        
+        # Count total agents from agent_activity table
+        total_agents_query = '''
+            SELECT COUNT(DISTINCT agent_id) as total_agents 
+            FROM agent_activity 
+        '''
+        if session_id:
+            total_agents_query += ' WHERE session_id = ?'
+            total_agents_result = db.execute(total_agents_query, (session_id,)).fetchone()
+        else:
+            total_agents_result = db.execute(total_agents_query).fetchone()
+        
+        total_agents = total_agents_result['total_agents'] if total_agents_result else 0
+        
+        # Calculate average quality score based on agent performance
+        quality_query = '''
+            SELECT AVG(quality_score) as avg_quality 
+            FROM agent_performance 
+        '''
+        if session_id:
+            quality_query += ' WHERE session_id = ?'
+            quality_result = db.execute(quality_query, (session_id,)).fetchone()
+        else:
+            quality_result = db.execute(quality_query).fetchone()
+        
+        avg_quality = quality_result['avg_quality'] if quality_result and quality_result['avg_quality'] else 0.0
+        
+        # Count critical issues (failed tasks or low quality scores)
+        issues_query = '''
+            SELECT COUNT(*) as critical_issues 
+            FROM agent_performance 
+            WHERE quality_score < 0.5 OR task_completed = 0
+        '''
+        if session_id:
+            issues_query += ' AND session_id = ?'
+            issues_result = db.execute(issues_query, (session_id,)).fetchone()
+        else:
+            issues_result = db.execute(issues_query).fetchone()
+        
+        critical_issues = issues_result['critical_issues'] if issues_result else 0
+        
+        # Get active agents from current framework
+        active_agents_count = 0
+        if research_framework:
+            if hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                try:
+                    # Try to get current agents from virtual lab
+                    current_agents = getattr(research_framework.virtual_lab, 'agents', {})
+                    active_agents_count = len(current_agents)
+                except:
+                    active_agents_count = 0
+        
+        return {
+            'total_agents': max(total_agents, active_agents_count),  # Use the higher count
+            'avg_quality_score': round(avg_quality, 2),
+            'critical_issues': critical_issues,
+            'active_agents': active_agents_count
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting agent stats: {e}")
+        return {
+            'total_agents': 0,
+            'avg_quality_score': 0.0,
+            'critical_issues': 0,
+            'active_agents': 0
+        }
+
 def store_metrics(session_id: Optional[str] = None):
     """Store system metrics in database."""
     try:
         with app.app_context():
             metrics = get_system_metrics()
             db = get_db()
-            db.execute('''
-                INSERT INTO metrics (cpu_usage, memory_usage, active_agents, session_id)
-                VALUES (?, ?, ?, ?)
-            ''', (metrics['cpu_usage'], metrics['memory_usage'], 
-                  metrics['active_agents'], session_id))
-            db.commit()
+            if db is None:
+                logger.warning("Could not get database connection for storing metrics")
+                return
+                
+            try:
+                db.execute('''
+                    INSERT INTO metrics (cpu_usage, memory_usage, active_agents, session_id)
+                    VALUES (?, ?, ?, ?)
+                ''', (metrics['cpu_usage'], metrics['memory_usage'], 
+                      metrics['active_agents'], session_id))
+                db.commit()
+            finally:
+                db.close()
     except Exception as e:
         logger.error(f"Error storing metrics: {e}")
+
+def store_agent_performance(agent_id: str, session_id: str, task_completed: int, quality_score: float, status: str):
+    """Store agent performance data in database."""
+    try:
+        with app.app_context():
+            db = get_db()
+            if db is None:
+                logger.warning("Could not get database connection for storing agent performance")
+                return
+                
+            try:
+                db.execute('''
+                    INSERT INTO agent_performance (agent_id, session_id, task_completed, quality_score, status)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (agent_id, session_id, task_completed, quality_score, status))
+                db.commit()
+            finally:
+                db.close()
+    except Exception as e:
+        logger.error(f"Error storing agent performance: {e}")
 
 # Background monitoring thread
 def monitoring_thread():
@@ -357,6 +544,22 @@ def monitoring_thread():
 def index():
     """Serve the main interface."""
     return render_template('index.html')
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors gracefully."""
+    # Check if it's a static file request
+    if request.path.startswith('/static/') or request.path.endswith('.map'):
+        # Log missing static files at debug level only
+        logger.debug(f"Missing static file: {request.path}")
+        return '', 404
+    
+    # For other 404s, return JSON error
+    return jsonify({'error': 'Not found', 'path': request.path}), 404
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
@@ -515,20 +718,52 @@ def start_research():
                 return jsonify({'error': 'Research framework not initialized'}), 500
         
         data = request.get_json()
-        research_question = data.get('research_question', '')
+        if not data:
+            return jsonify({'error': 'Invalid JSON data'}), 400
+            
+        research_question = data.get('research_question', '').strip()
         
+        # Input validation and sanitization
         if not research_question:
             return jsonify({'error': 'Research question is required'}), 400
+            
+        if len(research_question) > 1000:
+            return jsonify({'error': 'Research question too long (max 1000 characters)'}), 400
+            
+        # Sanitize inputs
+        import html
+        research_question = html.escape(research_question)
         
-        # Prepare constraints and context
+        # Validate constraints
         constraints = {}
         if data.get('budget'):
-            constraints['budget'] = data['budget']
+            try:
+                budget = float(data['budget'])
+                if budget < 0 or budget > 1000000:
+                    return jsonify({'error': 'Invalid budget value'}), 400
+                constraints['budget'] = budget
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid budget format'}), 400
+                
         if data.get('timeline'):
-            constraints['timeline_weeks'] = data['timeline']
+            try:
+                timeline = int(data['timeline'])
+                if timeline < 1 or timeline > 52:
+                    return jsonify({'error': 'Invalid timeline (1-52 weeks)'}), 400
+                constraints['timeline_weeks'] = timeline
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid timeline format'}), 400
+                
         if data.get('max_agents'):
-            constraints['team_size_max'] = data['max_agents']
+            try:
+                max_agents = int(data['max_agents'])
+                if max_agents < 1 or max_agents > 20:
+                    return jsonify({'error': 'Invalid max agents (1-20)'}), 400
+                constraints['team_size_max'] = max_agents
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid max agents format'}), 400
         
+        # Prepare context
         context = {}
         if data.get('domain'):
             context['domain'] = data['domain']
@@ -540,6 +775,15 @@ def start_research():
             try:
                 global current_session
                 session_id = f'session_{int(time.time())}'
+                
+                # Initialize current_session immediately
+                global current_session
+                current_session = {
+                    'session_id': session_id,
+                    'status': 'running',
+                    'research_question': research_question,
+                    'start_time': time.time()
+                }
                 
                 # Emit status update
                 socketio.emit('research_status', {
@@ -576,21 +820,79 @@ def start_research():
                         'timestamp': time.time()
                     }, namespace='/')
                 
-                # Store the original method before replacing it
-                original_conduct = research_framework.conduct_virtual_lab_research
+                # Set up activity tracking hooks
+                def track_agent_activity(agent_id, activity_type, message, metadata=None):
+                    emit_agent_activity(agent_id, activity_type, message)
+                    # Log to framework
+                    if hasattr(research_framework, 'log_agent_activity'):
+                        research_framework.log_agent_activity(agent_id, activity_type, message, session_id, metadata)
+                    elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                        research_framework.virtual_lab.log_agent_activity(agent_id, activity_type, message, session_id, metadata)
                 
-                # Call the actual virtual lab research
+                def track_chat_message(log_type, author, message, metadata=None):
+                    emit_chat_log(log_type, author, message)
+                    # Log to framework
+                    if hasattr(research_framework, 'log_chat_message'):
+                        research_framework.log_chat_message(log_type, author, message, session_id, metadata)
+                    elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                        research_framework.virtual_lab.log_chat_message(log_type, author, message, session_id, metadata)
+                
+                # Override framework methods to ensure logging
+                original_log_agent_activity = getattr(research_framework, 'log_agent_activity', None)
+                original_log_chat_message = getattr(research_framework, 'log_chat_message', None)
+                
+                def enhanced_log_agent_activity(agent_id, activity_type, message, session_id=None, metadata=None):
+                    track_agent_activity(agent_id, activity_type, message, metadata)
+                    if original_log_agent_activity:
+                        return original_log_agent_activity(agent_id, activity_type, message, session_id, metadata)
+                    return None
+                
+                def enhanced_log_chat_message(log_type, author, message, session_id=None, metadata=None):
+                    track_chat_message(log_type, author, message, metadata)
+                    if original_log_chat_message:
+                        return original_log_chat_message(log_type, author, message, session_id, metadata)
+                    return None
+                
+                # Store original conduct method
+                original_conduct = getattr(research_framework, 'conduct_virtual_lab_research', None)
+                
                 def tracked_conduct_research(research_question, constraints=None, context=None):
                     # Emit initial status
                     emit_chat_log('system', 'System', 'Starting Virtual Lab research session')
                     
-                    # Call the original method (not the replaced one)
-                    results = original_conduct(research_question, constraints, context)
+                    # Set up activity tracking hooks
+                    def track_agent_activity(agent_id, activity_type, message, metadata=None):
+                        emit_agent_activity(agent_id, activity_type, message)
+                        # Also log to framework if available
+                        if hasattr(research_framework, 'log_agent_activity'):
+                            research_framework.log_agent_activity(agent_id, activity_type, message, session_id, metadata)
+                        elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                            research_framework.virtual_lab.log_agent_activity(agent_id, activity_type, message, session_id, metadata)
+                    
+                    def track_chat_message(log_type, author, message, metadata=None):
+                        emit_chat_log(log_type, author, message)
+                        # Also log to framework if available
+                        if hasattr(research_framework, 'log_chat_message'):
+                            research_framework.log_chat_message(log_type, author, message, session_id, metadata)
+                        elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                            research_framework.virtual_lab.log_chat_message(log_type, author, message, session_id, metadata)
+                    
+                    # Call the original method if it exists
+                    if original_conduct:
+                        results = original_conduct(research_question, constraints, context)
+                    else:
+                        # Fallback to virtual lab if available
+                        if hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                            results = research_framework.virtual_lab.conduct_research_session(
+                                research_question, constraints, context
+                            )
+                        else:
+                            results = {'error': 'No research method available'}
                     
                     # Emit phase updates based on actual results
                     if results and 'phases' in results:
                         for i, (phase_name, phase_result) in enumerate(results['phases'].items()):
-                            emit_chat_log('thought', 'System', f'Completed phase: {phase_name.replace("_", " ").title()}')
+                            track_chat_message('thought', 'System', f'Completed phase: {phase_name.replace("_", " ").title()}')
                             socketio.emit('phase_update', {
                                 'phase': i + 1,
                                 'phase_name': phase_name,
@@ -601,59 +903,54 @@ def start_research():
                             if phase_result.get('success'):
                                 if 'hired_agents' in phase_result:
                                     for expertise, agent_info in phase_result['hired_agents'].get('hired_agents', {}).items():
-                                        emit_agent_activity(
+                                        track_agent_activity(
                                             agent_info.get('agent_id', expertise),
                                             'meeting',
                                             f'Participated in {phase_name} phase',
                                             'active'
                                         )
                     
-                    # Extract and store meeting records from results
-                    if results and 'phases' in results:
-                        for phase_name, phase_result in results['phases'].items():
-                            if phase_result and 'meeting_record' in phase_result:
-                                meeting_record = phase_result['meeting_record']
-                                if hasattr(meeting_record, 'to_dict'):
-                                    meeting_data = meeting_record.to_dict()
-                                    
-                                    # Store meeting in database
-                                    db = get_db()
-                                    db.execute('''
-                                        INSERT INTO meetings (session_id, meeting_id, participants, topic, duration, outcome, transcript)
-                                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                                    ''', (
-                                        session_id,
-                                        meeting_data.get('meeting_id', f'{phase_name}_meeting'),
-                                        json.dumps(meeting_data.get('participants', [])),
-                                        f'{phase_name.replace("_", " ").title()} Meeting',
-                                        meeting_data.get('end_time', 0) - meeting_data.get('start_time', 0),
-                                        json.dumps(meeting_data.get('outcomes', {})),
-                                        json.dumps(meeting_data.get('discussion_transcript', []))
-                                    ))
-                                    db.commit()
-                                    
-                                    # Emit meeting to UI
-                                    socketio.emit('meeting', {
-                                        'session_id': session_id,
-                                        'meeting_id': meeting_data.get('meeting_id', f'{phase_name}_meeting'),
-                                        'participants': json.dumps(meeting_data.get('participants', [])),
-                                        'topic': f'{phase_name.replace("_", " ").title()} Meeting',
-                                        'duration': meeting_data.get('end_time', 0) - meeting_data.get('start_time', 0),
-                                        'outcome': json.dumps(meeting_data.get('outcomes', {})),
-                                        'timestamp': meeting_data.get('start_time', time.time())
-                                    }, namespace='/')
-                    
                     return results
                 
                 # Temporarily replace the method
                 research_framework.conduct_virtual_lab_research = tracked_conduct_research
                 
-                # Conduct research
-                results = research_framework.conduct_virtual_lab_research(
-                    research_question=research_question,
-                    constraints=constraints,
-                    context=context
-                )
+                # Conduct research with enhanced tracking
+                try:
+                    results = research_framework.conduct_virtual_lab_research(
+                        research_question=research_question,
+                        constraints=constraints,
+                        context=context
+                    )
+                    
+                    # Emit phase completion updates
+                    if results and isinstance(results, dict):
+                        if 'phase_results' in results:
+                            for phase_name, phase_data in results['phase_results'].items():
+                                phase_num = {
+                                    'team_selection': 1,
+                                    'literature_review': 2,
+                                    'project_specification': 3,
+                                    'tools_selection': 4,
+                                    'tools_implementation': 5,
+                                    'workflow_design': 6,
+                                    'execution': 7,
+                                    'synthesis': 8
+                                }.get(phase_name, 0)
+                                
+                                socketio.emit('phase_update', {
+                                    'phase': phase_num,
+                                    'phase_name': phase_name.replace('_', ' ').title(),
+                                    'status': 'completed' if phase_data.get('success') else 'failed',
+                                    'progress': (phase_num / 8) * 100
+                                }, namespace='/')
+                except Exception as research_error:
+                    logger.error(f"Research execution error: {research_error}")
+                    results = {
+                        'status': 'error',
+                        'error': str(research_error),
+                        'phase_results': {}
+                    }
                 
                 # Restore original method
                 research_framework.conduct_virtual_lab_research = original_conduct
@@ -730,7 +1027,8 @@ def start_research():
                     'status': serializable_results.get('status', 'completed'),
                     'research_question': research_question,
                     'results': serializable_results,
-                    'start_time': time.time()
+                    'start_time': time.time(),
+                    'end_time': time.time()
                 }
                 
                 # Store in database with app context
@@ -791,45 +1089,91 @@ def get_research_status():
 
 @app.route('/api/sessions', methods=['GET'])
 def get_sessions():
-    """Get list of research sessions."""
+    """Get list of all research sessions."""
     try:
         db = get_db()
-        sessions = db.execute('''
-            SELECT id, created_at, research_question, status
-            FROM sessions
-            ORDER BY created_at DESC
-            LIMIT 50
-        ''').fetchall()
+        if db is None:
+            return jsonify({
+                'sessions': [],
+                'total': 0
+            })
         
-        return jsonify([dict(session) for session in sessions])
+        try:
+            sessions = db.execute('''
+                SELECT DISTINCT session_id, 
+                       MIN(timestamp) as start_time,
+                       MAX(timestamp) as end_time,
+                       COUNT(*) as activity_count
+                FROM agent_activity 
+                GROUP BY session_id
+                ORDER BY start_time DESC
+            ''').fetchall()
+            
+            return jsonify({
+                'sessions': [dict(session) for session in sessions],
+                'total': len(sessions)
+            })
+        finally:
+            db.close()
+        
     except Exception as e:
         logger.error(f"Error getting sessions: {e}")
-        return jsonify({'error': str(e)}), 500
+        # Return empty sessions list instead of error
+        return jsonify({
+            'sessions': [],
+            'total': 0
+        })
 
 @app.route('/api/sessions/<session_id>', methods=['GET'])
 def get_session(session_id):
-    """Get detailed session information."""
+    """Get detailed information about a specific session."""
     try:
         db = get_db()
-        session = db.execute('''
-            SELECT * FROM sessions WHERE id = ?
+        
+        # Get session metadata
+        session_info = db.execute('''
+            SELECT session_id, 
+                   MIN(timestamp) as start_time,
+                   MAX(timestamp) as end_time,
+                   COUNT(*) as activity_count
+            FROM agent_activity 
+            WHERE session_id = ?
+            GROUP BY session_id
         ''', (session_id,)).fetchone()
         
-        if session:
-            session_dict = dict(session)
-            # Parse JSON fields
-            if session_dict.get('config'):
-                session_dict['config'] = json.loads(session_dict['config'])
-            if session_dict.get('results'):
-                session_dict['results'] = json.loads(session_dict['results'])
-            if session_dict.get('logs'):
-                session_dict['logs'] = json.loads(session_dict['logs'])
-            
-            return jsonify(session_dict)
-        else:
+        if not session_info:
             return jsonify({'error': 'Session not found'}), 404
+        
+        # Get agent activity for this session
+        activities = db.execute('''
+            SELECT * FROM agent_activity 
+            WHERE session_id = ?
+            ORDER BY timestamp ASC
+        ''', (session_id,)).fetchall()
+        
+        # Get chat logs for this session
+        chat_logs = db.execute('''
+            SELECT * FROM chat_logs 
+            WHERE session_id = ?
+            ORDER BY timestamp ASC
+        ''', (session_id,)).fetchall()
+        
+        # Get meetings for this session
+        meetings = db.execute('''
+            SELECT * FROM meetings 
+            WHERE session_id = ?
+            ORDER BY timestamp DESC
+        ''', (session_id,)).fetchall()
+        
+        return jsonify({
+            'session': dict(session_info),
+            'activities': [dict(activity) for activity in activities],
+            'chat_logs': [dict(log) for log in chat_logs],
+            'meetings': [dict(meeting) for meeting in meetings]
+        })
+        
     except Exception as e:
-        logger.error(f"Error getting session: {e}")
+        logger.error(f"Error getting session {session_id}: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/metrics', methods=['GET'])
@@ -838,48 +1182,71 @@ def get_metrics():
     try:
         timeframe = request.args.get('timeframe', 'session')
         
-        db = get_db()
-        
-        if timeframe == 'session' and current_session:
-            # Get metrics for current session
-            session_id = current_session.get('session_id')
-            metrics = db.execute('''
-                SELECT * FROM metrics 
-                WHERE session_id = ?
-                ORDER BY timestamp DESC
-                LIMIT 100
-            ''', (session_id,)).fetchall()
-        else:
-            # Get recent metrics
-            hours = {'24h': 24, '7d': 168, '30d': 720}.get(timeframe, 1)
-            metrics = db.execute('''
-                SELECT * FROM metrics 
-                WHERE timestamp > datetime('now', '-{} hours')
-                ORDER BY timestamp DESC
-                LIMIT 1000
-            '''.format(hours)).fetchall()
-        
-        # Get summary statistics
+        # Get current metrics (this doesn't require database)
         current_metrics = get_system_metrics()
         
-        # Get session statistics
-        session_stats = db.execute('''
-            SELECT 
-                COUNT(*) as total_sessions,
-                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successful_sessions
-            FROM sessions
-        ''').fetchone()
-        
-        return jsonify({
-            'current': current_metrics,
-            'history': [dict(m) for m in metrics],
-            'session_stats': dict(session_stats) if session_stats else {},
-            'agent_stats': {
-                'total_agents': 0,
-                'avg_quality_score': 0.0,
-                'critical_issues': 0
-            }
-        })
+        # Try to get database metrics, but don't fail if database is closed
+        try:
+            db = get_db()
+            if db is None:
+                # Return metrics without database data
+                return jsonify({
+                    'current': current_metrics,
+                    'history': [],
+                    'session_stats': {'total_sessions': 0, 'successful_sessions': 0},
+                    'agent_stats': {'active_agents': 0, 'avg_quality_score': 0.0, 'critical_issues': 0, 'total_agents': 0}
+                })
+            
+            try:
+                if timeframe == 'session' and current_session:
+                    # Get metrics for current session
+                    session_id = current_session.get('session_id')
+                    metrics = db.execute('''
+                        SELECT * FROM metrics 
+                        WHERE session_id = ?
+                        ORDER BY timestamp DESC
+                        LIMIT 100
+                    ''', (session_id,)).fetchall()
+                else:
+                    # Get recent metrics
+                    hours = {'24h': 24, '7d': 168, '30d': 720}.get(timeframe, 1)
+                    metrics = db.execute('''
+                        SELECT * FROM metrics 
+                        WHERE timestamp > datetime('now', '-{} hours')
+                        ORDER BY timestamp DESC
+                        LIMIT 1000
+                    '''.format(hours)).fetchall()
+                
+                # Get session statistics
+                session_stats = db.execute('''
+                    SELECT 
+                        COUNT(*) as total_sessions,
+                        SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as successful_sessions
+                    FROM sessions
+                ''').fetchone()
+                
+                # Get agent stats
+                agent_stats = get_agent_stats(db, current_session)
+                
+                return jsonify({
+                    'current': current_metrics,
+                    'history': [dict(m) for m in metrics],
+                    'session_stats': dict(session_stats) if session_stats else {},
+                    'agent_stats': agent_stats
+                })
+                
+            finally:
+                db.close()
+                
+        except Exception as db_error:
+            logger.warning(f"Database error in metrics endpoint: {db_error}")
+            # Return metrics without database data
+            return jsonify({
+                'current': current_metrics,
+                'history': [],
+                'session_stats': {'total_sessions': 0, 'successful_sessions': 0},
+                'agent_stats': {'active_agents': 0, 'avg_quality_score': 0.0, 'critical_issues': 0, 'total_agents': 0}
+            })
         
     except Exception as e:
         logger.error(f"Error getting metrics: {e}")
@@ -903,6 +1270,16 @@ def send_intervention():
             'timestamp': time.time()
         }
         
+        # Store in database
+        if current_session:
+            session_id = current_session.get('session_id')
+            db = get_db()
+            db.execute('''
+                INSERT INTO agent_activity (session_id, agent_id, activity_type, message, status)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (session_id, 'human', 'intervention', message, 'active'))
+            db.commit()
+        
         # Emit to all clients
         socketio.emit('activity_log', activity, namespace='/')
         
@@ -916,6 +1293,38 @@ def send_intervention():
         logger.error(f"Error sending intervention: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/agent-activity', methods=['GET'])
+def get_agent_activity():
+    """Get agent activity for a session."""
+    try:
+        session_id = request.args.get('session_id')
+        agent_id = request.args.get('agent_id')
+        limit = int(request.args.get('limit', 50))
+        
+        # Try to get from framework first
+        activities = []
+        if research_framework:
+            if hasattr(research_framework, 'get_agent_activity_log'):
+                activities = research_framework.get_agent_activity_log(session_id)
+            elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                activities = research_framework.virtual_lab.get_agent_activity_log(session_id)
+        
+        # Filter by agent_id if specified
+        if agent_id:
+            activities = [a for a in activities if a.get('agent_id') == agent_id]
+        
+        # Limit results
+        activities = activities[-limit:] if activities else []
+        
+        return jsonify({
+            'activities': activities,
+            'total': len(activities)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting agent activity: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/chat-logs', methods=['GET'])
 def get_chat_logs():
     """Get chat logs for a session."""
@@ -924,29 +1333,23 @@ def get_chat_logs():
         log_type = request.args.get('type')  # thought, choice, communication, tool_call, system
         limit = int(request.args.get('limit', 100))
         
-        db = get_db()
+        # Try to get from framework first
+        logs = []
+        if research_framework:
+            if hasattr(research_framework, 'get_chat_logs'):
+                logs = research_framework.get_chat_logs(session_id)
+            elif hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+                logs = research_framework.virtual_lab.get_chat_logs(session_id)
         
-        query = '''
-            SELECT * FROM chat_logs 
-            WHERE 1=1
-        '''
-        params = []
-        
-        if session_id:
-            query += ' AND session_id = ?'
-            params.append(session_id)
-        
+        # Filter by log_type if specified
         if log_type:
-            query += ' AND log_type = ?'
-            params.append(log_type)
+            logs = [log for log in logs if log.get('log_type') == log_type]
         
-        query += ' ORDER BY timestamp DESC LIMIT ?'
-        params.append(limit)
-        
-        logs = db.execute(query, params).fetchall()
+        # Limit results
+        logs = logs[-limit:] if logs else []
         
         return jsonify({
-            'logs': [dict(log) for log in logs],
+            'logs': logs,
             'total': len(logs)
         })
         
@@ -990,44 +1393,6 @@ def add_chat_log():
         logger.error(f"Error adding chat log: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/agent-activity', methods=['GET'])
-def get_agent_activity():
-    """Get agent activity for a session."""
-    try:
-        session_id = request.args.get('session_id')
-        agent_id = request.args.get('agent_id')
-        limit = int(request.args.get('limit', 50))
-        
-        db = get_db()
-        
-        query = '''
-            SELECT * FROM agent_activity 
-            WHERE 1=1
-        '''
-        params = []
-        
-        if session_id:
-            query += ' AND session_id = ?'
-            params.append(session_id)
-        
-        if agent_id:
-            query += ' AND agent_id = ?'
-            params.append(agent_id)
-        
-        query += ' ORDER BY timestamp DESC LIMIT ?'
-        params.append(limit)
-        
-        activities = db.execute(query, params).fetchall()
-        
-        return jsonify({
-            'activities': [dict(activity) for activity in activities],
-            'total': len(activities)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting agent activity: {e}")
-        return jsonify({'error': str(e)}), 500
-
 @app.route('/api/agent-activity', methods=['POST'])
 def add_agent_activity():
     """Add a new agent activity entry."""
@@ -1068,13 +1433,12 @@ def add_agent_activity():
 
 @app.route('/api/meetings', methods=['GET'])
 def get_meetings():
-    """Get meetings for a session."""
+    """Get list of meetings."""
     try:
         session_id = request.args.get('session_id')
-        limit = int(request.args.get('limit', 20))
+        limit = int(request.args.get('limit', 50))
         
         db = get_db()
-        
         query = '''
             SELECT * FROM meetings 
             WHERE 1=1
@@ -1090,6 +1454,8 @@ def get_meetings():
         
         meetings = db.execute(query, params).fetchall()
         
+        # If no meetings found and no session_id specified, return empty list
+        # instead of example data
         return jsonify({
             'meetings': [dict(meeting) for meeting in meetings],
             'total': len(meetings)
@@ -1139,6 +1505,129 @@ def add_meeting():
         logger.error(f"Error adding meeting: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/agents', methods=['GET'])
+def get_agents():
+    """Get all agents from the framework."""
+    try:
+        agents = []
+        added_agent_ids = set()
+        
+        if research_framework and hasattr(research_framework, 'virtual_lab') and research_framework.virtual_lab:
+            # Get agents from virtual lab if available
+            all_agents = research_framework.virtual_lab.get_active_agents()
+            
+            # Add PI agent
+            if hasattr(research_framework.virtual_lab, 'pi_agent'):
+                pi_agent = research_framework.virtual_lab.pi_agent
+                if pi_agent.agent_id not in added_agent_ids:
+                    agents.append({
+                        'id': pi_agent.agent_id,
+                        'name': pi_agent.role,
+                        'expertise': ', '.join(pi_agent.expertise),
+                        'status': 'active' if hasattr(pi_agent, 'is_active') and pi_agent.is_active() else 'active',
+                        'is_active': hasattr(pi_agent, 'is_active') and pi_agent.is_active(),
+                        'current_task': getattr(pi_agent, 'current_task', {}).get('id') if hasattr(pi_agent, 'current_task') and getattr(pi_agent, 'current_task') else None,
+                        'performance': getattr(pi_agent, 'performance_metrics', {
+                            'contributions': 0,
+                            'meetings_attended': 0,
+                            'tools_used': 0,
+                            'phases_completed': 0
+                        }),
+                        'recent_activities': [],
+                        'agent_type': 'Principal Investigator'
+                    })
+                    added_agent_ids.add(pi_agent.agent_id)
+            
+            # Add Scientific Critic
+            if hasattr(research_framework.virtual_lab, 'scientific_critic'):
+                critic_agent = research_framework.virtual_lab.scientific_critic
+                if critic_agent.agent_id not in added_agent_ids:
+                    agents.append({
+                        'id': critic_agent.agent_id,
+                        'name': critic_agent.role,
+                        'expertise': ', '.join(critic_agent.expertise),
+                        'status': 'active' if hasattr(critic_agent, 'is_active') and critic_agent.is_active() else 'active',
+                        'is_active': hasattr(critic_agent, 'is_active') and critic_agent.is_active(),
+                        'current_task': getattr(critic_agent, 'current_task', {}).get('id') if hasattr(critic_agent, 'current_task') and getattr(critic_agent, 'current_task') else None,
+                        'performance': getattr(critic_agent, 'performance_metrics', {
+                            'contributions': 0,
+                            'meetings_attended': 0,
+                            'tools_used': 0,
+                            'phases_completed': 0
+                        }),
+                        'recent_activities': [],
+                        'agent_type': 'Scientific Critic'
+                    })
+                    added_agent_ids.add(critic_agent.agent_id)
+            
+            # Add other agents (excluding PI and Critic which are already added)
+            for agent in all_agents:
+                # Skip if this agent is already added
+                if agent.agent_id in added_agent_ids:
+                    continue
+                # Get recent activities from database
+                db = get_db()
+                recent_activities = []
+                if db:
+                    try:
+                        activities = db.execute('''
+                            SELECT activity_type, message, timestamp 
+                            FROM agent_activity 
+                            WHERE agent_id = ? 
+                            ORDER BY timestamp DESC 
+                            LIMIT 5
+                        ''', (agent.agent_id,)).fetchall()
+                        recent_activities = [{
+                            'activity': activity['message'],
+                            'type': activity['activity_type'],
+                            'timestamp': activity['timestamp']
+                        } for activity in activities]
+                    except:
+                        pass
+                
+                agents.append({
+                    'id': agent.agent_id,
+                    'name': agent.role,
+                    'expertise': ', '.join(agent.expertise),
+                    'status': 'active' if hasattr(agent, 'is_active') and agent.is_active() else 'idle',
+                    'is_active': hasattr(agent, 'is_active') and agent.is_active(),
+                    'current_task': getattr(agent, 'current_task', {}).get('id') if hasattr(agent, 'current_task') and getattr(agent, 'current_task') else None,
+                    'performance': getattr(agent, 'performance_metrics', {
+                        'contributions': 0,
+                        'meetings_attended': 0,
+                        'tools_used': 0,
+                        'phases_completed': 0
+                    }),
+                    'recent_activities': recent_activities,
+                    'agent_type': agent.__class__.__name__
+                })
+                added_agent_ids.add(agent.agent_id)
+        elif hasattr(research_framework, 'get_active_agents'):
+            all_agents = research_framework.get_active_agents()
+            for agent in all_agents:
+                agents.append({
+                    'id': agent.agent_id,
+                    'name': agent.role,
+                    'expertise': ', '.join(agent.expertise),
+                    'status': 'active' if hasattr(agent, 'is_active') and agent.is_active() else 'idle',
+                    'is_active': hasattr(agent, 'is_active') and agent.is_active(),
+                    'current_task': getattr(agent, 'current_task', {}).get('id') if hasattr(agent, 'current_task') and getattr(agent, 'current_task') else None,
+                    'performance': getattr(agent, 'performance_metrics', {
+                        'contributions': 0,
+                        'meetings_attended': 0,
+                        'tools_used': 0,
+                        'phases_completed': 0
+                    }),
+                    'recent_activities': [],
+                    'agent_type': agent.__class__.__name__
+                })
+        
+        return jsonify({'agents': agents})
+        
+    except Exception as e:
+        logger.error(f"Error getting agents: {e}")
+        return jsonify({'agents': [], 'error': str(e)})
+
 # WebSocket events
 @socketio.on('connect')
 def handle_connect():
@@ -1166,6 +1655,15 @@ def handle_disconnect():
         del active_connections[client_id]
     
     logger.info(f"Client disconnected: {client_id}")
+
+@socketio.on('heartbeat')
+def handle_heartbeat():
+    """Handle client heartbeat to keep connection alive."""
+    client_id = request.sid
+    if client_id in active_connections:
+        active_connections[client_id]['last_seen'] = time.time()
+    
+    emit('heartbeat_ack', {'timestamp': time.time()})
 
 @socketio.on('join_session')
 def handle_join_session(data):
@@ -1218,6 +1716,9 @@ if __name__ == '__main__':
     init_db()
     load_system_config()
     initialize_framework()
+    
+    # Exempt API routes from CSRF protection
+    exempt_api_routes()
     
     # Start monitoring thread
     monitor_thread = threading.Thread(target=monitoring_thread)

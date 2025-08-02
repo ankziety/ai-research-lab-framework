@@ -13,6 +13,8 @@ class AIResearchLabApp {
         this.agents = new Map();
         this.currentPhase = 0;
         this.isResearchActive = false;
+        this.intervals = new Set();
+        this.eventListeners = new Map();
         
         this.init();
     }
@@ -22,6 +24,7 @@ class AIResearchLabApp {
         this.initializeWebSocket();
         this.loadConfiguration();
         this.startSystemMonitoring();
+        this.startHeartbeat();
         
         console.log('AI Research Lab Interface initialized');
     }
@@ -31,7 +34,14 @@ class AIResearchLabApp {
     // ========================================
     
     initializeWebSocket() {
-        this.socket = io();
+        this.socket = io({
+            transports: ['polling', 'websocket'],
+            reconnection: true,
+            reconnectionAttempts: 5,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            timeout: 20000
+        });
         this.setupWebSocketEventHandlers();
     }
 
@@ -39,11 +49,41 @@ class AIResearchLabApp {
         this.socket.on('connect', () => {
             console.log('Connected to server');
             this.updateSystemStatus('online');
+            this.showNotification('success', 'Connected', 'Successfully connected to the research framework');
         });
 
-        this.socket.on('disconnect', () => {
-            console.log('Disconnected from server');
+        this.socket.on('disconnect', (reason) => {
+            console.log('Disconnected from server:', reason);
             this.updateSystemStatus('offline');
+            this.showNotification('warning', 'Disconnected', 'Connection lost. Attempting to reconnect...');
+        });
+
+        this.socket.on('reconnect', (attemptNumber) => {
+            console.log('Reconnected to server after', attemptNumber, 'attempts');
+            this.updateSystemStatus('online');
+            this.showNotification('success', 'Reconnected', 'Successfully reconnected to the research framework');
+        });
+
+        this.socket.on('reconnect_attempt', (attemptNumber) => {
+            console.log('Reconnection attempt:', attemptNumber);
+            this.updateSystemStatus('connecting');
+        });
+
+        this.socket.on('reconnect_error', (error) => {
+            console.log('Reconnection error:', error);
+            this.updateSystemStatus('error');
+            this.showNotification('error', 'Connection Error', 'Failed to reconnect. Please refresh the page.');
+        });
+
+        this.socket.on('reconnect_failed', () => {
+            console.log('Reconnection failed');
+            this.updateSystemStatus('error');
+            this.showNotification('error', 'Connection Failed', 'Unable to reconnect. Please refresh the page.');
+        });
+
+        // Heartbeat to keep connection alive
+        this.socket.on('heartbeat_ack', (data) => {
+            console.log('Heartbeat acknowledged:', data);
         });
 
         this.socket.on('system_status', (data) => {
@@ -72,6 +112,7 @@ class AIResearchLabApp {
 
         this.socket.on('agent_activity', (data) => {
             this.updateAgentActivity(data);
+            this.addActivityLogEntry(data);
         });
         this.socket.on('activity_log', (data) => {
             this.addActivityLogEntry(data);
@@ -95,8 +136,10 @@ class AIResearchLabApp {
         this.initializeProgressTracking();
         this.initializeActivityLog();
         this.initializeChatLogs();
+        this.initializeMeetings();
         this.initializeSettings();
         this.initializeConstraints();
+        this.initializeHistory();
     }
     
     initializeNavigation() {
@@ -142,8 +185,58 @@ class AIResearchLabApp {
     
     initializeAgentVisualization() {
         this.agentsContainer = document.getElementById('agentsContainer');
-        this.agentsList = document.getElementById('agentsList');
-        this.meetingIndicator = document.querySelector('.meeting-indicator');
+        
+        // Load all agents from the framework
+        this.loadAllAgents();
+        
+        // Add refresh button event listener
+        document.getElementById('refreshAgentsBtn').addEventListener('click', () => {
+            this.loadAllAgents();
+        });
+    }
+    
+    async loadAllAgents() {
+        try {
+            const response = await fetch('/api/agents');
+            const data = await response.json();
+            
+            if (data.agents) {
+                // Clear existing agents
+                this.agents.clear();
+                this.agentsContainer.innerHTML = '';
+                
+                // Add all agents to the meeting table
+                data.agents.forEach(agentData => {
+                    const agent = {
+                        id: agentData.id,
+                        name: agentData.name,
+                        expertise: agentData.expertise,
+                        status: agentData.status,
+                        is_active: agentData.is_active,
+                        current_task: agentData.current_task,
+                        performance: agentData.performance || {
+                            contributions: 0,
+                            meetings_attended: 0,
+                            tools_used: 0,
+                            phases_completed: 0
+                        },
+                        recent_activities: agentData.recent_activities || [],
+                        agent_type: agentData.agent_type || 'Unknown'
+                    };
+                    
+                    this.agents.set(agent.id, agent);
+                    
+                    // Create avatar for meeting table
+                    const avatar = this.createAgentAvatar(agent);
+                    this.agentsContainer.appendChild(avatar);
+                });
+                
+                // Update agents list
+                this.updateAgentsList();
+            }
+        } catch (error) {
+            console.error('Error loading agents:', error);
+        }
     }
     
     initializeProgressTracking() {
@@ -199,6 +292,23 @@ class AIResearchLabApp {
         
         // Load existing chat logs
         this.loadChatLogs();
+    }
+    
+    initializeHistory() {
+        this.loadHistory();
+        
+        // Set up event handlers for history controls
+        document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+            this.clearHistory();
+        });
+        
+        document.getElementById('exportHistoryBtn').addEventListener('click', () => {
+            this.exportHistory();
+        });
+        
+        document.getElementById('sessionFilter').addEventListener('change', (e) => {
+            this.filterHistory(e.target.value);
+        });
     }
     
     initializeSettings() {
@@ -343,27 +453,33 @@ class AIResearchLabApp {
     // ========================================
     
     async startResearch() {
-        const researchQuestion = document.getElementById('researchQuestion').value.trim();
-        
-        if (!researchQuestion) {
-            this.showNotification('error', 'Error', 'Please enter a research question');
-            return;
-        }
-        
-        const config = {
-            research_question: researchQuestion,
-            domain: document.getElementById('domain').value,
-            priority: document.getElementById('priority').value,
-            budget: parseInt(document.getElementById('budget').value) || null,
-            timeline: parseInt(document.getElementById('timeline').value) || null,
-            max_agents: parseInt(document.getElementById('maxAgents').value) || null
-        };
-        
-        // Add custom constraints
-        const constraints = this.getCustomConstraints();
-        Object.assign(config, constraints);
-        
         try {
+            const researchQuestion = this.sanitizeInput(document.getElementById('researchQuestion').value.trim());
+            
+            if (!researchQuestion) {
+                this.showNotification('error', 'Error', 'Please enter a research question');
+                return;
+            }
+            
+            // Input validation
+            if (researchQuestion.length > 1000) {
+                this.showNotification('error', 'Error', 'Research question too long (max 1000 characters)');
+                return;
+            }
+            
+            const config = {
+                research_question: researchQuestion,
+                domain: this.sanitizeInput(document.getElementById('domain').value),
+                priority: this.sanitizeInput(document.getElementById('priority').value),
+                budget: this.validateNumber(document.getElementById('budget').value, 0, 1000000),
+                timeline: this.validateNumber(document.getElementById('timeline').value, 1, 52),
+                max_agents: this.validateNumber(document.getElementById('maxAgents').value, 1, 20)
+            };
+            
+            // Add custom constraints
+            const constraints = this.getCustomConstraints();
+            Object.assign(config, constraints);
+            
             this.isResearchActive = true;
             this.updateResearchButtons();
             
@@ -375,19 +491,23 @@ class AIResearchLabApp {
                 body: JSON.stringify(config)
             });
             
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
             const result = await response.json();
             
             if (result.success) {
                 this.showNotification('success', 'Research Started', result.message);
                 this.updateSystemStatus('running');
             } else {
-                this.showNotification('error', 'Error', result.error);
+                this.showNotification('error', 'Error', result.error || 'Unknown error occurred');
                 this.isResearchActive = false;
                 this.updateResearchButtons();
             }
         } catch (error) {
             console.error('Error starting research:', error);
-            this.showNotification('error', 'Error', 'Failed to start research session');
+            this.showNotification('error', 'Error', `Failed to start research session: ${error.message}`);
             this.isResearchActive = false;
             this.updateResearchButtons();
         }
@@ -434,30 +554,63 @@ class AIResearchLabApp {
         const avatar = document.createElement('div');
         avatar.className = 'agent-avatar';
         avatar.id = `agent-${agent.id}`;
+        
+        // Create circular avatar with initials
+        const initials = this.getAgentInitials(agent.name);
+        const color = this.getAgentColor(agent.id);
+        
         avatar.innerHTML = `
-            ${this.getAgentInitials(agent.name)}
+            <div class="agent-circle" style="background-color: ${color}">
+                <span class="agent-initials">${initials}</span>
+            </div>
             <div class="agent-tooltip">${agent.name} - ${agent.expertise}</div>
+            <div class="agent-status-indicator"></div>
         `;
         
-        // Position agent around the meeting table
+        // Position agent around the table
         this.positionAgentAvatar(avatar, agent.id);
         
         return avatar;
     }
     
+    getAgentColor(agentId) {
+        // Generate consistent colors for agents
+        const colors = [
+            '#4A90E2', '#7ED321', '#F5A623', '#D0021B', 
+            '#9013FE', '#50E3C2', '#F8E71C', '#BD10E0',
+            '#4A4A4A', '#9B9B9B', '#D8D8D8', '#FFFFFF'
+        ];
+        const index = agentId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+        return colors[index];
+    }
+    
     positionAgentAvatar(avatar, agentId) {
-        const containerRect = this.agentsContainer.getBoundingClientRect();
+        // Position agents in a circle around the meeting table
+        const container = this.agentsContainer;
+        const containerRect = container.getBoundingClientRect();
         const centerX = containerRect.width / 2;
         const centerY = containerRect.height / 2;
-        const radius = 150;
+        const radius = Math.min(centerX, centerY) * 0.6;
         
-        // Calculate position around circle
-        const angle = (agentId * 2 * Math.PI) / 6; // Assuming max 6 agents
-        const x = centerX + radius * Math.cos(angle) - 30; // 30 = half avatar width
-        const y = centerY + radius * Math.sin(angle) - 30; // 30 = half avatar height
+        // Calculate position based on agent ID
+        const agentIndex = this.agents.size - 1;
+        const angle = (agentIndex * 2 * Math.PI) / Math.max(this.agents.size, 1);
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
         
-        avatar.style.left = `${x}px`;
-        avatar.style.top = `${y}px`;
+        avatar.style.position = 'absolute';
+        avatar.style.left = `${x - 25}px`;
+        avatar.style.top = `${y - 25}px`;
+        avatar.style.zIndex = '10';
+        
+        // Add animation for new agents
+        avatar.style.opacity = '0';
+        avatar.style.transform = 'scale(0)';
+        setTimeout(() => {
+            avatar.style.transition = 'all 0.5s ease-out';
+            avatar.style.opacity = '1';
+            avatar.style.transform = 'scale(1)';
+        }, 100);
     }
     
     updateAgentActivity(data) {
@@ -465,26 +618,44 @@ class AIResearchLabApp {
         let agent = this.agents.get(agentId);
         
         if (!agent) {
-            // Create new agent
-            agent = {
-                id: agentId,
-                name: data.name || `Agent ${agentId}`,
-                expertise: data.expertise || 'General',
-                status: data.status || 'idle',
-                activity: data.activity || ''
-            };
-            this.agents.set(agentId, agent);
-            
-            // Add to visualization
-            const avatar = this.createAgentAvatar(agent);
-            this.agentsContainer.appendChild(avatar);
-            
-            // Add to agents list
-            this.updateAgentsList();
+            // Reload all agents to get the new one
+            this.loadAllAgents();
+            return;
         } else {
             // Update existing agent
             agent.status = data.status || agent.status;
             agent.activity = data.activity || agent.activity;
+            
+            // Update performance metrics if provided
+            if (data.metadata) {
+                if (data.metadata.word_count) {
+                    agent.performance.total_words += data.metadata.word_count;
+                    agent.performance.contributions += 1;
+                    agent.performance.avg_sentence_length = 
+                        agent.performance.total_words / agent.performance.contributions;
+                }
+                if (data.metadata.meeting_attended) {
+                    agent.performance.meetings_attended += 1;
+                }
+                if (data.metadata.tool_used) {
+                    agent.performance.tools_used += 1;
+                }
+                if (data.metadata.phase_completed) {
+                    agent.performance.phases_completed += 1;
+                }
+            }
+            
+            // Add to recent activities
+            agent.recent_activities.unshift({
+                activity: data.activity || data.message,
+                timestamp: Date.now() / 1000,
+                type: data.activity_type || 'general'
+            });
+            
+            // Keep only last 10 activities
+            if (agent.recent_activities.length > 10) {
+                agent.recent_activities = agent.recent_activities.slice(0, 10);
+            }
         }
         
         // Update avatar appearance
@@ -495,13 +666,28 @@ class AIResearchLabApp {
             this.showAgentSpeech(agentId, data.message);
         }
         
-        // Update activity log
+        // Update activity log with enhanced information
         this.addActivityLogEntry({
             type: 'agent_activity',
             author: agent.name,
             message: data.activity || data.message,
-            timestamp: Date.now() / 1000
+            timestamp: Date.now() / 1000,
+            metadata: {
+                agent_id: agentId,
+                activity_type: data.activity_type,
+                expertise: agent.expertise,
+                status: agent.status,
+                performance: agent.performance
+            }
         });
+        
+        // Update agents list to reflect changes
+        this.updateAgentsList();
+        
+        // Update meeting indicator if this is a meeting activity
+        if (data.activity_type === 'meeting' || data.activity?.includes('meeting')) {
+            this.updateMeetingIndicator(true);
+        }
     }
     
     updateAgentAvatar(agent) {
@@ -531,26 +717,39 @@ class AIResearchLabApp {
             existingBubble.remove();
         }
         
-        // Create speech bubble
+        // Create animated speech bubble
         const bubble = document.createElement('div');
         bubble.className = 'speech-bubble';
-        bubble.textContent = message.length > 100 ? message.substring(0, 100) + '...' : message;
+        bubble.innerHTML = `
+            <div class="speech-content">
+                <div class="speech-text">${message.length > 100 ? message.substring(0, 100) + '...' : message}</div>
+                <div class="speech-tail"></div>
+            </div>
+        `;
         
-        // Position bubble relative to avatar
-        bubble.style.bottom = '70px';
+        // Position bubble above the agent
+        bubble.style.position = 'absolute';
+        bubble.style.bottom = '60px';
         bubble.style.left = '50%';
         bubble.style.transform = 'translateX(-50%)';
+        bubble.style.zIndex = '20';
         
         avatar.appendChild(bubble);
         
         // Show bubble with animation
-        setTimeout(() => bubble.classList.add('show'), 100);
-        
-        // Hide bubble after 3 seconds
         setTimeout(() => {
-            bubble.classList.remove('show');
+            bubble.style.transition = 'all 0.3s ease-out';
+            bubble.style.opacity = '1';
+            bubble.style.transform = 'translateX(-50%) scale(1)';
+        }, 100);
+        
+        // Hide bubble after 4 seconds
+        setTimeout(() => {
+            bubble.style.transition = 'all 0.3s ease-in';
+            bubble.style.opacity = '0';
+            bubble.style.transform = 'translateX(-50%) scale(0.8)';
             setTimeout(() => bubble.remove(), 300);
-        }, 3000);
+        }, 4000);
     }
     
     updateAgentsList() {
@@ -560,26 +759,62 @@ class AIResearchLabApp {
         this.agents.forEach(agent => {
             const card = document.createElement('div');
             card.className = 'agent-card';
+            
+            // Get recent activity for display
+            const recentActivity = agent.recent_activities.length > 0 ? 
+                agent.recent_activities[0].activity : 'No recent activity';
+            
+            // Determine status display
+            const statusText = agent.is_active ? 'Active' : 'Idle';
+            const statusClass = agent.is_active ? 'active' : 'idle';
+            
             card.innerHTML = `
                 <div class="agent-card-header">
-                    <div class="agent-card-avatar">${this.getAgentInitials(agent.name)}</div>
+                    <div class="agent-card-avatar" style="background-color: ${this.getAgentColor(agent.id)}">
+                        ${this.getAgentInitials(agent.name)}
+                    </div>
                     <div class="agent-card-info">
                         <h4>${agent.name}</h4>
                         <p>${agent.expertise}</p>
+                        <div class="agent-status">
+                            <span class="status-dot ${statusClass}"></span>
+                            <span class="status-text">${statusText}</span>
+                        </div>
                     </div>
                 </div>
-                <div class="agent-card-status">
-                    <div class="agent-status-dot"></div>
-                    <span>${agent.status.charAt(0).toUpperCase() + agent.status.slice(1)}</span>
-                </div>
-                <div class="agent-card-metrics">
-                    <div class="agent-metric">
-                        <div class="agent-metric-value">0</div>
-                        <div class="agent-metric-label">Tasks</div>
+                <div class="agent-card-content">
+                    <div class="agent-recent-activity">
+                        <strong>Recent Activity:</strong>
+                        <p>${recentActivity}</p>
                     </div>
-                    <div class="agent-metric">
-                        <div class="agent-metric-value">0.0</div>
-                        <div class="agent-metric-label">Quality</div>
+                    <div class="agent-card-metrics">
+                        <div class="agent-metric">
+                            <div class="agent-metric-value">${agent.performance.contributions || 0}</div>
+                            <div class="agent-metric-label">Contributions</div>
+                        </div>
+                        <div class="agent-metric">
+                            <div class="agent-metric-value">${agent.performance.meetings_attended || 0}</div>
+                            <div class="agent-metric-label">Meetings</div>
+                        </div>
+                        <div class="agent-metric">
+                            <div class="agent-metric-value">${agent.performance.tools_used || 0}</div>
+                            <div class="agent-metric-label">Tools Used</div>
+                        </div>
+                        <div class="agent-metric">
+                            <div class="agent-metric-value">${agent.performance.phases_completed || 0}</div>
+                            <div class="agent-metric-label">Phases</div>
+                        </div>
+                    </div>
+                    <div class="agent-activities-list">
+                        <strong>Recent Activities:</strong>
+                        <div class="activities-scroll">
+                            ${agent.recent_activities.slice(0, 3).map(activity => `
+                                <div class="activity-item-mini">
+                                    <span class="activity-time-mini">${new Date(activity.timestamp * 1000).toLocaleTimeString()}</span>
+                                    <span class="activity-text-mini">${activity.activity}</span>
+                                </div>
+                            `).join('')}
+                        </div>
                     </div>
                 </div>
             `;
@@ -587,9 +822,26 @@ class AIResearchLabApp {
             agentsList.appendChild(card);
         });
         
-        // Update team stats
+        // Update team stats - show total agents present
         document.getElementById('activeAgents').textContent = this.agents.size;
-        document.getElementById('teamEfficiency').textContent = '0%'; // Calculate actual efficiency
+        
+        // Calculate team efficiency
+        let totalContributions = 0;
+        let totalMeetings = 0;
+        let totalTools = 0;
+        let totalPhases = 0;
+        
+        this.agents.forEach(agent => {
+            totalContributions += agent.performance.contributions || 0;
+            totalMeetings += agent.performance.meetings_attended || 0;
+            totalTools += agent.performance.tools_used || 0;
+            totalPhases += agent.performance.phases_completed || 0;
+        });
+        
+        const efficiency = this.agents.size > 0 ? 
+            Math.round((totalContributions + totalMeetings + totalTools + totalPhases) / this.agents.size) : 0;
+        
+        document.getElementById('teamEfficiency').textContent = `${efficiency}%`;
     }
     
     getAgentInitials(name) {
@@ -606,22 +858,38 @@ class AIResearchLabApp {
         const currentPhaseDisplay = document.getElementById('currentPhase');
         const overallProgress = document.getElementById('overallProgress');
         
+        // Calculate progress if not provided
+        let progress = data.progress;
+        if (!progress && data.phase) {
+            const totalPhases = 7; // Number of phases in the research process
+            progress = (data.phase / totalPhases) * 100;
+        }
+        
         // Update progress line
-        progressFill.style.width = `${data.progress}%`;
+        if (progressFill) {
+            progressFill.style.width = `${progress || 0}%`;
+        }
         
         // Update current phase display
-        currentPhaseDisplay.textContent = data.name;
-        overallProgress.textContent = `${Math.round(data.progress)}%`;
+        if (currentPhaseDisplay) {
+            currentPhaseDisplay.textContent = data.name || data.phase_name || `Phase ${data.phase}`;
+        }
+        if (overallProgress) {
+            overallProgress.textContent = `${Math.round(progress || 0)}%`;
+        }
         
         // Update phase indicators
         const phases = document.querySelectorAll('.phase');
         phases.forEach((phase, index) => {
-            phase.classList.remove('current', 'completed');
+            phase.classList.remove('current', 'completed', 'failed');
             
             if (index + 1 < data.phase) {
                 phase.classList.add('completed');
             } else if (index + 1 === data.phase) {
                 phase.classList.add('current');
+                if (data.status === 'failed') {
+                    phase.classList.add('failed');
+                }
             }
         });
         
@@ -630,12 +898,18 @@ class AIResearchLabApp {
         
         // Update meeting indicator if there's a team meeting
         if (data.meeting_active) {
-            this.meetingIndicator.classList.add('active');
-            this.meetingIndicator.innerHTML = `
-                <i class="fas fa-users"></i>
-                <span>Team Meeting: ${data.name}</span>
-            `;
+            this.updateMeetingIndicator(true);
+        } else {
+            this.updateMeetingIndicator(false);
         }
+        
+        // Add activity log entry for phase updates
+        this.addActivityLogEntry({
+            type: 'system',
+            author: 'System',
+            message: `Phase ${data.phase}: ${data.name || data.phase_name} - ${data.status || 'in progress'}`,
+            timestamp: Date.now() / 1000
+        });
     }
     
     showPhaseDetails(phaseNumber) {
@@ -798,21 +1072,42 @@ class AIResearchLabApp {
     addChatLogEntry(data) {
         const chatStream = document.getElementById('chatStream');
         const entry = document.createElement('div');
-        entry.className = `chat-item ${data.type || 'system'}`;
+        entry.className = `chat-item ${data.log_type || data.type || 'system'}`;
         
         const timeString = new Date(data.timestamp * 1000).toLocaleTimeString();
         
+        // Calculate text metrics only for non-system messages
+        let textMetrics = data.metadata || {};
+        const isSystemMessage = (data.log_type || data.type || 'system') === 'system';
+        
+        if (!textMetrics.word_count && data.message && !isSystemMessage) {
+            const words = data.message.split(' ');
+            const sentences = data.message.split('.').filter(s => s.trim());
+            textMetrics = {
+                word_count: words.length,
+                sentence_count: sentences.length,
+                avg_sentence_length: sentences.length > 0 ? words.length / sentences.length : 0
+            };
+        }
+        
         entry.innerHTML = `
             <div class="chat-avatar">
-                ${this.getChatIcon(data.type || 'system')}
+                ${this.getChatIcon(data.log_type || data.type || 'system')}
             </div>
             <div class="chat-content">
                 <div class="chat-header">
                     <span class="chat-author">${data.author || 'System'}</span>
-                    <span class="chat-type">${data.type || 'system'}</span>
+                    <span class="chat-type">${data.log_type || data.type || 'system'}</span>
                     <span class="chat-time">${timeString}</span>
                 </div>
-                <div class="chat-message">${data.message}</div>
+                <div class="chat-message">${this.renderMarkdown(data.message)}</div>
+                ${!isSystemMessage && textMetrics.word_count ? `
+                <div class="chat-metrics">
+                    <span class="metric">Words: ${textMetrics.word_count}</span>
+                    <span class="metric">Sentences: ${textMetrics.sentence_count}</span>
+                    <span class="metric">Avg Length: ${textMetrics.avg_sentence_length ? textMetrics.avg_sentence_length.toFixed(1) : '0'}</span>
+                </div>
+                ` : ''}
             </div>
         `;
         
@@ -835,6 +1130,58 @@ class AIResearchLabApp {
         };
         
         return icons[type] || icons.system;
+    }
+    
+    renderMarkdown(text) {
+        if (!text) return '';
+        
+        // Configure marked options for better rendering
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            tables: true,
+            smartLists: true,
+            smartypants: true,
+            highlight: function(code, lang) {
+                // Basic syntax highlighting
+                return `<pre><code class="language-${lang}">${this.escapeHtml(code)}</code></pre>`;
+            }.bind(this)
+        });
+        
+        // Parse markdown to HTML
+        try {
+            const html = marked.parse(text);
+            return html;
+        } catch (e) {
+            console.error('Markdown parsing error:', e);
+            // Fallback to plain text with basic line breaks
+            return text.replace(/\n/g, '<br>');
+        }
+    }
+    
+    escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, m => map[m]);
+    }
+    
+    sanitizeInput(input) {
+        if (!input) return '';
+        return this.escapeHtml(input.toString().trim());
+    }
+    
+    validateNumber(value, min, max) {
+        if (!value) return null;
+        const num = parseInt(value);
+        if (isNaN(num) || num < min || num > max) {
+            return null;
+        }
+        return num;
     }
     
     clearChatLogs() {
@@ -875,22 +1222,249 @@ class AIResearchLabApp {
     // Meetings
     // ========================================
     
-    addMeetingEntry(data) {
-        // Add to activity log
-        this.addActivityLogEntry({
-            type: 'meeting',
-            author: 'System',
-            message: `Meeting: ${data.topic} (${data.participants} participants)`,
-            timestamp: data.timestamp
+    initializeMeetings() {
+        this.loadMeetings();
+        
+        // Set up event handlers for meetings controls
+        document.getElementById('clearMeetingsBtn').addEventListener('click', () => {
+            this.clearMeetings();
         });
         
-        // Add to chat log
-        this.addChatLogEntry({
-            type: 'communication',
-            author: 'Meeting',
-            message: `Meeting started: ${data.topic} with ${data.participants} participants`,
-            timestamp: data.timestamp
+        document.getElementById('exportMeetingsBtn').addEventListener('click', () => {
+            this.exportMeetings();
         });
+        
+        document.getElementById('meetingFilter').addEventListener('change', (e) => {
+            this.filterMeetings(e.target.value);
+        });
+    }
+    
+    async loadMeetings() {
+        try {
+            const response = await fetch('/api/meetings');
+            const data = await response.json();
+            
+            if (data.meetings) {
+                data.meetings.forEach(meeting => {
+                    this.displayMeetingEntry(meeting);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading meetings:', error);
+        }
+    }
+    
+    addMeetingEntry(data) {
+        // Handle nested meeting_data structure from virtual_lab
+        const meetingData = data.meeting_data || data;
+        const eventType = data.event_type || 'meeting_update';
+        
+        // Extract meeting information
+        const meeting = {
+            meeting_id: meetingData.meeting_id || 'unknown',
+            topic: meetingData.topic || meetingData.phase || 'Research Meeting',
+            participants: meetingData.participants || [],
+            meeting_type: meetingData.meeting_type || 'team_meeting',
+            phase: meetingData.phase || 'unknown',
+            timestamp: data.timestamp || Date.now() / 1000,
+            duration: meetingData.duration || 0,
+            outcome: meetingData.outcome || '',
+            transcript: meetingData.transcript || ''
+        };
+        
+        // Handle different event types
+        if (eventType === 'meeting_start') {
+            // Update meeting indicator
+            this.updateMeetingIndicator(true, meeting.topic);
+            
+            // Add to activity log
+            this.addActivityLogEntry({
+                type: 'meeting',
+                author: 'System',
+                message: `Meeting started: ${meeting.topic}`,
+                timestamp: meeting.timestamp
+            });
+            
+            // Add to chat log
+            this.addChatLogEntry({
+                type: 'communication',
+                author: 'Meeting',
+                message: `Meeting started: ${meeting.topic} with ${meeting.participants.length} participants`,
+                timestamp: meeting.timestamp
+            });
+        } else if (eventType === 'meeting_end') {
+            // Update meeting indicator
+            this.updateMeetingIndicator(false);
+            
+            // Store meeting in database
+            this.storeMeetingRecord(meeting);
+            
+            // Add to meetings panel
+            this.displayMeetingEntry(meeting);
+        }
+    }
+    
+    displayMeetingEntry(data) {
+        const meetingsList = document.getElementById('meetingsList');
+        const meetingElement = document.createElement('div');
+        meetingElement.className = 'meeting-item';
+        
+        // Parse participants if it's a string
+        let participants = data.participants;
+        if (typeof participants === 'string') {
+            try {
+                participants = JSON.parse(participants);
+            } catch (e) {
+                participants = [participants];
+            }
+        }
+        if (!Array.isArray(participants)) {
+            participants = [participants];
+        }
+        
+        const participantsList = participants.join(', ');
+        const timeStr = data.timestamp ? new Date(data.timestamp * 1000).toLocaleString() : 'Unknown time';
+        
+        meetingElement.innerHTML = `
+            <div class="meeting-header">
+                <div class="meeting-info">
+                    <h4>${data.topic || data.meeting_id || 'Research Meeting'}</h4>
+                    <span class="meeting-type">${this.getMeetingType(data.topic)}</span>
+                </div>
+                <span class="meeting-time">${timeStr}</span>
+            </div>
+            <div class="meeting-details">
+                <div class="meeting-participants">
+                    <span class="participants-label">Participants:</span>
+                    <span class="participants-list">${participantsList}</span>
+                </div>
+                <div class="meeting-duration">
+                    <span class="duration-label">Duration:</span>
+                    <span class="duration-value">${data.duration || 0} minutes</span>
+                </div>
+                <div class="meeting-outcome">
+                    ${data.outcome || 'Meeting in progress...'}
+                </div>
+                ${data.transcript ? `<div class="meeting-transcript">
+                    <details>
+                        <summary>View Transcript</summary>
+                        <pre>${data.transcript}</pre>
+                    </details>
+                </div>` : ''}
+            </div>
+        `;
+        
+        // Insert at the top (after the welcome message)
+        const firstChild = meetingsList.firstElementChild;
+        if (firstChild && firstChild.classList.contains('system')) {
+            meetingsList.insertBefore(meetingElement, firstChild.nextSibling);
+        } else {
+            meetingsList.appendChild(meetingElement);
+        }
+    }
+    
+    getMeetingType(topic) {
+        if (!topic) return 'general';
+        
+        const topicLower = topic.toLowerCase();
+        if (topicLower.includes('individual')) return 'individual';
+        if (topicLower.includes('team')) return 'team';
+        if (topicLower.includes('review') || topicLower.includes('critique')) return 'review';
+        return 'general';
+    }
+    
+    async storeMeetingRecord(meeting) {
+        try {
+            const response = await fetch('/api/meetings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    session_id: this.currentSessionId || 'default',
+                    meeting_id: meeting.meeting_id,
+                    participants: JSON.stringify(meeting.participants),
+                    topic: meeting.topic,
+                    duration: meeting.duration,
+                    outcome: meeting.outcome,
+                    transcript: meeting.transcript
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to store meeting record');
+            }
+        } catch (error) {
+            console.error('Error storing meeting record:', error);
+        }
+    }
+    
+    updateMeetingIndicator(isActive, topic = '') {
+        const indicator = document.querySelector('.meeting-indicator');
+        if (indicator) {
+            const icon = indicator.querySelector('i');
+            const text = indicator.querySelector('span');
+            
+            if (isActive) {
+                indicator.classList.add('active');
+                icon.className = 'fas fa-comments fa-pulse';
+                text.textContent = topic || 'Meeting in progress';
+            } else {
+                indicator.classList.remove('active');
+                icon.className = 'fas fa-comments';
+                text.textContent = 'No active meeting';
+            }
+        }
+    }
+    
+    clearMeetings() {
+        const meetingsList = document.getElementById('meetingsList');
+        const systemMessage = meetingsList.querySelector('.meeting-item.system');
+        meetingsList.innerHTML = '';
+        if (systemMessage) {
+            meetingsList.appendChild(systemMessage);
+        }
+    }
+    
+    filterMeetings(type) {
+        const meetings = document.querySelectorAll('#meetingsList .meeting-item:not(.system)');
+        meetings.forEach(meeting => {
+            const meetingType = meeting.querySelector('.meeting-type').textContent;
+            if (!type || meetingType === type) {
+                meeting.style.display = 'block';
+            } else {
+                meeting.style.display = 'none';
+            }
+        });
+    }
+    
+    exportMeetings() {
+        const meetings = Array.from(document.querySelectorAll('#meetingsList .meeting-item:not(.system)'));
+        const meetingsData = meetings.map(meeting => {
+            const topic = meeting.querySelector('h4').textContent;
+            const type = meeting.querySelector('.meeting-type').textContent;
+            const time = meeting.querySelector('.meeting-time').textContent;
+            const participants = meeting.querySelector('.participants-list').textContent;
+            const duration = meeting.querySelector('.duration-value')?.textContent || '';
+            const outcome = meeting.querySelector('.meeting-outcome').textContent;
+            
+            return {
+                topic,
+                type,
+                time,
+                participants,
+                duration,
+                outcome
+            };
+        });
+        
+        const blob = new Blob([JSON.stringify(meetingsData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'meetings-export.json';
+        a.click();
+        URL.revokeObjectURL(url);
     }
     
     // ========================================
@@ -1227,25 +1801,42 @@ class AIResearchLabApp {
     }
     
     updateSystemMetrics(metrics) {
-        // Update CPU usage
-        document.getElementById('cpuUsage').textContent = `${Math.round(metrics.cpu_usage)}%`;
+        // Debounce frequent updates
+        if (this.metricsUpdateTimeout) {
+            clearTimeout(this.metricsUpdateTimeout);
+        }
         
-        // Update memory info if available
-        if (metrics.memory_usage !== undefined) {
-            const memoryCard = document.querySelector('.metric-card .metric-content');
-            if (memoryCard) {
-                memoryCard.innerHTML += `<div class="metric-sub">Memory: ${Math.round(metrics.memory_usage)}%</div>`;
+        this.metricsUpdateTimeout = setTimeout(() => {
+            // Update CPU usage
+            const cpuElement = document.getElementById('cpuUsage');
+            if (cpuElement && metrics.cpu_usage !== undefined) {
+                cpuElement.textContent = `${Math.round(metrics.cpu_usage)}%`;
             }
-        }
-        
-        // Update active agents count
-        if (metrics.active_agents !== undefined) {
-            document.getElementById('activeAgentsCount').textContent = metrics.active_agents;
-        }
+            
+            // Update memory info if available
+            if (metrics.memory_usage !== undefined) {
+                const memoryCard = document.querySelector('.metric-card .metric-content');
+                if (memoryCard) {
+                    const existingMemory = memoryCard.querySelector('.metric-sub');
+                    if (existingMemory) {
+                        existingMemory.textContent = `Memory: ${Math.round(metrics.memory_usage)}%`;
+                    } else {
+                        memoryCard.innerHTML += `<div class="metric-sub">Memory: ${Math.round(metrics.memory_usage)}%</div>`;
+                    }
+                }
+            }
+            
+            // Update active agents count
+            const agentsElement = document.getElementById('activeAgentsCount');
+            if (agentsElement && metrics.active_agents !== undefined) {
+                agentsElement.textContent = metrics.active_agents;
+            }
+        }, 100); // Debounce to 100ms
     }
     
     async startSystemMonitoring() {
-        setInterval(async () => {
+        // Start monitoring system metrics
+        const monitorMetrics = async () => {
             try {
                 const response = await fetch('/api/metrics?timeframe=session');
                 const data = await response.json();
@@ -1254,15 +1845,96 @@ class AIResearchLabApp {
                     this.updateSystemMetrics(data.current);
                 }
                 
+                if (data.agent_stats) {
+                    // Update agent statistics
+                    document.getElementById('avgAgentScore').textContent = 
+                        data.agent_stats.avg_quality_score || '0.0';
+                    document.getElementById('activeAgentsCount').textContent = 
+                        data.agent_stats.active_agents || '0';
+                    document.getElementById('criticalIssues').textContent = 
+                        data.agent_stats.critical_issues || '0';
+                }
+                
                 if (data.session_stats) {
-                    document.getElementById('totalSessions').textContent = data.session_stats.total_sessions || 0;
-                    document.getElementById('successfulSessions').textContent = data.session_stats.successful_sessions || 0;
+                    document.getElementById('totalSessions').textContent = 
+                        data.session_stats.total_sessions || '0';
+                    document.getElementById('successfulSessions').textContent = 
+                        data.session_stats.successful_sessions || '0';
                 }
                 
             } catch (error) {
-                console.error('Error fetching metrics:', error);
+                console.error('Error monitoring metrics:', error);
             }
-        }, 30000); // Update every 30 seconds
+        };
+        
+        // Start monitoring
+        monitorMetrics();
+        this.intervals.add(setInterval(monitorMetrics, 10000)); // Every 10 seconds
+        
+        // Refresh agents periodically
+        const refreshAgents = () => {
+            this.loadAllAgents();
+        };
+        
+        refreshAgents();
+        this.intervals.add(setInterval(refreshAgents, 30000)); // Every 30 seconds
+    }
+    
+    refreshCurrentPanelData() {
+        // Get currently active panel
+        const activePanel = document.querySelector('.panel.active');
+        if (!activePanel) return;
+        
+        const panelId = activePanel.id;
+        
+        switch (panelId) {
+            case 'agents-panel':
+                this.updateAgentsList();
+                break;
+            case 'history-panel':
+                this.loadHistory();
+                break;
+            case 'meetings-panel':
+                this.loadMeetings();
+                break;
+            case 'chat-logs-panel':
+                this.loadChatLogs();
+                break;
+            case 'metrics-panel':
+                // Metrics already refreshed by startSystemMonitoring
+                break;
+            default:
+                // For other panels, no specific refresh needed
+                break;
+        }
+    }
+
+    startHeartbeat() {
+        // Send heartbeat every 30 seconds to keep connection alive
+        const heartbeatInterval = setInterval(() => {
+            if (this.socket && this.socket.connected) {
+                this.socket.emit('heartbeat');
+            }
+        }, 30000);
+        
+        this.intervals.add(heartbeatInterval);
+    }
+    
+    cleanup() {
+        // Clear all intervals
+        this.intervals.forEach(interval => clearInterval(interval));
+        this.intervals.clear();
+        
+        // Remove all event listeners
+        this.eventListeners.forEach((listener, element) => {
+            element.removeEventListener(listener.type, listener.handler);
+        });
+        this.eventListeners.clear();
+        
+        // Disconnect socket
+        if (this.socket) {
+            this.socket.disconnect();
+        }
     }
     
     // ========================================
@@ -1362,11 +2034,262 @@ class AIResearchLabApp {
             setTimeout(() => notification.remove(), 300);
         });
     }
+
+    updateMeetingIndicator(activeMeeting = false) {
+        const indicator = this.meetingIndicator;
+        if (!indicator) return;
+        
+        if (activeMeeting) {
+            indicator.innerHTML = `
+                <i class="fas fa-comments"></i>
+                <span>Active Meeting</span>
+                <div class="meeting-pulse"></div>
+            `;
+            indicator.classList.add('active');
+        } else {
+            indicator.innerHTML = `
+                <i class="fas fa-comments"></i>
+                <span>No active meeting</span>
+            `;
+            indicator.classList.remove('active');
+        }
+    }
+
+    async loadHistory() {
+        try {
+            const response = await fetch('/api/sessions');
+            const data = await response.json();
+            
+            if (data.sessions) {
+                data.sessions.forEach(session => {
+                    this.displayHistoryEntry(session);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading history:', error);
+        }
+    }
+    
+    displayHistoryEntry(session) {
+        const historyList = document.getElementById('historyList');
+        const historyElement = document.createElement('div');
+        historyElement.className = 'history-item';
+        historyElement.dataset.sessionId = session.session_id;
+        
+        const startTime = new Date(session.start_time * 1000);
+        const endTime = session.end_time ? new Date(session.end_time * 1000) : null;
+        const duration = endTime ? Math.round((endTime - startTime) / 1000 / 60) : 'Ongoing';
+        
+        historyElement.innerHTML = `
+            <div class="history-header">
+                <div class="history-info">
+                    <h4>Session ${session.session_id}</h4>
+                    <span class="history-type">research</span>
+                </div>
+                <span class="history-time">${startTime.toLocaleString()}</span>
+            </div>
+            <div class="history-details">
+                <div class="history-stats">
+                    <div class="history-stat">
+                        <span class="stat-label">Duration:</span>
+                        <span class="stat-value">${duration} min</span>
+                    </div>
+                    <div class="history-stat">
+                        <span class="stat-label">Activities:</span>
+                        <span class="stat-value">${session.activity_count}</span>
+                    </div>
+                </div>
+                <div class="history-actions">
+                    <button class="btn btn-ghost btn-sm" onclick="app.viewSession('${session.session_id}')">
+                        <i class="fas fa-eye"></i>
+                        View Details
+                    </button>
+                    <button class="btn btn-ghost btn-sm" onclick="app.exportSession('${session.session_id}')">
+                        <i class="fas fa-download"></i>
+                        Export
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        // Insert at the top (after the welcome message)
+        const firstChild = historyList.firstElementChild;
+        if (firstChild && firstChild.classList.contains('system')) {
+            historyList.insertBefore(historyElement, firstChild.nextSibling);
+        } else {
+            historyList.appendChild(historyElement);
+        }
+    }
+    
+    async viewSession(sessionId) {
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}`);
+            const data = await response.json();
+            
+            if (data.error) {
+                this.showNotification('error', 'Error', data.error);
+                return;
+            }
+            
+            // Show session details in a modal or new panel
+            this.showSessionDetails(data);
+        } catch (error) {
+            console.error('Error viewing session:', error);
+            this.showNotification('error', 'Error', 'Failed to load session details');
+        }
+    }
+    
+    showSessionDetails(sessionData) {
+        // Create a modal to show session details
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.innerHTML = `
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Session ${sessionData.session.session_id}</h2>
+                    <button class="btn btn-ghost" onclick="this.closest('.modal-overlay').remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <div class="session-info">
+                        <h3>Session Information</h3>
+                        <p><strong>Start Time:</strong> ${new Date(sessionData.session.start_time * 1000).toLocaleString()}</p>
+                        <p><strong>End Time:</strong> ${sessionData.session.end_time ? new Date(sessionData.session.end_time * 1000).toLocaleString() : 'Ongoing'}</p>
+                        <p><strong>Activities:</strong> ${sessionData.session.activity_count}</p>
+                    </div>
+                    <div class="session-activities">
+                        <h3>Activities (${sessionData.activities.length})</h3>
+                        <div class="activity-list">
+                            ${sessionData.activities.map(activity => `
+                                <div class="activity-item">
+                                    <span class="activity-time">${new Date(activity.timestamp * 1000).toLocaleTimeString()}</span>
+                                    <span class="activity-agent">${activity.agent_id}</span>
+                                    <span class="activity-message">${activity.activity}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="session-chat">
+                        <h3>Chat Log (${sessionData.chat_logs.length})</h3>
+                        <div class="chat-list">
+                            ${sessionData.chat_logs.map(log => `
+                                <div class="chat-item ${log.log_type}">
+                                    <span class="chat-time">${new Date(log.timestamp * 1000).toLocaleTimeString()}</span>
+                                    <span class="chat-author">${log.author}</span>
+                                    <span class="chat-message">${log.message}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+    }
+    
+    async exportSession(sessionId) {
+        try {
+            const response = await fetch(`/api/sessions/${sessionId}`);
+            const data = await response.json();
+            
+            if (data.error) {
+                this.showNotification('error', 'Error', data.error);
+                return;
+            }
+            
+            // Create export data
+            const exportData = {
+                session: data.session,
+                activities: data.activities,
+                chat_logs: data.chat_logs,
+                meetings: data.meetings,
+                export_time: new Date().toISOString()
+            };
+            
+            // Download as JSON
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `session_${sessionId}_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            this.showNotification('success', 'Exported', 'Session data exported successfully');
+        } catch (error) {
+            console.error('Error exporting session:', error);
+            this.showNotification('error', 'Error', 'Failed to export session');
+        }
+    }
+    
+    clearHistory() {
+        const historyList = document.getElementById('historyList');
+        const systemMessage = historyList.querySelector('.history-item.system');
+        historyList.innerHTML = '';
+        if (systemMessage) {
+            historyList.appendChild(systemMessage);
+        }
+    }
+    
+    filterHistory(filter) {
+        const historyItems = document.querySelectorAll('#historyList .history-item:not(.system)');
+        historyItems.forEach(item => {
+            const sessionId = item.dataset.sessionId;
+            const startTime = new Date(sessionId.split('_')[1] * 1000);
+            const now = new Date();
+            
+            let show = true;
+            switch (filter) {
+                case 'recent':
+                    show = (now - startTime) < 24 * 60 * 60 * 1000; // 24 hours
+                    break;
+                case 'week':
+                    show = (now - startTime) < 7 * 24 * 60 * 60 * 1000; // 7 days
+                    break;
+                case 'month':
+                    show = (now - startTime) < 30 * 24 * 60 * 60 * 1000; // 30 days
+                    break;
+                default:
+                    show = true;
+            }
+            
+            item.style.display = show ? 'block' : 'none';
+        });
+    }
+    
+    exportHistory() {
+        const historyItems = Array.from(document.querySelectorAll('#historyList .history-item:not(.system)'));
+        const exportData = historyItems.map(item => {
+            const sessionId = item.dataset.sessionId;
+            const title = item.querySelector('h4').textContent;
+            const time = item.querySelector('.history-time').textContent;
+            const stats = Array.from(item.querySelectorAll('.history-stat')).map(stat => {
+                const label = stat.querySelector('.stat-label').textContent;
+                const value = stat.querySelector('.stat-value').textContent;
+                return `${label} ${value}`;
+            }).join(', ');
+            
+            return `[${time}] ${title} - ${stats}`;
+        });
+        
+        const blob = new Blob([exportData.join('\n')], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `session_history_${new Date().toISOString().split('T')[0]}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
 }
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.aiResearchLab = new AIResearchLabApp();
+    // Create global alias for easier access
+    window.app = window.aiResearchLab;
 });
 
 // Demo functions for testing

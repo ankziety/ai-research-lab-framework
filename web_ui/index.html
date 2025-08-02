@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Research Lab</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=SF+Pro+Display:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
@@ -55,6 +54,14 @@
                         <i class="fas fa-brain"></i>
                         <span>Chat Log</span>
                     </button>
+                    <button class="nav-item" data-panel="meetings">
+                        <i class="fas fa-handshake"></i>
+                        <span>Meetings</span>
+                    </button>
+                    <button class="nav-item" data-panel="history">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
+                    </button>
                     <button class="nav-item" data-panel="metrics">
                         <i class="fas fa-analytics"></i>
                         <span>Metrics</span>
@@ -69,24 +76,29 @@
                     <div class="panel-header">
                         <h2>Research Configuration</h2>
                         <div class="panel-actions">
-                            <button class="btn btn-primary" id="startResearchBtn">
-                                <i class="fas fa-play"></i>
-                                Start Research
-                            </button>
-                            <button class="btn btn-secondary hidden" id="stopResearchBtn">
-                                <i class="fas fa-stop"></i>
-                                Stop Research
-                            </button>
+                                                <button class="btn btn-primary" id="startResearchBtn" aria-label="Start research session">
+                        <i class="fas fa-play" aria-hidden="true"></i>
+                        Start Research
+                    </button>
+                    <button class="btn btn-secondary hidden" id="stopResearchBtn" aria-label="Stop research session">
+                        <i class="fas fa-stop" aria-hidden="true"></i>
+                        Stop Research
+                    </button>
                         </div>
                     </div>
                     
                     <div class="research-config">
-                        <div class="form-group">
-                            <label for="researchQuestion">Research Question</label>
-                            <textarea id="researchQuestion" 
-                                placeholder="Enter your research question or objective..."
-                                rows="3"></textarea>
-                        </div>
+                                <div class="form-group">
+            <label for="researchQuestion" aria-label="Research question input">Research Question</label>
+            <textarea id="researchQuestion" 
+                placeholder="Enter your research question or objective..."
+                rows="3"
+                aria-describedby="research-question-help"
+                aria-required="true"></textarea>
+            <div id="research-question-help" class="form-help">
+                Describe your research objective in detail (max 1000 characters)
+            </div>
+        </div>
                         
                         <div class="form-row">
                             <div class="form-group">
@@ -154,6 +166,9 @@
                                 <span class="stat-value" id="teamEfficiency">0%</span>
                                 <span class="stat-label">Efficiency</span>
                             </span>
+                            <button class="btn btn-ghost" id="refreshAgentsBtn" title="Refresh agents">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
                         </div>
                     </div>
                     
@@ -255,20 +270,6 @@
                     </div>
                     
                     <div class="activity-stream" id="activityStream">
-                        <div class="activity-item system">
-                            <div class="activity-avatar">
-                                <i class="fas fa-cog"></i>
-                            </div>
-                            <div class="activity-content">
-                                <div class="activity-header">
-                                    <span class="activity-author">System</span>
-                                    <span class="activity-time">Just now</span>
-                                </div>
-                                <div class="activity-message">
-                                    AI Research Lab initialized and ready for operation.
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     
                     <div class="human-intervention" id="humanIntervention">
@@ -306,21 +307,58 @@
                     </div>
                     
                     <div class="chat-stream" id="chatStream">
-                        <div class="chat-item system">
-                            <div class="chat-avatar">
-                                <i class="fas fa-cog"></i>
-                            </div>
-                            <div class="chat-content">
-                                <div class="chat-header">
-                                    <span class="chat-author">System</span>
-                                    <span class="chat-type">system</span>
-                                    <span class="chat-time">Just now</span>
-                                </div>
-                                <div class="chat-message">
-                                    Chat log initialized. All thoughts, choices, and communications will be displayed here.
-                                </div>
-                            </div>
+                    </div>
+                </section>
+
+                <!-- Meetings Panel -->
+                <section class="panel" id="meetings-panel">
+                    <div class="panel-header">
+                        <h2>Research Meetings</h2>
+                        <div class="meetings-controls">
+                            <select id="meetingFilter">
+                                <option value="">All Meetings</option>
+                                <option value="individual">Individual Meetings</option>
+                                <option value="team">Team Meetings</option>
+                                <option value="review">Review Meetings</option>
+                            </select>
+                            <button class="btn btn-ghost" id="clearMeetingsBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportMeetingsBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
                         </div>
+                    </div>
+                    
+                    <div class="meetings-list" id="meetingsList">
+                    </div>
+                </section>
+
+                <!-- History Panel -->
+                <section class="panel" id="history-panel">
+                    <div class="panel-header">
+                        <h2>Session History</h2>
+                        <div class="history-controls">
+                            <select id="sessionFilter">
+                                <option value="">All Sessions</option>
+                                <option value="recent">Recent (24h)</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                            <button class="btn btn-ghost" id="clearHistoryBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportHistoryBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="history-list" id="historyList">
                     </div>
                 </section>
 
@@ -634,6 +672,7 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
