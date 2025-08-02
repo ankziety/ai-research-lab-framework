@@ -52,7 +52,7 @@ def minimal_virtual_lab_demo():
             framework = MultiAgentResearchFramework(config)
             
             if hasattr(framework, 'virtual_lab'):
-                print("Virtual Lab integrated successfully")
+                print("Virtual Lab integrated")
                 
                 # Check available methods
                 vlab_methods = [
@@ -87,19 +87,11 @@ def minimal_virtual_lab_demo():
         except Exception as e:
             print(f"Framework initialization failed: {e}")
         
-        print("\nVirtual Lab Key Features:")
-        print("   - Meeting-based research coordination")
-        print("   - Structured 7-phase research methodology")
-        print("   - Multi-agent collaboration")
-        print("   - Cross-agent interaction and critique")
-        print("   - Scientific quality assessment")
-        print("   - Iterative refinement workflows")
+        print("\nMinimal Virtual Lab demonstration completed.")
         
         print("\nBased on the paper:")
         print("   'The Virtual Lab of AI agents designs new SARS-CoV-2 nanobodies'")
         print("   by Swanson et al. (2025)")
-        
-        print("\nVirtual Lab implementation verified!")
         
     except ImportError as e:
         print(f"Import failed: {e}")

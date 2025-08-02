@@ -52,7 +52,7 @@ def demo_virtual_lab_research():
         # Initialize framework
         print("🔧 Initializing Multi-Agent Research Framework with Virtual Lab...")
         framework = MultiAgentResearchFramework(config)
-        print("✅ Framework initialized successfully!")
+        print("Framework initialized.")
         print()
         
         # Example research questions for different domains
@@ -111,7 +111,7 @@ def demo_virtual_lab_research():
         
         # Display results summary
         if vlab_results.get('success', True) and vlab_results.get('status') == 'completed':
-            print("✅ Virtual Lab Research Session Completed Successfully!")
+            print("Virtual Lab Research Session Completed")
             print("=" * 50)
             
             # Session summary
@@ -227,16 +227,7 @@ def demo_virtual_lab_research():
             print(f"   Research Domains: {knowledge_stats.get('unique_domains', 0)}")
         
         print()
-        print("🎉 Virtual Lab Demo Completed!")
-        print()
-        print("Features Demonstrated:")
-        print("• Meeting-based research coordination")
-        print("• Structured 7-phase research methodology")
-        print("• Multi-agent collaboration and expertise")
-        print("• Cross-agent interaction and critique")
-        print("• Scientific quality assessment")
-        print("• Automated workflow design and execution")
-        print("• Comprehensive results synthesis")
+        print("Virtual Lab demonstration completed.")
         
     except Exception as e:
         print(f"❌ Demo failed with error: {e}")
@@ -250,7 +241,7 @@ def demo_virtual_lab_research():
 def demo_comparison():
     """Demonstrate the difference between traditional and Virtual Lab approaches."""
     
-    print("🔄 Comparing Traditional vs Virtual Lab Approaches")
+    print("Comparing Traditional vs Virtual Lab Approaches")
     print("=" * 50)
     
     config = {
@@ -309,12 +300,6 @@ def demo_comparison():
         print(f"   Traditional agents used: {traditional_agents}")
         print(f"   Virtual Lab phases completed: {vlab_phases}")
         print()
-        
-        print("📋 Virtual Lab Method Summary:")
-        print("   • Structured 7-phase research process")
-        print("   • Meeting-based agent coordination") 
-        print("   • Integrated critique and quality control")
-        print("   • Cross-agent collaboration features")
         
     except Exception as e:
         print(f"❌ Comparison demo failed: {e}")
