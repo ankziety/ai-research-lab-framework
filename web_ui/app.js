@@ -32,45 +32,47 @@ class AIResearchLabApp {
     
     initializeWebSocket() {
         this.socket = io();
-        
+        this.setupWebSocketEventHandlers();
+    }
+
+    setupWebSocketEventHandlers() {
         this.socket.on('connect', () => {
             console.log('Connected to server');
             this.updateSystemStatus('online');
         });
-        
+
         this.socket.on('disconnect', () => {
             console.log('Disconnected from server');
             this.updateSystemStatus('offline');
         });
-        
+
         this.socket.on('system_status', (data) => {
             this.handleSystemStatus(data);
         });
-        
+
         this.socket.on('system_metrics', (data) => {
             this.updateSystemMetrics(data);
         });
-        
+
         this.socket.on('research_status', (data) => {
             this.handleResearchStatus(data);
         });
-        
+
         this.socket.on('research_complete', (data) => {
             this.handleResearchComplete(data);
         });
-        
+
         this.socket.on('research_error', (data) => {
             this.handleResearchError(data);
         });
-        
+
         this.socket.on('phase_update', (data) => {
             this.updateResearchPhase(data);
         });
-        
+
         this.socket.on('agent_activity', (data) => {
             this.updateAgentActivity(data);
         });
-        
         this.socket.on('activity_log', (data) => {
             this.addActivityLogEntry(data);
         });
