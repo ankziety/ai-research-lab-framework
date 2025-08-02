@@ -6,7 +6,7 @@ networkx>=3.0.0
 pytest>=6.0.0
 
 # Multi-agent system dependencies
-sentence-transformers>=2.2.0
+sentence-transformers>=2.2.0  # Fixed encoder_attention_mask deprecation warning
 faiss-cpu>=1.7.0
 
 # LLM API integration (optional but recommended for full functionality)
