@@ -36,7 +36,19 @@ app = Flask(__name__,
            template_folder='.',
            static_folder='.',
            static_url_path='')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'ai-research-lab-secret-key-change-in-production')
+
+# Securely set SECRET_KEY
+secret_key = os.environ.get('SECRET_KEY')
+if not secret_key:
+    # Determine if running in development mode
+    flask_env = os.environ.get('FLASK_ENV', '').lower()
+    if flask_env in ('development', 'debug'):
+        # Generate a random secret key for development
+        secret_key = secrets.token_urlsafe(32)
+        logging.warning("SECRET_KEY not set, using a random key for development. Do not use this in production!")
+    else:
+        raise RuntimeError("SECRET_KEY environment variable must be set in production.")
+app.config['SECRET_KEY'] = secret_key
 app.config['SESSION_TYPE'] = 'filesystem'
 
 # SocketIO setup for real-time communication
