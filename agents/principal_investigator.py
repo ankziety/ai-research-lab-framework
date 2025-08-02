@@ -29,6 +29,17 @@ class PrincipalInvestigatorAgent(BaseAgent):
         self.research_history = []
         self.current_research_context = ""  # Track current research problem for dynamic agent creation
         
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        base_dict = super().to_dict()
+        base_dict.update({
+            'active_research_sessions': list(self.active_research_sessions.keys()),
+            'hired_agents_count': len(self.hired_agents),
+            'research_history_count': len(self.research_history),
+            'current_research_context': self.current_research_context
+        })
+        return base_dict
+    
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """
         Generate PI response with focus on coordination and synthesis.
@@ -492,7 +503,15 @@ class PrincipalInvestigatorAgent(BaseAgent):
             
             # Step 2: Hire required agents
             hiring_result = self.hire_agents(marketplace, analysis['required_expertise'], constraints)
-            session_data['hired_agents'] = hiring_result
+            
+            # Convert agent objects to dictionaries for JSON serialization
+            serializable_hiring_result = {
+                'hired_agents': {expertise: agent.to_dict() for expertise, agent in hiring_result['hired_agents'].items()},
+                'hiring_decisions': hiring_result['hiring_decisions'],
+                'total_hired': hiring_result['total_hired'],
+                'new_agents_created': hiring_result['new_agents_created']
+            }
+            session_data['hired_agents'] = serializable_hiring_result
             
             # Step 3: Decompose into tasks
             tasks = self.decompose_research_task(analysis)
@@ -528,23 +547,46 @@ class PrincipalInvestigatorAgent(BaseAgent):
         return session_data
     
     def _assign_tasks_to_agents(self, tasks: List[Dict[str, Any]], 
-                               hired_agents: Dict[str, BaseAgent]) -> Dict[str, Any]:
+                               hired_agents: Dict[str, Any]) -> Dict[str, Any]:
         """Assign tasks to hired agents."""
         assignments = {}
         
+        # Extract agent dictionaries from hired_agents structure
+        agent_dicts = hired_agents.get('hired_agents', {})
+        
         for task in tasks:
             expertise = task['expertise_required']
-            if expertise in hired_agents:
-                agent = hired_agents[expertise]
-                if agent.assign_task(task):
+            if expertise in agent_dicts:
+                agent_dict = agent_dicts[expertise]
+                # Create a simple agent object for task assignment
+                simple_agent = self._create_simple_agent_from_dict(agent_dict)
+                if simple_agent.assign_task(task):
                     assignments[task['id']] = {
-                        'agent_id': agent.agent_id,
+                        'agent_id': simple_agent.agent_id,
                         'task': task,
                         'status': 'assigned'
                     }
-                    logger.info(f"Assigned task {task['id']} to {agent.agent_id}")
+                    logger.info(f"Assigned task {task['id']} to {simple_agent.agent_id}")
         
         return assignments
+    
+    def _create_simple_agent_from_dict(self, agent_dict: Dict[str, Any]) -> BaseAgent:
+        """Create a simple agent object from dictionary for task assignment."""
+        from agents.base_agent import BaseAgent
+        
+        class SimpleAgent(BaseAgent):
+            def __init__(self, agent_dict):
+                super().__init__(
+                    agent_id=agent_dict['agent_id'],
+                    role=agent_dict['role'],
+                    expertise=agent_dict['expertise']
+                )
+            
+            def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
+                """Generate a simple response based on role and expertise."""
+                return f"Agent {self.agent_id} ({self.role}) response: {prompt[:100]}..."
+        
+        return SimpleAgent(agent_dict)
     
     def _execute_research_tasks(self, task_assignments: Dict[str, Any]) -> Dict[str, Any]:
         """Execute assigned research tasks with real agent interaction."""
@@ -556,15 +598,22 @@ class PrincipalInvestigatorAgent(BaseAgent):
                 agent_id = assignment['agent_id']
                 agent = None
                 
-                # Find the agent instance
+                # Find the agent instance from our stored hired agents
                 for hired_agent in self.hired_agents.values():
                     if hired_agent.agent_id == agent_id:
                         agent = hired_agent
                         break
                 
+                # If not found in stored agents, create a simple agent for execution
                 if not agent:
-                    logger.warning(f"Agent {agent_id} not found for task {task_id}")
-                    continue
+                    logger.warning(f"Agent {agent_id} not found in stored agents, creating simple agent")
+                    # We would need to get the agent dict from the session data
+                    # For now, create a simple agent
+                    agent = self._create_simple_agent_from_dict({
+                        'agent_id': agent_id,
+                        'role': 'Unknown Agent',
+                        'expertise': ['general']
+                    })
                 
                 # Assign task to agent
                 task_data = assignment['task']

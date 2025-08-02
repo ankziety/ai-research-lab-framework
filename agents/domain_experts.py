@@ -77,6 +77,12 @@ class MedicalExpert(BaseAgent):
         task_lower = task_description.lower()
         matches = sum(1 for keyword in all_keywords if keyword in task_lower)
         return min(1.0, matches * 0.15)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        base_dict = super().to_dict()
+        base_dict['domain'] = self.domain
+        return base_dict
 
 
 class PsychologyExpert(BaseAgent):
@@ -131,6 +137,10 @@ class PsychologyExpert(BaseAgent):
         task_lower = task_description.lower()
         matches = sum(1 for keyword in psychology_keywords if keyword in task_lower)
         return min(1.0, matches * 0.15)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return super().to_dict()
 
 
 class NeuroscienceExpert(BaseAgent):
@@ -185,6 +195,10 @@ class NeuroscienceExpert(BaseAgent):
         task_lower = task_description.lower()
         matches = sum(1 for keyword in neuroscience_keywords if keyword in task_lower)
         return min(1.0, matches * 0.15)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return super().to_dict()
 
 
 class DataScienceExpert(BaseAgent):
@@ -240,6 +254,10 @@ class DataScienceExpert(BaseAgent):
         task_lower = task_description.lower()
         matches = sum(1 for keyword in data_science_keywords if keyword in task_lower)
         return min(1.0, matches * 0.15)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return super().to_dict()
 
 
 class LiteratureResearcher(BaseAgent):
@@ -295,3 +313,7 @@ class LiteratureResearcher(BaseAgent):
         task_lower = task_description.lower()
         matches = sum(1 for keyword in literature_keywords if keyword in task_lower)
         return min(1.0, matches * 0.15)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return super().to_dict()
