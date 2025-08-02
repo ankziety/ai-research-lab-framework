@@ -624,4 +624,13 @@ if __name__ == '__main__':
     
     # Run the app
     logger.info("Starting AI Research Lab Web Interface...")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True, allow_unsafe_werkzeug=True)
+    # Configure debug and allow_unsafe_werkzeug based on environment variables
+    debug_mode = os.environ.get('FLASK_DEBUG', '0') == '1'
+    allow_unsafe_werkzeug = os.environ.get('ALLOW_UNSAFE_WERKZEUG', '0') == '1'
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=5000,
+        debug=debug_mode,
+        allow_unsafe_werkzeug=allow_unsafe_werkzeug
+    )
