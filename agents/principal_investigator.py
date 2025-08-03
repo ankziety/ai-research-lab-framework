@@ -17,12 +17,13 @@ class PrincipalInvestigatorAgent(BaseAgent):
     and dynamically hires domain expert agents based on research needs.
     """
     
-    def __init__(self, agent_id: str = "PI", model_config: Optional[Dict[str, Any]] = None):
+    def __init__(self, agent_id: str = "PI", model_config: Optional[Dict[str, Any]] = None, cost_manager=None):
         super().__init__(
             agent_id=agent_id,
             role="Principal Investigator",
             expertise=["Research Coordination", "Task Decomposition", "Team Management"],
-            model_config=model_config
+            model_config=model_config,
+            cost_manager=cost_manager
         )
         self.active_research_sessions = {}
         self.hired_agents = {}
@@ -73,25 +74,14 @@ class PrincipalInvestigatorAgent(BaseAgent):
         """
         coordination_keywords = [
             'coordinate', 'manage', 'overview', 'synthesize', 
-            'integrate', 'plan', 'strategy', 'workflow'
+            'integrate', 'plan', 'strategy', 'workflow', 
         ]
         
         task_lower = task_description.lower()
         relevance = sum(1 for keyword in coordination_keywords if keyword in task_lower)
         return min(1.0, relevance * 0.2)  # Max relevance for coordination tasks
     
-    def analyze_research_problem(self, problem_description: str, 
-                               constraints: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        Analyze a research problem and determine required expertise.
-        
-        Args:
-            problem_description: Description of the research problem
-            constraints: Optional constraints (budget, time, etc.)
-            
-        Returns:
-            Analysis including required expertise and task breakdown
-        """
+    
     def analyze_research_problem(self, problem_description: str, 
                                constraints: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
@@ -130,7 +120,7 @@ class PrincipalInvestigatorAgent(BaseAgent):
         llm_response = self.llm_client.generate_response(
             analysis_prompt, 
             {'constraints': constraints or {}}, 
-            agent_role=self.role
+            agent_role=self.role,
         )
         
         # Parse LLM response
@@ -471,19 +461,23 @@ class PrincipalInvestigatorAgent(BaseAgent):
         return tasks
     
     def coordinate_research_session(self, problem_description: str, 
-                                  marketplace, constraints: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+                                  marketplace, constraints: Optional[Dict[str, Any]] = None,
+                                  session_id: Optional[str] = None) -> Dict[str, Any]:
         """
-        Coordinate a complete research session from problem analysis to completion.
+        Coordinate a complete research session.
         
         Args:
-            problem_description: Research problem to investigate
+            problem_description: Research problem description
             marketplace: AgentMarketplace instance
             constraints: Optional constraints
+            session_id: Optional session ID to use (if not provided, will generate one)
             
         Returns:
             Complete research session results
         """
-        session_id = f"session_{int(time.time())}"
+        if session_id is None:
+            session_id = f"session_{int(time.time())}"
+        
         logger.info(f"Starting research session: {session_id}")
         
         # Set current research context for dynamic agent creation

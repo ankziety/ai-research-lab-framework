@@ -16,7 +16,7 @@ class ScientificCriticAgent(BaseAgent):
     """
     
     def __init__(self, agent_id: str = "scientific_critic",
-                 model_config: Optional[Dict[str, Any]] = None):
+                 model_config: Optional[Dict[str, Any]] = None, cost_manager=None):
         super().__init__(
             agent_id=agent_id,
             role="Scientific Critic",
@@ -24,7 +24,8 @@ class ScientificCriticAgent(BaseAgent):
                 "Research Methodology", "Critical Analysis", "Bias Detection",
                 "Logical Reasoning", "Quality Assessment", "Scientific Rigor"
             ],
-            model_config=model_config
+            model_config=model_config,
+            cost_manager=cost_manager
         )
         self.critique_history = []
     
@@ -56,10 +57,18 @@ class ScientificCriticAgent(BaseAgent):
         Be constructive but thorough in identifying potential issues and suggesting improvements.
         """
         
+        # Add agent context for cost tracking
+        context_with_agent = {
+            **context,
+            'agent_id': self.agent_id,
+            'task_type': context.get('task_type', 'critique')
+        }
+        
         return self.llm_client.generate_response(
             specialized_prompt,
-            context,
-            agent_role=self.role
+            context_with_agent,
+            agent_role=self.role,
+            cost_manager=self.cost_manager
         )
     
     def assess_task_relevance(self, task_description: str) -> float:
