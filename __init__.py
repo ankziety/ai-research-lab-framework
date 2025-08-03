@@ -24,6 +24,17 @@ from .data import (
 # Agent system
 from .agents import BaseAgent, PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
 
+# Physics-specific agents (NEW)
+try:
+    from .agents.physics import (
+        BasePhysicsAgent, QuantumPhysicsAgent, ComputationalPhysicsAgent,
+        ExperimentalPhysicsAgent, MaterialsPhysicsAgent, AstrophysicsAgent,
+        PhysicsAgentRegistry, create_physics_agent, get_physics_domain_for_query
+    )
+    PHYSICS_AGENTS_AVAILABLE = True
+except ImportError:
+    PHYSICS_AGENTS_AVAILABLE = False
+
 # Memory system
 from .memory import VectorDatabase, ContextManager, KnowledgeRepository
 
@@ -49,6 +60,15 @@ def create_research_framework(config=None):
     """Create a new research framework instance."""
     return create_framework(config)
 
+# Physics agent creation convenience function
+def create_physics_research_team(research_question, team_size=3):
+    """Create a physics research team for a specific question."""
+    if PHYSICS_AGENTS_AVAILABLE:
+        registry = PhysicsAgentRegistry()
+        return registry.create_physics_agent_team(research_question, team_size)
+    else:
+        raise ImportError("Physics agents not available")
+
 __all__ = [
     'MultiAgentResearchFramework',
     'create_framework',
@@ -73,5 +93,21 @@ __all__ = [
     'BaseTool',
     'ExperimentRunner',
     'draft_manuscript',
-    'visualize_results'
+    'visualize_results',
+    'create_physics_research_team',
+    'PHYSICS_AGENTS_AVAILABLE'
 ]
+
+# Add physics agents to __all__ if available
+if PHYSICS_AGENTS_AVAILABLE:
+    __all__.extend([
+        'BasePhysicsAgent',
+        'QuantumPhysicsAgent',
+        'ComputationalPhysicsAgent', 
+        'ExperimentalPhysicsAgent',
+        'MaterialsPhysicsAgent',
+        'AstrophysicsAgent',
+        'PhysicsAgentRegistry',
+        'create_physics_agent',
+        'get_physics_domain_for_query'
+    ])
