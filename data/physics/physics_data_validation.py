@@ -551,7 +551,7 @@ class PhysicsDataValidation:
             
             # Convert to MeV/c²
             if mass_unit == 'kg':
-                mass_mev = mass * 5.61e35  # Conversion factor
+                mass_mev = mass * KG_TO_MEV_C2  # Convert kg to MeV/c²
             elif mass_unit in ['MeV', 'MeV/c2']:
                 mass_mev = mass
             else:
