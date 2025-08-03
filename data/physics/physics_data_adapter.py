@@ -21,13 +21,19 @@ from .physics_data_export import PhysicsDataExport
 try:
     from ..data_manager import DataManager
     DATA_MANAGER_AVAILABLE = True
-except ImportError:
-    try:
-        from ...web_ui.data_manager import DataManager
-        DATA_MANAGER_AVAILABLE = True
-    except ImportError:
-        DATA_MANAGER_AVAILABLE = False
-        DataManager = None
+except ModuleNotFoundError as e:
+    if e.name == 'data_manager':
+        try:
+            from ...web_ui.data_manager import DataManager
+            DATA_MANAGER_AVAILABLE = True
+        except ModuleNotFoundError as e2:
+            if e2.name == 'data_manager':
+                DATA_MANAGER_AVAILABLE = False
+                DataManager = None
+            else:
+                raise
+    else:
+        raise
 
 logger = logging.getLogger(__name__)
 
