@@ -1,0 +1,98 @@
+{
+  "crystal_structures": {
+    "fcc_aluminum": {
+      "lattice_parameters": {
+        "a": 4.05,
+        "b": 4.05,
+        "c": 4.05,
+        "alpha": 90,
+        "beta": 90,
+        "gamma": 90
+      },
+      "space_group": "Fm3m",
+      "atoms": [
+        "Al"
+      ],
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ]
+      ],
+      "density": 2700,
+      "coordination_number": 12
+    },
+    "bcc_iron": {
+      "lattice_parameters": {
+        "a": 2.87,
+        "b": 2.87,
+        "c": 2.87,
+        "alpha": 90,
+        "beta": 90,
+        "gamma": 90
+      },
+      "space_group": "Im3m",
+      "atoms": [
+        "Fe"
+      ],
+      "positions": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0.5,
+          0.5,
+          0.5
+        ]
+      ],
+      "density": 7874,
+      "coordination_number": 8
+    }
+  },
+  "elastic_constants": {
+    "aluminum": {
+      "C11": 108000000000.0,
+      "C12": 62000000000.0,
+      "C44": 28000000000.0
+    },
+    "iron": {
+      "C11": 230000000000.0,
+      "C12": 135000000000.0,
+      "C44": 116000000000.0
+    }
+  },
+  "thermal_properties": {
+    "aluminum": {
+      "thermal_conductivity": 237,
+      "specific_heat": 897,
+      "thermal_expansion": 2.31e-05
+    },
+    "iron": {
+      "thermal_conductivity": 80.2,
+      "specific_heat": 449,
+      "thermal_expansion": 1.18e-05
+    }
+  },
+  "phase_diagrams": {
+    "iron_carbon": {
+      "phases": [
+        "austenite",
+        "ferrite",
+        "cementite"
+      ],
+      "transition_temperatures": [
+        727,
+        910,
+        1147
+      ],
+      "carbon_concentrations": [
+        0.0,
+        0.77,
+        6.67
+      ]
+    }
+  }
+}

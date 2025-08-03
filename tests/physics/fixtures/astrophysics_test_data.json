@@ -1,0 +1,158 @@
+{
+  "celestial_bodies": {
+    "earth": {
+      "mass_kg": 5.972e+24,
+      "radius_m": 6371000.0,
+      "orbital_period_s": 31557600.0,
+      "orbital_radius_m": 149600000000.0,
+      "surface_gravity": 9.81
+    },
+    "sun": {
+      "mass_kg": 1.989e+30,
+      "radius_m": 696000000.0,
+      "luminosity_W": 3.828e+26,
+      "surface_temperature_K": 5778,
+      "core_temperature_K": 15700000.0
+    },
+    "jupiter": {
+      "mass_kg": 1.898e+27,
+      "radius_m": 69911000.0,
+      "orbital_period_s": 374336251.20000005,
+      "orbital_radius_m": 778500000000.0
+    }
+  },
+  "stellar_evolution": {
+    "main_sequence_lifetimes": {
+      "masses_solar": [
+        0.1,
+        0.5,
+        1.0,
+        2.0,
+        5.0,
+        10.0,
+        25.0
+      ],
+      "lifetimes_years": [
+        10000000000000.0,
+        56000000000.0,
+        10000000000.0,
+        1000000000.0,
+        65000000.0,
+        32000000.0,
+        7000000.0
+      ]
+    },
+    "stellar_types": {
+      "O": {
+        "mass_range": [
+          15,
+          90
+        ],
+        "temperature_range": [
+          30000,
+          50000
+        ],
+        "color": "blue"
+      },
+      "B": {
+        "mass_range": [
+          2.1,
+          16
+        ],
+        "temperature_range": [
+          10000,
+          30000
+        ],
+        "color": "blue-white"
+      },
+      "A": {
+        "mass_range": [
+          1.4,
+          2.1
+        ],
+        "temperature_range": [
+          7500,
+          10000
+        ],
+        "color": "white"
+      },
+      "F": {
+        "mass_range": [
+          1.04,
+          1.4
+        ],
+        "temperature_range": [
+          6000,
+          7500
+        ],
+        "color": "yellow-white"
+      },
+      "G": {
+        "mass_range": [
+          0.8,
+          1.04
+        ],
+        "temperature_range": [
+          5200,
+          6000
+        ],
+        "color": "yellow"
+      },
+      "K": {
+        "mass_range": [
+          0.45,
+          0.8
+        ],
+        "temperature_range": [
+          3700,
+          5200
+        ],
+        "color": "orange"
+      },
+      "M": {
+        "mass_range": [
+          0.08,
+          0.45
+        ],
+        "temperature_range": [
+          2400,
+          3700
+        ],
+        "color": "red"
+      }
+    }
+  },
+  "cosmological_parameters": {
+    "planck_2018": {
+      "H0": 67.4,
+      "Omega_m": 0.315,
+      "Omega_lambda": 0.685,
+      "Omega_b": 0.049,
+      "sigma_8": 0.811,
+      "n_s": 0.965
+    },
+    "wmap_9year": {
+      "H0": 69.3,
+      "Omega_m": 0.287,
+      "Omega_lambda": 0.713,
+      "Omega_b": 0.0463,
+      "sigma_8": 0.821,
+      "n_s": 0.972
+    }
+  },
+  "galaxy_properties": {
+    "milky_way": {
+      "mass_kg": 1.5e+42,
+      "stellar_mass_kg": 1.1934e+41,
+      "disk_radius_pc": 26000,
+      "disk_thickness_pc": 1000,
+      "rotation_velocity_km_s": 220
+    },
+    "andromeda": {
+      "mass_kg": 1.5e+42,
+      "stellar_mass_kg": 1.9889999999999998e+41,
+      "disk_radius_pc": 35000,
+      "rotation_velocity_km_s": 250
+    }
+  }
+}
