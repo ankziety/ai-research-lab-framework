@@ -24,18 +24,31 @@ __version__ = "1.0.0"
 __author__ = "Physics Workflow Enhancement Team"
 
 # Core physics workflow components
-from .physics_workflow_engine import PhysicsWorkflowEngine
-from .physics_phase_enhancer import PhysicsPhaseEnhancer  
-from .physics_validation_engine import PhysicsValidationEngine
-from .physics_discovery_engine import PhysicsDiscoveryEngine
-from .physics_integration_manager import PhysicsIntegrationManager
+from .physics_workflow_engine import PhysicsWorkflowEngine, PhysicsResearchDomain, PhysicsSimulationType
+from .physics_phase_enhancer import PhysicsPhaseEnhancer, PhysicsEnhancementConfig
+from .physics_validation_engine import PhysicsValidationEngine, ValidationLevel
+from .physics_discovery_engine import PhysicsDiscoveryEngine, DiscoveryType
+from .physics_integration_manager import (
+    PhysicsIntegrationManager, 
+    PhysicsIntegrationConfig,
+    IntegrationMode,
+    create_physics_enhanced_framework,
+    create_physics_integration_manager,
+    apply_physics_enhancements
+)
 from .physics_workflow_decorators import (
     physics_enhanced_phase,
     physics_agent_selection,
     physics_literature_analysis,
     physics_mathematical_modeling,
     physics_simulation_execution,
-    physics_law_discovery
+    physics_law_discovery,
+    physics_validation,
+    physics_performance_monitor,
+    physics_workflow_orchestrator,
+    configure_physics_decorators,
+    DecoratorConfig,
+    DecoratorMode
 )
 
 # Convenience functions for physics workflow integration
@@ -80,18 +93,41 @@ def apply_physics_enhancements(virtual_lab_system, config=None):
     return enhancer.enhance_virtual_lab(virtual_lab_system)
 
 __all__ = [
+    # Core Engines
     'PhysicsWorkflowEngine',
     'PhysicsPhaseEnhancer',
     'PhysicsValidationEngine', 
     'PhysicsDiscoveryEngine',
     'PhysicsIntegrationManager',
+    
+    # Engine Types and Enums
+    'PhysicsResearchDomain',
+    'PhysicsSimulationType',
+    'ValidationLevel',
+    'DiscoveryType',
+    'IntegrationMode',
+    
+    # Configuration Classes
+    'PhysicsEnhancementConfig',
+    'PhysicsIntegrationConfig',
+    'DecoratorConfig',
+    'DecoratorMode',
+    
+    # Decorator Functions
     'physics_enhanced_phase',
     'physics_agent_selection',
     'physics_literature_analysis',
     'physics_mathematical_modeling',
     'physics_simulation_execution',
     'physics_law_discovery',
+    'physics_validation',
+    'physics_performance_monitor',
+    'physics_workflow_orchestrator',
+    'configure_physics_decorators',
+    
+    # Convenience Functions
     'create_physics_enhanced_framework',
+    'create_physics_integration_manager',
     'create_physics_workflow_engine',
     'apply_physics_enhancements'
 ]
