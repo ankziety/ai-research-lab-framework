@@ -193,7 +193,7 @@ class PhysicsDataVisualization:
             if plot_type == 'line':
                 x = data.get('x', range(len(data.get('y', []))))
                 y = data.get('y', [])
-                ax.plot(x, y, linewidth=config.default_config.__dict__.get('linewidth', 2))
+                ax.plot(x, y, linewidth=plt.rcParams.get('lines.linewidth', 2))
                 
             elif plot_type == 'scatter':
                 x = data.get('x', [])
