@@ -181,10 +181,11 @@ class PhysicsDataManager:
         logger.info("Physics data database initialized")
     
     def get_db_connection(self) -> sqlite3.Connection:
-        """Get a database connection."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+        """Get a thread-local database connection."""
+        if not hasattr(self._thread_local, "conn") or self._thread_local.conn is None:
+            self._thread_local.conn = sqlite3.connect(self.db_path, check_same_thread=True)
+            self._thread_local.conn.row_factory = sqlite3.Row
+        return self._thread_local.conn
     
     def load_physics_data(self, source: str, format: str, **kwargs) -> Optional[PhysicsDataset]:
         """
