@@ -21,25 +21,81 @@ Available Engines:
 - NumericalMethodsEngine: Advanced numerical methods for PDEs
 """
 
-from .base_physics_engine import BasePhysicsEngine
+from .base_physics_engine import (
+    BasePhysicsEngine, 
+    PhysicsEngineType, 
+    SoftwareInterface,
+    PhysicsProblemSpec,
+    PhysicsResult
+)
 from .quantum_simulation_engine import QuantumSimulationEngine
 from .molecular_dynamics_engine import MolecularDynamicsEngine
 from .statistical_physics_engine import StatisticalPhysicsEngine
 from .multi_physics_engine import MultiPhysicsEngine
 from .numerical_methods import NumericalMethodsEngine
-from .physics_engine_factory import PhysicsEngineFactory
-from .physics_engine_registry import PhysicsEngineRegistry
+from .physics_engine_factory import PhysicsEngineFactory, PhysicsEngineConfig
+from .physics_engine_registry import PhysicsEngineRegistry, EngineStatus
 
 __all__ = [
+    # Base classes and types
     'BasePhysicsEngine',
+    'PhysicsEngineType',
+    'SoftwareInterface', 
+    'PhysicsProblemSpec',
+    'PhysicsResult',
+    
+    # Physics engines
     'QuantumSimulationEngine',
     'MolecularDynamicsEngine', 
     'StatisticalPhysicsEngine',
     'MultiPhysicsEngine',
     'NumericalMethodsEngine',
+    
+    # Management components
     'PhysicsEngineFactory',
-    'PhysicsEngineRegistry'
+    'PhysicsEngineConfig',
+    'PhysicsEngineRegistry',
+    'EngineStatus'
 ]
+
+# Convenience function for easy access
+def create_physics_engine_suite(config=None, cost_manager=None):
+    """
+    Create a complete suite of physics engines.
+    
+    Args:
+        config: Optional configuration dictionary
+        cost_manager: Optional cost manager
+        
+    Returns:
+        Dictionary with factory, registry, and all engines
+    """
+    factory = PhysicsEngineFactory(config, cost_manager)
+    registry = PhysicsEngineRegistry(factory)
+    
+    # Create all engine types
+    engines = {}
+    for engine_type in PhysicsEngineType:
+        try:
+            engine = factory.create_engine(engine_type)
+            engines[engine_type.value] = engine
+            
+            # Register in registry
+            registry.register_engine(
+                engine_id=f"default_{engine_type.value}",
+                engine_type=engine_type,
+                auto_create=False  # Already created
+            )
+            registry.engines[f"default_{engine_type.value}"].engine_instance = engine
+            
+        except Exception as e:
+            print(f"Warning: Could not create {engine_type.value}: {e}")
+    
+    return {
+        'factory': factory,
+        'registry': registry,
+        'engines': engines
+    }
 
 __version__ = "1.0.0"
 __author__ = "AI Research Lab Framework"
