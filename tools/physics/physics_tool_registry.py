@@ -35,11 +35,17 @@ class PhysicsToolRegistry:
         
         # Physics domain hierarchy
         self.domain_hierarchy = {
-            "quantum_mechanics": ["atomic_physics", "molecular_physics", "condensed_matter"],
+            "quantum_mechanics": ["atomic_physics", "molecular_physics", "condensed_matter", "quantum_chemistry"],
             "classical_mechanics": ["fluid_dynamics", "solid_mechanics", "thermodynamics"],
-            "electromagnetism": ["optics", "plasma_physics", "electronics"],
-            "astrophysics": ["stellar_physics", "cosmology", "galactic_dynamics"],
-            "materials_science": ["crystallography", "electronic_materials", "magnetic_materials"],
+            "electromagnetism": ["optics", "photonics", "plasma_physics", "electronics"],
+            "particle_physics": ["high_energy_physics", "elementary_particles", "quantum_field_theory"],
+            "nuclear_physics": ["radioactivity", "nuclear_reactions", "nuclear_structure"],
+            "astrophysics": ["stellar_physics", "cosmology", "galactic_dynamics", "gravitational_waves"],
+            "condensed_matter": ["solid_state_physics", "materials_science", "electronic_materials", "magnetic_materials"],
+            "biophysics": ["biological_physics", "molecular_biophysics", "membrane_physics"],
+            "plasma_physics": ["fusion_physics", "space_plasmas", "magnetohydrodynamics"],
+            "optics": ["photonics", "laser_physics", "nonlinear_optics", "fiber_optics"],
+            "statistical_mechanics": ["thermodynamics", "kinetic_theory", "critical_phenomena"],
             "experimental_physics": ["data_analysis", "instrumentation", "metrology"]
         }
         
@@ -73,6 +79,42 @@ class PhysicsToolRegistry:
             from .visualization_tool import VisualizationTool
             viz_tool = VisualizationTool()
             self.register_physics_tool(viz_tool, domains=["data_visualization", "experimental_physics"])
+            
+            # TODO: Add new specialized tools after implementing missing abstract methods
+            # # Import and register particle physics tool
+            # from .particle_physics_tool import ParticlePhysicsTool
+            # particle_tool = ParticlePhysicsTool()
+            # self.register_physics_tool(particle_tool, domains=["particle_physics", "high_energy_physics"])
+            
+            # # Import and register nuclear physics tool
+            # from .nuclear_physics_tool import NuclearPhysicsTool
+            # nuclear_tool = NuclearPhysicsTool()
+            # self.register_physics_tool(nuclear_tool, domains=["nuclear_physics", "radioactivity"])
+            
+            # # Import and register condensed matter tool
+            # from .condensed_matter_tool import CondensedMatterTool
+            # cm_tool = CondensedMatterTool()
+            # self.register_physics_tool(cm_tool, domains=["condensed_matter", "solid_state_physics"])
+            
+            # # Import and register biophysics tool
+            # from .biophysics_tool import BiophysicsTool
+            # bio_tool = BiophysicsTool()
+            # self.register_physics_tool(bio_tool, domains=["biophysics", "biological_physics"])
+            
+            # # Import and register plasma physics tool
+            # from .plasma_physics_tool import PlasmaPhysicsTool
+            # plasma_tool = PlasmaPhysicsTool()
+            # self.register_physics_tool(plasma_tool, domains=["plasma_physics", "fusion_physics"])
+            
+            # # Import and register optics and photonics tool
+            # from .optics_photonics_tool import OpticsPhotonicsTool
+            # optics_tool = OpticsPhotonicsTool()
+            # self.register_physics_tool(optics_tool, domains=["optics", "photonics", "laser_physics"])
+            
+            # # Import and register statistical mechanics tool
+            # from .statistical_mechanics_tool import StatisticalMechanicsTool
+            # stat_mech_tool = StatisticalMechanicsTool()
+            # self.register_physics_tool(stat_mech_tool, domains=["statistical_mechanics", "thermodynamics"])
             
             logger.info(f"Registered {len(self.physics_tools)} physics tools in PhysicsToolRegistry")
             
