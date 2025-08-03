@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Physics Research Dashboard - AI Research Lab</title>
+    
+    <!-- Core styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <!-- Physics-specific styles -->
+    <link rel="stylesheet" href="{{ url_for('physics.static', filename='physics.css') }}">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for visualizations -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Three.js for 3D visualizations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body class="physics-interface">
+    <div class="physics-container">
+        <!-- Physics Header -->
+        <header class="physics-header">
+            <h1>
+                <i class="fas fa-atom"></i>
+                Physics Research Dashboard
+            </h1>
+            <p class="subtitle">Advanced Physics Research Monitoring and Control Interface</p>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="physics-navigation">
+            <div class="nav-tabs">
+                <button class="nav-tab active" data-tab="dashboard">
+                    <i class="fas fa-tachometer-alt"></i>
+                    Dashboard
+                </button>
+                <button class="nav-tab" data-tab="visualizations">
+                    <i class="fas fa-chart-line"></i>
+                    Visualizations
+                </button>
+                <button class="nav-tab" data-tab="experiments">
+                    <i class="fas fa-flask"></i>
+                    Experiments
+                </button>
+                <button class="nav-tab" data-tab="tools">
+                    <i class="fas fa-tools"></i>
+                    Tool Management
+                </button>
+                <button class="nav-tab" data-tab="results">
+                    <i class="fas fa-chart-bar"></i>
+                    Results
+                </button>
+            </div>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div class="tab-content active" id="dashboard-tab">
+            <!-- Real-time Metrics Dashboard -->
+            <section class="physics-dashboard">
+                <!-- Simulation Metrics -->
+                <div class="dashboard-card simulation-metrics">
+                    <h3><i class="fas fa-cogs"></i> Simulation Status</h3>
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-sim-active">0</div>
+                            <div class="metric-label">Active</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-sim-queued">0</div>
+                            <div class="metric-label">Queued</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-sim-running">0</div>
+                            <div class="metric-label">Running</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-sim-completed">0</div>
+                            <div class="metric-label">Completed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Experiment Metrics -->
+                <div class="dashboard-card experiment-metrics">
+                    <h3><i class="fas fa-flask"></i> Experiments</h3>
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-exp-total">0</div>
+                            <div class="metric-label">Total</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-exp-pending">0</div>
+                            <div class="metric-label">Pending</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-exp-running">0</div>
+                            <div class="metric-label">Running</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-exp-completed">0</div>
+                            <div class="metric-label">Completed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tool Status -->
+                <div class="dashboard-card tool-status">
+                    <h3><i class="fas fa-tools"></i> Physics Tools</h3>
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-tools-total">0</div>
+                            <div class="metric-label">Total Tools</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-tools-online">0</div>
+                            <div class="metric-label">Online</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-tools-offline">0</div>
+                            <div class="metric-label">Offline</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Research Sessions -->
+                <div class="dashboard-card">
+                    <h3><i class="fas fa-project-diagram"></i> Research Sessions</h3>
+                    <div class="metric-grid">
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-sessions-active">0</div>
+                            <div class="metric-label">Active</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-sessions-total">0</div>
+                            <div class="metric-label">Total</div>
+                        </div>
+                        <div class="metric-item">
+                            <div class="metric-value" id="physics-viz-active">0</div>
+                            <div class="metric-label">Visualizations</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Dashboard Charts -->
+            <section class="dashboard-charts">
+                <div class="physics-chart-container">
+                    <div id="physics-simulation-chart"></div>
+                </div>
+                <div class="physics-chart-container">
+                    <div id="physics-experiment-chart"></div>
+                </div>
+                <div class="physics-chart-container">
+                    <div id="physics-resource-chart"></div>
+                </div>
+            </section>
+
+            <!-- Dashboard Controls -->
+            <section class="dashboard-controls">
+                <div class="controls-panel">
+                    <button class="physics-btn primary" id="physics-dashboard-refresh">
+                        <i class="fas fa-sync-alt"></i>
+                        Refresh Dashboard
+                    </button>
+                    <select class="physics-form-control" id="physics-dashboard-timerange" style="width: auto; display: inline-block;">
+                        <option value="realtime">Real-time</option>
+                        <option value="1hour">Last Hour</option>
+                        <option value="24hours">Last 24 Hours</option>
+                        <option value="7days">Last 7 Days</option>
+                    </select>
+                    <button class="physics-btn secondary" id="export-dashboard-data">
+                        <i class="fas fa-download"></i>
+                        Export Data
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- Visualizations Tab -->
+        <div class="tab-content" id="visualizations-tab">
+            <section class="visualization-controls">
+                <div class="controls-header">
+                    <h3><i class="fas fa-chart-line"></i> Physics Visualizations</h3>
+                    <button class="physics-btn primary" id="create-physics-visualization">
+                        <i class="fas fa-plus"></i>
+                        Create Visualization
+                    </button>
+                </div>
+
+                <!-- Visualization Type Selector -->
+                <div class="viz-type-selector">
+                    <h4>Choose Visualization Type</h4>
+                    <div class="viz-type-grid">
+                        <div class="viz-type-card" data-type="phase_diagram">
+                            <div class="viz-type-icon"><i class="fas fa-chart-area"></i></div>
+                            <div class="viz-type-name">Phase Diagram</div>
+                            <div class="viz-type-desc">Temperature-pressure phase relationships</div>
+                        </div>
+                        <div class="viz-type-card" data-type="energy_landscape">
+                            <div class="viz-type-icon"><i class="fas fa-mountain"></i></div>
+                            <div class="viz-type-name">Energy Landscape</div>
+                            <div class="viz-type-desc">Potential energy surface visualization</div>
+                        </div>
+                        <div class="viz-type-card" data-type="molecular_structure">
+                            <div class="viz-type-icon"><i class="fas fa-atom"></i></div>
+                            <div class="viz-type-name">Molecular Structure</div>
+                            <div class="viz-type-desc">3D molecular geometry and bonds</div>
+                        </div>
+                        <div class="viz-type-card" data-type="quantum_state">
+                            <div class="viz-type-icon"><i class="fas fa-wave-square"></i></div>
+                            <div class="viz-type-name">Quantum State</div>
+                            <div class="viz-type-desc">Wave function and probability distributions</div>
+                        </div>
+                        <div class="viz-type-card" data-type="field_visualization">
+                            <div class="viz-type-icon"><i class="fas fa-vector-square"></i></div>
+                            <div class="viz-type-name">Field Visualization</div>
+                            <div class="viz-type-desc">Vector and scalar field representations</div>
+                        </div>
+                        <div class="viz-type-card" data-type="statistical_distribution">
+                            <div class="viz-type-icon"><i class="fas fa-bell-curve"></i></div>
+                            <div class="viz-type-name">Statistical Distribution</div>
+                            <div class="viz-type-desc">Probability distributions and histograms</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visualization Search and Filter -->
+                <div class="viz-controls">
+                    <div class="search-filter">
+                        <input type="text" class="physics-form-control" id="physics-viz-search" 
+                               placeholder="Search visualizations...">
+                        <select class="physics-form-control" id="physics-viz-filter">
+                            <option value="">All Types</option>
+                            <option value="phase_diagram">Phase Diagrams</option>
+                            <option value="energy_landscape">Energy Landscapes</option>
+                            <option value="molecular_structure">Molecular Structures</option>
+                            <option value="quantum_state">Quantum States</option>
+                        </select>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Visualization Library -->
+            <section class="visualization-library" id="physics-viz-library">
+                <!-- Visualizations will be populated here -->
+            </section>
+        </div>
+
+        <!-- Experiments Tab -->
+        <div class="tab-content" id="experiments-tab">
+            <section class="experiment-interface">
+                <div class="interface-header">
+                    <h3><i class="fas fa-flask"></i> Physics Experiments</h3>
+                    <button class="physics-btn primary" id="create-physics-experiment">
+                        <i class="fas fa-plus"></i>
+                        Create Experiment
+                    </button>
+                </div>
+
+                <!-- Experiment Queue -->
+                <div class="experiment-queue">
+                    <div class="queue-header">
+                        <h4><i class="fas fa-list"></i> Experiment Queue</h4>
+                        <div class="queue-controls">
+                            <button class="physics-btn success" id="start-experiment-queue">
+                                <i class="fas fa-play"></i>
+                                Start Queue
+                            </button>
+                            <button class="physics-btn warning" id="pause-experiment-queue">
+                                <i class="fas fa-pause"></i>
+                                Pause
+                            </button>
+                            <button class="physics-btn danger" id="clear-experiment-queue">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="experiment-list" id="physics-experiment-queue">
+                        <!-- Experiment queue items will be populated here -->
+                    </div>
+                </div>
+
+                <!-- Experiment History -->
+                <div class="experiment-history">
+                    <h4><i class="fas fa-history"></i> Recent Experiments</h4>
+                    <div class="experiment-list" id="physics-experiment-history">
+                        <!-- Experiment history will be populated here -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Tools Tab -->
+        <div class="tab-content" id="tools-tab">
+            <section class="tool-management">
+                <div class="management-header">
+                    <h3><i class="fas fa-tools"></i> Physics Tool Management</h3>
+                    <div class="tool-actions">
+                        <button class="physics-btn primary" id="check-tool-updates">
+                            <i class="fas fa-sync-alt"></i>
+                            Check Updates
+                        </button>
+                        <button class="physics-btn secondary" id="view-system-resources">
+                            <i class="fas fa-server"></i>
+                            System Resources
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tools Grid -->
+                <div class="tools-grid" id="physics-tools-grid">
+                    <!-- Tool cards will be populated here -->
+                </div>
+
+                <!-- Resource Monitor -->
+                <div class="resource-monitor">
+                    <h4><i class="fas fa-chart-area"></i> System Resource Usage</h4>
+                    <div class="resource-grid">
+                        <div class="resource-item">
+                            <div class="resource-value" id="system-cpu-usage">0%</div>
+                            <div class="resource-label">CPU Usage</div>
+                            <div class="resource-bar">
+                                <div class="resource-bar-fill low" id="cpu-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="resource-item">
+                            <div class="resource-value" id="system-memory-usage">0%</div>
+                            <div class="resource-label">Memory Usage</div>
+                            <div class="resource-bar">
+                                <div class="resource-bar-fill medium" id="memory-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="resource-item">
+                            <div class="resource-value" id="system-disk-usage">0%</div>
+                            <div class="resource-label">Disk Usage</div>
+                            <div class="resource-bar">
+                                <div class="resource-bar-fill low" id="disk-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div class="resource-item">
+                            <div class="resource-value" id="system-gpu-usage">N/A</div>
+                            <div class="resource-label">GPU Usage</div>
+                            <div class="resource-bar">
+                                <div class="resource-bar-fill low" id="gpu-bar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- Results Tab -->
+        <div class="tab-content" id="results-tab">
+            <section class="results-display">
+                <div class="results-header">
+                    <h3><i class="fas fa-chart-bar"></i> Physics Results</h3>
+                    <div class="results-controls">
+                        <button class="physics-btn primary" id="analyze-physics-results">
+                            <i class="fas fa-calculator"></i>
+                            Analyze
+                        </button>
+                        <button class="physics-btn secondary" id="compare-physics-results">
+                            <i class="fas fa-balance-scale"></i>
+                            Compare
+                        </button>
+                        <button class="physics-btn secondary" id="export-physics-results">
+                            <i class="fas fa-download"></i>
+                            Export
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Results Filter -->
+                <div class="results-filter">
+                    <select class="physics-form-control" id="results-type-filter">
+                        <option value="">All Result Types</option>
+                        <option value="experimental_data">Experimental Data</option>
+                        <option value="simulation_output">Simulation Output</option>
+                        <option value="theoretical_calculation">Theoretical Calculation</option>
+                        <option value="statistical_analysis">Statistical Analysis</option>
+                    </select>
+                    <input type="text" class="physics-form-control" id="results-search" 
+                           placeholder="Search results...">
+                </div>
+
+                <!-- Results Grid -->
+                <div class="results-grid" id="physics-results-grid">
+                    <!-- Result cards will be populated here -->
+                </div>
+            </section>
+        </div>
+
+        <!-- Modals -->
+        
+        <!-- Visualization Creator Modal -->
+        <div class="physics-modal-overlay" id="physics-viz-creator-modal">
+            <div class="physics-modal">
+                <div class="physics-modal-header">
+                    <h3 class="physics-modal-title">Create Physics Visualization</h3>
+                    <button class="physics-modal-close" id="close-viz-creator">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="physics-viz-create-form" class="physics-form">
+                    <div class="physics-form-group">
+                        <label for="physics-viz-type">Visualization Type</label>
+                        <select class="physics-form-control" id="physics-viz-type" name="type" required>
+                            <option value="phase_diagram">Phase Diagram</option>
+                            <option value="energy_landscape">Energy Landscape</option>
+                            <option value="molecular_structure">Molecular Structure</option>
+                            <option value="quantum_state">Quantum State</option>
+                            <option value="field_visualization">Field Visualization</option>
+                        </select>
+                    </div>
+                    <div class="physics-form-group">
+                        <label for="physics-viz-data">Data</label>
+                        <textarea class="physics-form-control" id="physics-viz-data" name="data" 
+                                  placeholder="Enter data as JSON array or comma-separated values..." required></textarea>
+                        <div class="physics-form-help">
+                            Enter your data as JSON array, e.g., [1,2,3,4,5] or comma-separated values
+                        </div>
+                    </div>
+                    <div class="physics-form-group">
+                        <label for="physics-viz-width">Width (px)</label>
+                        <input type="number" class="physics-form-control" id="physics-viz-width" 
+                               name="width" value="800" min="400" max="2000">
+                    </div>
+                    <div class="physics-form-group">
+                        <label for="physics-viz-height">Height (px)</label>
+                        <input type="number" class="physics-form-control" id="physics-viz-height" 
+                               name="height" value="600" min="300" max="1500">
+                    </div>
+                    <div class="physics-form-group">
+                        <label for="physics-viz-color">Color Scheme</label>
+                        <select class="physics-form-control" id="physics-viz-color" name="color_scheme">
+                            <option value="viridis">Viridis</option>
+                            <option value="plasma">Plasma</option>
+                            <option value="inferno">Inferno</option>
+                            <option value="coolwarm">Cool-Warm</option>
+                            <option value="spectral">Spectral</option>
+                        </select>
+                    </div>
+                    <div class="physics-form-group">
+                        <label>
+                            <input type="checkbox" name="interactive" checked>
+                            Interactive visualization
+                        </label>
+                    </div>
+                    <div class="physics-form-group">
+                        <label>
+                            <input type="checkbox" name="animation">
+                            Enable animation
+                        </label>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="physics-btn secondary" id="cancel-viz-creator">Cancel</button>
+                        <button type="submit" class="physics-btn primary">Create Visualization</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Experiment Creator Modal -->
+        <div class="physics-modal-overlay" id="physics-exp-creator-modal">
+            <div class="physics-modal">
+                <div class="physics-modal-header">
+                    <h3 class="physics-modal-title">Create Physics Experiment</h3>
+                    <button class="physics-modal-close" id="close-exp-creator">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <form id="physics-exp-create-form" class="physics-form">
+                    <div class="physics-form-group">
+                        <label for="physics-exp-type">Experiment Type</label>
+                        <select class="physics-form-control" id="physics-exp-type" name="type" required>
+                            <option value="quantum_simulation">Quantum Simulation</option>
+                            <option value="molecular_dynamics">Molecular Dynamics</option>
+                            <option value="monte_carlo">Monte Carlo</option>
+                            <option value="statistical_analysis">Statistical Analysis</option>
+                            <option value="parameter_sweep">Parameter Sweep</option>
+                            <option value="optimization">Optimization</option>
+                        </select>
+                    </div>
+                    <div class="physics-form-group">
+                        <label for="physics-exp-description">Description</label>
+                        <textarea class="physics-form-control" id="physics-exp-description" 
+                                  name="description" placeholder="Describe your experiment..."></textarea>
+                    </div>
+                    <div class="parameter-editor">
+                        <h4>Experiment Parameters</h4>
+                        <div class="parameter-list" id="experiment-parameters">
+                            <!-- Parameters will be added dynamically -->
+                        </div>
+                        <button type="button" class="physics-btn secondary" id="add-experiment-parameter">
+                            <i class="fas fa-plus"></i>
+                            Add Parameter
+                        </button>
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="physics-btn secondary" id="cancel-exp-creator">Cancel</button>
+                        <button type="submit" class="physics-btn primary">Create Experiment</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notifications Container -->
+    <div class="notifications-container" id="physics-notifications">
+        <!-- Physics-specific notifications will appear here -->
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+    <script src="{{ url_for('physics.static', filename='physics.js') }}"></script>
+    
+    <!-- Tab switching functionality -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Tab switching
+            const tabs = document.querySelectorAll('.nav-tab');
+            const contents = document.querySelectorAll('.tab-content');
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const targetTab = tab.dataset.tab;
+                    
+                    // Remove active class from all tabs and contents
+                    tabs.forEach(t => t.classList.remove('active'));
+                    contents.forEach(c => c.classList.remove('active'));
+                    
+                    // Add active class to clicked tab and corresponding content
+                    tab.classList.add('active');
+                    document.getElementById(targetTab + '-tab').classList.add('active');
+                });
+            });
+            
+            // Modal controls
+            function setupModal(modalId, openBtnId, closeBtnId, cancelBtnId) {
+                const modal = document.getElementById(modalId);
+                const openBtn = document.getElementById(openBtnId);
+                const closeBtn = document.getElementById(closeBtnId);
+                const cancelBtn = document.getElementById(cancelBtnId);
+                
+                if (openBtn) {
+                    openBtn.addEventListener('click', () => modal.classList.add('show'));
+                }
+                if (closeBtn) {
+                    closeBtn.addEventListener('click', () => modal.classList.remove('show'));
+                }
+                if (cancelBtn) {
+                    cancelBtn.addEventListener('click', () => modal.classList.remove('show'));
+                }
+                
+                // Close on overlay click
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) {
+                        modal.classList.remove('show');
+                    }
+                });
+            }
+            
+            setupModal('physics-viz-creator-modal', 'create-physics-visualization', 
+                      'close-viz-creator', 'cancel-viz-creator');
+            setupModal('physics-exp-creator-modal', 'create-physics-experiment', 
+                      'close-exp-creator', 'cancel-exp-creator');
+        });
+    </script>
+    
+    <style>
+        /* Additional styles for the navigation tabs */
+        .physics-navigation {
+            margin-bottom: 30px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            background: white;
+            border-radius: 10px;
+            padding: 5px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow-x: auto;
+        }
+        
+        .nav-tab {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            background: transparent;
+            color: #7f8c8d;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .nav-tab:hover {
+            color: #3498db;
+            background: #f8f9fa;
+        }
+        
+        .nav-tab.active {
+            background: #3498db;
+            color: white;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .controls-header,
+        .interface-header,
+        .management-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .search-filter {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .controls-panel {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard-charts {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-tabs {
+                overflow-x: auto;
+            }
+            
+            .nav-tab {
+                min-width: 120px;
+            }
+            
+            .controls-header,
+            .interface-header,
+            .management-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: stretch;
+            }
+            
+            .search-filter {
+                flex-direction: column;
+            }
+            
+            .controls-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</body>
+</html>
