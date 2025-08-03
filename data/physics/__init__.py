@@ -10,18 +10,42 @@ This package contains physics-specific data processing and management components
 - PhysicsDataAdapter: Adapter for existing data system integration
 """
 
-from .physics_data_manager import PhysicsDataManager
-from .physics_database_connector import PhysicsDatabaseConnector
-from .physics_data_validation import PhysicsDataValidation
-from .physics_data_visualization import PhysicsDataVisualization
-from .physics_data_export import PhysicsDataExport
+from .physics_data_manager import PhysicsDataManager, PhysicsDataset
+from .physics_database_connector import PhysicsDatabaseConnector, DatabaseConnection
+from .physics_data_validation import PhysicsDataValidation, ValidationResult, ValidationLevel
+from .physics_data_visualization import PhysicsDataVisualization, PlotConfig
+from .physics_data_export import PhysicsDataExport, ExportConfig
 from .physics_data_adapter import PhysicsDataAdapter
+
+# Convenience function to create a complete physics data system
+def create_physics_data_system(config: dict = None, base_dir: str = None):
+    """
+    Create a complete physics data management system.
+    
+    Args:
+        config: Configuration dictionary
+        base_dir: Base directory for physics data storage
+    
+    Returns:
+        PhysicsDataAdapter instance with all components initialized
+    """
+    if config is None:
+        config = {}
+    
+    return PhysicsDataAdapter(config)
 
 __all__ = [
     'PhysicsDataManager',
+    'PhysicsDataset',
     'PhysicsDatabaseConnector',
+    'DatabaseConnection',
     'PhysicsDataValidation',
+    'ValidationResult',
+    'ValidationLevel',
     'PhysicsDataVisualization',
+    'PlotConfig',
     'PhysicsDataExport',
-    'PhysicsDataAdapter'
+    'ExportConfig',
+    'PhysicsDataAdapter',
+    'create_physics_data_system'
 ]
