@@ -184,7 +184,7 @@ class PhysicsDataValidation:
             'me': {
                 'value': 9.1093837015e-31,
                 'unit': 'kg',
-                'uncertainty': 2.8e-40,
+                'uncertainty': 0,
                 'description': 'Electron rest mass'
             },
             'mp': {
