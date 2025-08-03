@@ -16,3 +16,66 @@ __pycache__/
 
 # Environment files
 .env
+
+# Database files
+*.db
+
+# Generated images and visualizations
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+
+# Generated experiment results
+*_experiment_results.*
+experiment_*.png
+visualization_*.png
+
+# Generated output directories
+visualizations/
+demo_visualizations/
+output/
+results/
+
+# Web UI
+web_ui/config_backup.json
+web_ui/config.json
+*config.json
+
+
+# Test files
+test_socket_connection.html
+test_base_agent.py
+test_vector_database.py
+test_research_framework.py
+test_research_framework_integration.py
+test_literature_integration.py
+test_comprehensive_serialization.py
+test_critic.py
+test_literature_retriever.py
+test_manuscript_drafter.py
+test_results_visualizer.py
+test_simple.py
+test_socket_connection.html
+test_specialist_registry.py
+test_virtual_lab.py
+test_web_ui_fixes.py
+test_config.py
+test_ui.py
+demo.py
+demo_old.py
+demo_virtual_lab.py
+example_complete_tool_system.py
+example_usage.py
+
+test_*.py
+test_*.html
+test_*.ipynb
+test_*.md
+test_*.txt
+test_*.json
+test_*.yaml
+test_*.yml
+test_*.csv
+test_*.tsv

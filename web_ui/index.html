@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Research Lab</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-flask"></i>
+                    <span>AI Research Lab</span>
+                </div>
+                <div class="header-controls">
+                    <button class="btn btn-secondary" id="settingsBtn">
+                        <i class="fas fa-cog"></i>
+                        Settings
+                    </button>
+                    <div class="status-indicator" id="systemStatus">
+                        <div class="status-dot offline"></div>
+                        <span>Offline</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <nav class="nav-menu">
+                    <button class="nav-item active" data-panel="research">
+                        <i class="fas fa-search"></i>
+                        <span>Research</span>
+                    </button>
+                    <button class="nav-item" data-panel="agents">
+                        <i class="fas fa-users"></i>
+                        <span>Agents</span>
+                    </button>
+                    <button class="nav-item" data-panel="progress">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Progress</span>
+                    </button>
+                    <button class="nav-item" data-panel="logs">
+                        <i class="fas fa-comments"></i>
+                        <span>Activity Log</span>
+                    </button>
+                    <button class="nav-item" data-panel="chat-logs">
+                        <i class="fas fa-brain"></i>
+                        <span>Chat Log</span>
+                    </button>
+                    <button class="nav-item" data-panel="meetings">
+                        <i class="fas fa-handshake"></i>
+                        <span>Meetings</span>
+                    </button>
+                    <button class="nav-item" data-panel="history">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
+                    </button>
+                    <button class="nav-item" data-panel="metrics">
+                        <i class="fas fa-analytics"></i>
+                        <span>Metrics</span>
+                    </button>
+                    <button class="nav-item" data-panel="meetings-stats">
+                        <i class="fas fa-users-cog"></i>
+                        <span>Meetings Stats</span>
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Content Panels -->
+            <div class="content-area">
+                <!-- Research Panel -->
+                <section class="panel active" id="research-panel">
+                    <div class="panel-header">
+                        <h2>Research Configuration</h2>
+                        <div class="panel-actions">
+                                                <button class="btn btn-primary" id="startResearchBtn" aria-label="Start research session">
+                        <i class="fas fa-play" aria-hidden="true"></i>
+                        Start Research
+                    </button>
+                    <button class="btn btn-secondary hidden" id="stopResearchBtn" aria-label="Stop research session">
+                        <i class="fas fa-stop" aria-hidden="true"></i>
+                        Stop Research
+                    </button>
+                    <button class="btn btn-ghost" id="testBtn" onclick="testWebUI()">
+                        <i class="fas fa-check"></i>
+                        Test UI
+                    </button>
+                        </div>
+                    </div>
+                    
+                    <div class="research-config">
+                                <div class="form-group">
+            <label for="researchQuestion" aria-label="Research question input">Research Question</label>
+            <textarea id="researchQuestion" 
+                placeholder="Enter your research question or objective..."
+                rows="3"
+                aria-describedby="research-question-help"
+                aria-required="true"></textarea>
+            <div id="research-question-help" class="form-help">
+                Describe your research objective in detail (max 1000 characters)
+            </div>
+        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="domain">Domain</label>
+                                <select id="domain">
+                                    <option value="">Select domain</option>
+                                    <option value="computational_biology">Computational Biology</option>
+                                    <option value="chemistry">Chemistry</option>
+                                    <option value="physics">Physics</option>
+                                    <option value="medicine">Medicine</option>
+                                    <option value="environmental_science">Environmental Science</option>
+                                    <option value="engineering">Engineering</option>
+                                    <option value="economics">Economics</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="priority">Priority</label>
+                                <select id="priority">
+                                    <option value="medium">Medium</option>
+                                    <option value="high">High</option>
+                                    <option value="low">Low</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="budget">Budget ($)</label>
+                                <input type="number" id="budget" placeholder="50000" min="0">
+                            </div>
+                            <div class="form-group">
+                                <label for="timeline">Timeline (weeks)</label>
+                                <input type="number" id="timeline" placeholder="12" min="1" max="52">
+                            </div>
+                            <div class="form-group">
+                                <label for="maxAgents">Max Agents</label>
+                                <input type="number" id="maxAgents" placeholder="6" min="2" max="12">
+                            </div>
+                        </div>
+                        
+                        <div class="constraints-section">
+                            <h3>Additional Constraints</h3>
+                            <div class="constraints-list" id="constraintsList">
+                                <!-- Dynamic constraints will be added here -->
+                            </div>
+                            <button class="btn btn-ghost" id="addConstraintBtn">
+                                <i class="fas fa-plus"></i>
+                                Add Constraint
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Agents Panel -->
+                <section class="panel" id="agents-panel">
+                    <div class="panel-header">
+                        <h2>Research Team</h2>
+                        <div class="team-stats">
+                            <span class="stat">
+                                <span class="stat-value" id="activeAgents">0</span>
+                                <span class="stat-label">Active Agents</span>
+                            </span>
+                            <span class="stat">
+                                <span class="stat-value" id="teamEfficiency">0%</span>
+                                <span class="stat-label">Efficiency</span>
+                            </span>
+                            <button class="btn btn-ghost" id="refreshAgentsBtn" title="Refresh agents">
+                                <i class="fas fa-sync-alt"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="agents-visualization">
+                        <div class="meeting-room" id="meetingRoom">
+                            <div class="meeting-table">
+                                <div class="table-center">
+                                    <div class="meeting-indicator">
+                                        <i class="fas fa-comments"></i>
+                                        <span>No active meeting</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="agents-container" id="agentsContainer">
+                                <!-- Agents will be dynamically added here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="agents-list" id="agentsList">
+                        <!-- Agent cards will be populated here -->
+                    </div>
+                </section>
+
+                <!-- Progress Panel -->
+                <section class="panel" id="progress-panel">
+                    <div class="panel-header">
+                        <h2>Research Progress</h2>
+                        <div class="progress-stats">
+                            <span class="stat">
+                                <span class="stat-value" id="currentPhase">-</span>
+                                <span class="stat-label">Current Phase</span>
+                            </span>
+                            <span class="stat">
+                                <span class="stat-value" id="overallProgress">0%</span>
+                                <span class="stat-label">Complete</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-timeline">
+                        <div class="phase-indicator">
+                            <div class="phases-container">
+                                <div class="phase" data-phase="1">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Team Selection</div>
+                                </div>
+                                <div class="phase" data-phase="2">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Project Specification</div>
+                                </div>
+                                <div class="phase" data-phase="3">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Tools Selection</div>
+                                </div>
+                                <div class="phase" data-phase="4">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Implementation</div>
+                                </div>
+                                <div class="phase" data-phase="5">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Workflow Design</div>
+                                </div>
+                                <div class="phase" data-phase="6">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Execution</div>
+                                </div>
+                                <div class="phase" data-phase="7">
+                                    <div class="phase-dot"></div>
+                                    <div class="phase-label">Synthesis</div>
+                                </div>
+                            </div>
+                            <div class="progress-line">
+                                <div class="progress-fill" id="progressFill"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="phase-details" id="phaseDetails">
+                            <h3>Select a phase to view details</h3>
+                            <p>Click on any phase above to see detailed information about that stage of the research process.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Activity Log Panel -->
+                <section class="panel" id="logs-panel">
+                    <div class="panel-header">
+                        <h2>Activity Log</h2>
+                        <div class="log-controls">
+                            <button class="btn btn-ghost" id="clearLogsBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportLogsBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="activity-stream" id="activityStream">
+                    </div>
+                    
+                    <div class="human-intervention" id="humanIntervention">
+                        <div class="intervention-input">
+                            <input type="text" placeholder="Type your intervention message..." id="interventionInput">
+                            <button class="btn btn-primary" id="sendInterventionBtn">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Chat Logs Panel -->
+                <section class="panel" id="chat-logs-panel">
+                    <div class="panel-header">
+                        <h2>Chat Log</h2>
+                        <div class="chat-controls">
+                            <select id="chatLogType">
+                                <option value="">All Types</option>
+                                <option value="thought">Thoughts</option>
+                                <option value="choice">Choices</option>
+                                <option value="communication">Communications</option>
+                                <option value="tool_call">Tool Calls</option>
+                                <option value="system">System</option>
+                            </select>
+                            <button class="btn btn-ghost" id="clearChatLogsBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportChatLogsBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-stream" id="chatStream">
+                    </div>
+                </section>
+
+                <!-- Meetings Panel -->
+                <section class="panel" id="meetings-panel">
+                    <div class="panel-header">
+                        <h2>Research Meetings</h2>
+                        <div class="meetings-controls">
+                            <select id="meetingFilter">
+                                <option value="">All Meetings</option>
+                                <option value="individual">Individual Meetings</option>
+                                <option value="team">Team Meetings</option>
+                                <option value="review">Review Meetings</option>
+                            </select>
+                            <button class="btn btn-ghost" id="clearMeetingsBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportMeetingsBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="meetings-list" id="meetingsStatsList">
+                    </div>
+                </section>
+
+                <!-- History Panel -->
+                <section class="panel" id="history-panel">
+                    <div class="panel-header">
+                        <h2>Session History</h2>
+                        <div class="history-controls">
+                            <select id="sessionFilter">
+                                <option value="">All Sessions</option>
+                                <option value="recent">Recent (24h)</option>
+                                <option value="week">This Week</option>
+                                <option value="month">This Month</option>
+                            </select>
+                            <button class="btn btn-ghost" id="clearHistoryBtn">
+                                <i class="fas fa-trash"></i>
+                                Clear
+                            </button>
+                            <button class="btn btn-ghost" id="exportHistoryBtn">
+                                <i class="fas fa-download"></i>
+                                Export
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="history-list" id="historyList">
+                        <div class="session-list" id="sessionList">
+                            <!-- Sessions will be loaded here -->
+                        </div>
+                        <div class="history-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Total Sessions:</span>
+                                <span class="stat-value" id="totalSessionsCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Active Sessions:</span>
+                                <span class="stat-value" id="activeSessionsCount">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Completed Sessions:</span>
+                                <span class="stat-value" id="completedSessionsCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Metrics Panel -->
+                <section class="panel" id="metrics-panel">
+                    <div class="panel-header">
+                        <h2>Performance Metrics</h2>
+                        <div class="metrics-controls">
+                            <select id="metricsTimeframe">
+                                <option value="session">Current Session</option>
+                                <option value="24h">Last 24 Hours</option>
+                                <option value="7d">Last 7 Days</option>
+                                <option value="30d">Last 30 Days</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="metrics-grid">
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>System Performance</h3>
+                                <i class="fas fa-server"></i>
+                            </div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="cpuUsage">0%</div>
+                                <div class="metric-label">CPU Usage</div>
+                                <div class="metric-chart" id="cpuChart"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Research Sessions</h3>
+                                <i class="fas fa-flask"></i>
+                            </div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="totalSessions">0</div>
+                                <div class="metric-label">Total Sessions</div>
+                                <div class="metric-sub">
+                                    <span id="successfulSessions">0</span> successful
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Agent Performance</h3>
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="avgAgentScore">0.0</div>
+                                <div class="metric-label">Avg Quality Score</div>
+                                <div class="metric-sub">
+                                    <span id="activeAgentsCount">0</span> agents active
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="metric-card">
+                            <div class="metric-header">
+                                <h3>Research Quality</h3>
+                                <i class="fas fa-star"></i>
+                            </div>
+                            <div class="metric-content">
+                                <div class="metric-value" id="avgQualityScore">0.0</div>
+                                <div class="metric-label">Quality Rating</div>
+                                <div class="metric-sub">
+                                    <span id="criticalIssues">0</span> critical issues
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Meetings Stats Panel -->
+                <section class="panel" id="meetings-stats-panel">
+                    <div class="panel-header">
+                        <h2>Research Meetings</h2>
+                        <div class="meetings-stats">
+                            <span class="stat">
+                                <span class="stat-value" id="totalMeetings">0</span>
+                                <span class="stat-label">Total Meetings</span>
+                            </span>
+                            <span class="stat">
+                                <span class="stat-value" id="avgMeetingDuration">0m</span>
+                                <span class="stat-label">Avg Duration</span>
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div class="meetings-container">
+                        <div class="meetings-list" id="meetingsList">
+                            <!-- Meeting entries will be populated here -->
+                        </div>
+                        
+                        <div class="meeting-details" id="meetingDetails">
+                            <h3>Select a meeting to view details</h3>
+                            <p>Click on any meeting above to see detailed information about the discussion, participants, and outcomes.</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="btn btn-ghost" id="closeSettingsBtn">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <div class="settings-section">
+                        <h3>API Configuration</h3>
+                        <div class="api-keys-grid">
+                            <div class="form-group">
+                                <label for="openaiKey">OpenAI API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="openaiKey" placeholder="sk-...">
+                                    <button class="btn btn-ghost toggle-key" data-target="openaiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="openai">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="openaiStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="anthropicKey">Anthropic API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="anthropicKey" placeholder="sk-ant-...">
+                                    <button class="btn btn-ghost toggle-key" data-target="anthropicKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="anthropic">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="anthropicStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="geminiKey">Google Gemini API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="geminiKey" placeholder="AIza...">
+                                    <button class="btn btn-ghost toggle-key" data-target="geminiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="gemini">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="geminiStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="huggingfaceKey">HuggingFace API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="huggingfaceKey" placeholder="hf_...">
+                                    <button class="btn btn-ghost toggle-key" data-target="huggingfaceKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="huggingface">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="huggingfaceStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="ollamaEndpoint">Ollama Endpoint</label>
+                                <div class="key-input">
+                                    <input type="text" id="ollamaEndpoint" placeholder="http://localhost:11434">
+                                    <button class="btn btn-ghost test-key" data-provider="ollama">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="ollamaStatus"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="provider-selection">
+                            <h4>Default LLM Provider</h4>
+                            <div class="form-group">
+                                <label for="defaultProvider">Primary Provider</label>
+                                <select id="defaultProvider">
+                                    <option value="openai">OpenAI (GPT-4)</option>
+                                    <option value="anthropic">Anthropic (Claude)</option>
+                                    <option value="gemini">Google (Gemini)</option>
+                                    <option value="huggingface">HuggingFace</option>
+                                    <option value="ollama">Ollama (Local)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="defaultModel">Default Model</label>
+                                <input type="text" id="defaultModel" placeholder="gpt-4" value="gpt-4">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>Search API Configuration</h3>
+                        <div class="search-keys-grid">
+                            <div class="form-group">
+                                <label for="googleSearchKey">Google Search API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="googleSearchKey" placeholder="AIza...">
+                                    <button class="btn btn-ghost toggle-key" data-target="googleSearchKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="google_search">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="googleSearchStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="googleSearchEngineId">Google Search Engine ID</label>
+                                <div class="key-input">
+                                    <input type="text" id="googleSearchEngineId" placeholder="012345678901234567890:abcdefghijk">
+                                    <button class="btn btn-ghost test-key" data-provider="google_search_engine">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="googleSearchEngineStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="serpapiKey">SerpAPI Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="serpapiKey" placeholder="...">
+                                    <button class="btn btn-ghost toggle-key" data-target="serpapiKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="serpapi">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="serpapiStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="semanticScholarKey">Semantic Scholar API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="semanticScholarKey" placeholder="...">
+                                    <button class="btn btn-ghost toggle-key" data-target="semanticScholarKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="semantic_scholar">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="semanticScholarStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="openalexEmail">OpenAlex Email</label>
+                                <div class="key-input">
+                                    <input type="email" id="openalexEmail" placeholder="your@email.com">
+                                    <button class="btn btn-ghost test-key" data-provider="openalex">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="openalexStatus"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="coreKey">CORE API Key</label>
+                                <div class="key-input">
+                                    <input type="password" id="coreKey" placeholder="...">
+                                    <button class="btn btn-ghost toggle-key" data-target="coreKey">
+                                        <i class="fas fa-eye"></i>
+                                    </button>
+                                    <button class="btn btn-ghost test-key" data-provider="core">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </div>
+                                <div class="key-status" id="coreStatus"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="free-options">
+                            <h4>Free Options</h4>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enableFreeSearch" checked>
+                                    Enable free search (uses mock data when APIs unavailable)
+                                </label>
+                            </div>
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" id="enableMockResponses" checked>
+                                    Enable mock responses for testing
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-section">
+                        <h3>System Configuration</h3>
+                        <div class="form-group">
+                            <label for="outputDir">Output Directory</label>
+                            <input type="text" id="outputDir" value="output" placeholder="output">
+                        </div>
+                        <div class="form-group">
+                            <label for="maxConcurrentAgents">Max Concurrent Agents</label>
+                            <input type="number" id="maxConcurrentAgents" value="8" min="1" max="20">
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="autoSaveResults">
+                                Auto-save results
+                            </label>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="enableNotifications">
+                                Enable notifications
+                            </label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancelSettingsBtn">Cancel</button>
+                    <button class="btn btn-primary" id="saveSettingsBtn">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="notifications-container" id="notificationsContainer">
+            <!-- Notifications will be added here dynamically -->
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="app.js"></script>
+    
+    <!-- Fallback for JavaScript errors -->
+    <script>
+        // Check if the app initialized properly after 5 seconds
+        setTimeout(() => {
+            if (!window.aiResearchLab) {
+                console.error('AI Research Lab App failed to initialize');
+                const container = document.getElementById('notificationsContainer');
+                if (container) {
+                    const notification = document.createElement('div');
+                    notification.className = 'notification error';
+                    notification.innerHTML = `
+                        <div class="notification-header">
+                            <span class="notification-title">Initialization Failed</span>
+                            <button class="notification-close">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="notification-message">The application failed to initialize. Please check the browser console for errors.</div>
+                    `;
+                    container.appendChild(notification);
+                    setTimeout(() => notification.classList.add('show'), 100);
+                }
+            }
+        }, 5000);
+        
+        // Test function for web UI
+        function testWebUI() {
+            const container = document.getElementById('notificationsContainer');
+            if (container) {
+                const notification = document.createElement('div');
+                notification.className = 'notification success';
+                notification.innerHTML = `
+                    <div class="notification-header">
+                        <span class="notification-title">UI Test</span>
+                        <button class="notification-close">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="notification-message">Web UI is working correctly!</div>
+                `;
+                container.appendChild(notification);
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+        }
+    </script>
+</body>
+</html>
