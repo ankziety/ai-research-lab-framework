@@ -440,7 +440,7 @@ class PhysicsDatabaseConnector:
             url,
             headers=db_conn.headers,
             timeout=db_conn.timeout,
-            params=params if 'params' in locals() else None
+            params=params
         )
         
         if response.status_code == 200:
