@@ -20,14 +20,14 @@ from pathlib import Path
 import logging
 
 # Import the new multi-agent framework
-from multi_agent_framework import MultiAgentResearchFramework
+from .multi_agent_framework import MultiAgentResearchFramework
 
 # Import legacy components for backward compatibility
-from manuscript_drafter import draft as draft_manuscript
-from literature_retriever import LiteratureRetriever
-from critic import Critic
-from results_visualizer import visualize as visualize_results
-from specialist_registry import SpecialistRegistry
+from ..data.manuscript_drafter import draft as draft_manuscript
+from ..data.literature_retriever import LiteratureRetriever
+from ..data.critic import Critic
+from ..data.results_visualizer import visualize as visualize_results
+from ..data.specialist_registry import SpecialistRegistry
 from experiments.experiment import ExperimentRunner
 
 # Configure logging

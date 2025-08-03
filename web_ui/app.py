@@ -26,9 +26,9 @@ from pathlib import Path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from ai_research_lab import create_framework
-from virtual_lab import ResearchPhase, MeetingRecord, MeetingAgenda
-from multi_agent_framework import MultiAgentResearchFramework
+from ..core.ai_research_lab import create_framework
+from ..core.virtual_lab import ResearchPhase, MeetingRecord, MeetingAgenda
+from ..core.multi_agent_framework import MultiAgentResearchFramework
 from data_manager import DataManager
 from data_migration import DataMigration
 

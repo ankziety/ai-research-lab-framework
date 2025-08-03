@@ -19,7 +19,7 @@ import hashlib
 from dataclasses import dataclass
 
 from .base_tool import BaseTool
-from cost_manager import CostManager
+from ..data.cost_manager import CostManager
 
 logger = logging.getLogger(__name__)
 

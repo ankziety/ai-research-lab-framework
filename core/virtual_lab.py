@@ -593,7 +593,7 @@ class VirtualLabMeetingSystem:
         if isinstance(meeting_result, dict) and meeting_result.get('success'):
             # Perform actual literature search
             try:
-                from literature_retriever import LiteratureRetriever
+                from ..data.literature_retriever import LiteratureRetriever
                 literature_retriever = LiteratureRetriever(config=self.config)
                 search_results = literature_retriever.search(
                     query=research_question,

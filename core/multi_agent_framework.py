@@ -21,16 +21,16 @@ from agents.base_agent import BaseAgent
 from memory import VectorDatabase, ContextManager, KnowledgeRepository
 
 # Import Virtual Lab meeting system
-from virtual_lab import VirtualLabMeetingSystem
+from .virtual_lab import VirtualLabMeetingSystem
 
 # Import cost management
-from cost_manager import CostManager
+from ..data.cost_manager import CostManager
 
 # Import original framework components for backward compatibility
-from manuscript_drafter import draft as draft_manuscript
-from literature_retriever import LiteratureRetriever
-from critic import Critic
-from results_visualizer import visualize as visualize_results
+from ..data.manuscript_drafter import draft as draft_manuscript
+from ..data.literature_retriever import LiteratureRetriever
+from ..data.critic import Critic
+from ..data.results_visualizer import visualize as visualize_results
 from experiments.experiment import ExperimentRunner
 
 logger = logging.getLogger(__name__)
