@@ -126,6 +126,56 @@ class ComputationalPhysicsAgent(BasePhysicsAgent):
         Returns:
             Simulation results including trajectories, energies, and analysis
         """
+        # Try using physics tools first for enhanced capabilities
+        if self.physics_tools_available:
+            try:
+                # Prepare parameters for computational physics tool
+                md_params = {
+                    'type': 'molecular_dynamics',
+                    'system_config': system_config,
+                    'simulation_parameters': {
+                        'n_particles': system_config.get('n_particles', 100),
+                        'n_steps': system_config.get('n_steps', 1000),
+                        'time_step': system_config.get('time_step', 0.001),
+                        'algorithm': system_config.get('algorithm', 'velocity_verlet'),
+                        'potential': system_config.get('potential', 'lennard_jones')
+                    }
+                }
+                
+                # Use computational physics tool with engine integration (if available)
+                # Note: 'computational_physics_tool' may not exist, so this will fallback gracefully
+                tool_result = self.use_physics_tool('computational_physics_tool', md_params)
+                
+                if tool_result.get('success', False):
+                    logger.info(f"MD simulation using {tool_result.get('method', 'physics tool')}")
+                    
+                    # Convert tool result to expected format
+                    simulation_result = {
+                        'success': True,
+                        'simulation_type': 'molecular_dynamics',
+                        'trajectory': tool_result.get('trajectory', []),
+                        'energies': tool_result.get('energies', {'kinetic': [], 'potential': [], 'total': []}),
+                        'temperature': tool_result.get('temperature', []),
+                        'pressure': tool_result.get('pressure', []),
+                        'analysis': tool_result.get('analysis', {}),
+                        'computational_cost': tool_result.get('computational_cost', {}),
+                        'engine_enhanced': tool_result.get('engine_enhanced', False),
+                        'computational_method': tool_result.get('method', 'unknown'),
+                        'precision': tool_result.get('precision', 'standard'),
+                        'n_particles': system_config.get('n_particles', 100),
+                        'n_steps': system_config.get('n_steps', 1000),
+                        'time_step': system_config.get('time_step', 0.001),
+                        'algorithm': system_config.get('algorithm', 'velocity_verlet'),
+                        'potential': system_config.get('potential', 'lennard_jones')
+                    }
+                    
+                    self.physics_metrics['simulations_run'] += 1
+                    return simulation_result
+                
+            except Exception as e:
+                logger.debug(f"Physics tools failed for MD simulation: {e}")
+        
+        # Fallback to legacy implementation
         simulation_result = {
             'success': False,
             'simulation_type': 'molecular_dynamics',
@@ -134,7 +184,9 @@ class ComputationalPhysicsAgent(BasePhysicsAgent):
             'temperature': [],
             'pressure': [],
             'analysis': {},
-            'computational_cost': {}
+            'computational_cost': {},
+            'engine_enhanced': False,
+            'computational_method': 'legacy_numerical'
         }
         
         try:
@@ -165,10 +217,12 @@ class ComputationalPhysicsAgent(BasePhysicsAgent):
                 'n_steps': n_steps,
                 'time_step': dt,
                 'algorithm': algorithm,
-                'potential': potential
+                'potential': potential,
+                'engine_enhanced': False,
+                'computational_method': 'legacy_numerical'
             })
             
-            self.computational_metrics['simulations_run'] += 1
+            self.physics_metrics['simulations_run'] += 1
             
         except Exception as e:
             simulation_result['error'] = str(e)

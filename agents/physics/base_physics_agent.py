@@ -15,6 +15,20 @@ from ..base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
+# Import physics tools and engine integration
+try:
+    from tools.physics import (
+        PhysicsToolRegistry,
+        get_physics_engine_adapter,
+        validate_integration
+    )
+    PHYSICS_TOOLS_AVAILABLE = True
+except ImportError:
+    PHYSICS_TOOLS_AVAILABLE = False
+    logger.warning("Physics tools not available - agents will use fallback methods")
+
+logger = logging.getLogger(__name__)
+
 
 class PhysicsScale(Enum):
     """Physical scales for cross-scale phenomena handling."""
@@ -70,13 +84,32 @@ class BasePhysicsAgent(BaseAgent, ABC):
         self.physics_tools_cache = {}
         self.physics_knowledge_base = {}
         
+        # Physics tools and engine integration
+        self.physics_tools_available = PHYSICS_TOOLS_AVAILABLE
+        self.physics_tool_registry = None
+        self.physics_engine_adapter = None
+        self.engine_enhanced_tools = {}
+        
+        # Initialize physics tools integration if available
+        if self.physics_tools_available:
+            try:
+                self.physics_tool_registry = PhysicsToolRegistry()
+                self.physics_engine_adapter = get_physics_engine_adapter()
+                self._discover_physics_tools()
+                logger.info(f"Physics tools integration enabled for {agent_id}")
+            except Exception as e:
+                logger.warning(f"Physics tools integration failed for {agent_id}: {e}")
+                self.physics_tools_available = False
+        
         # Performance tracking for physics tasks
         self.physics_metrics = {
             'equations_solved': 0,
             'simulations_run': 0,
             'experiments_designed': 0,
             'theories_validated': 0,
-            'discoveries_made': 0
+            'discoveries_made': 0,
+            'tools_used': 0,
+            'engine_enhanced_calculations': 0
         }
         
         logger.info(f"Physics Agent {self.agent_id} ({self.physics_domain}) initialized")
@@ -111,6 +144,105 @@ class BasePhysicsAgent(BaseAgent, ABC):
         """
         pass
     
+    def _discover_physics_tools(self) -> None:
+        """
+        Discover and initialize physics tools relevant to this agent's domain.
+        """
+        if not self.physics_tools_available or not self.physics_tool_registry:
+            return
+        
+        try:
+            # Get tools relevant to this agent's domain using correct method signature
+            domain_tools = self.physics_tool_registry.get_physics_tools_by_domain(
+                domain=self.physics_domain, 
+                include_subdomain=True,
+                engine_preference=None  # Include both engine and fallback tools
+            )
+            
+            # Initialize engine-enhanced tools
+            for tool in domain_tools:
+                tool_name = tool.tool_id
+                try:
+                    # Store the tool directly since we already have the instance
+                    self.engine_enhanced_tools[tool_name] = tool
+                    logger.debug(f"Initialized physics tool: {tool_name}")
+                except Exception as e:
+                    logger.debug(f"Could not register tool {tool_name}: {e}")
+            
+            logger.info(f"Discovered {len(self.engine_enhanced_tools)} physics tools for {self.physics_domain}")
+            
+        except Exception as e:
+            logger.warning(f"Physics tools discovery failed: {e}")
+    
+    def use_physics_tool(self, tool_name: str, parameters: Dict[str, Any], 
+                        context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Use a physics tool with engine enhancement when available.
+        
+        Args:
+            tool_name: Name of the physics tool to use
+            parameters: Tool parameters
+            context: Optional execution context
+            
+        Returns:
+            Tool execution result with enhanced capabilities when engines available
+        """
+        if not self.physics_tools_available:
+            return self._fallback_physics_calculation(tool_name, parameters)
+        
+        try:
+            # Try engine-enhanced tool first
+            if tool_name in self.engine_enhanced_tools:
+                tool = self.engine_enhanced_tools[tool_name]
+                result = tool.execute(parameters, context or {})
+                
+                # Track usage
+                self.physics_metrics['tools_used'] += 1
+                if result.get('engine_enhanced', False):
+                    self.physics_metrics['engine_enhanced_calculations'] += 1
+                
+                logger.info(f"Used physics tool {tool_name}")
+                return result
+            
+            # Fallback to registry tool request with correct signature
+            tool_result = self.physics_tool_registry.request_physics_tool(
+                agent_id=self.agent_id,
+                tool_id=tool_name,
+                task_specification=parameters,
+                context=context or {}
+            )
+            
+            if tool_result is not None:
+                result = tool_result.execute(parameters, context or {})
+                self.physics_metrics['tools_used'] += 1
+                
+                logger.info(f"Used physics tool {tool_name}")
+                return result
+            
+        except Exception as e:
+            logger.warning(f"Physics tool {tool_name} failed: {e}")
+        
+        return self._fallback_physics_calculation(tool_name, parameters)
+    
+    def _fallback_physics_calculation(self, calculation_type: str, 
+                                    parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Fallback physics calculation when tools/engines are unavailable.
+        
+        Args:
+            calculation_type: Type of calculation
+            parameters: Calculation parameters
+            
+        Returns:
+            Fallback calculation result
+        """
+        return {
+            'success': False,
+            'error': f"Physics tools unavailable for {calculation_type}",
+            'fallback_used': True,
+            'suggestion': "Install physics tools and engines for enhanced capabilities"
+        }
+    
     def discover_available_tools(self, research_question: str) -> List[Dict[str, Any]]:
         """
         Discover physics tools available for research.
@@ -129,11 +261,42 @@ class BasePhysicsAgent(BaseAgent, ABC):
         # Get base tools from parent class
         base_tools = super().discover_available_tools(research_question)
         
-        # Add physics-specific tool discovery
-        physics_tools = self._discover_physics_specific_tools(research_question)
+        # Add physics tools integration
+        physics_tools = []
+        if self.physics_tools_available and self.physics_tool_registry:
+            try:
+                # Use the physics tool discovery method with correct signature
+                discovered_tools = self.physics_tool_registry.discover_physics_tools(
+                    agent_id=self.agent_id,
+                    research_question=research_question,
+                    physics_domain=self.physics_domain,
+                    prefer_engines=True
+                )
+                
+                # Convert to tool format with physics-specific information
+                for tool_info in discovered_tools:
+                    physics_tool = {
+                        'name': tool_info.get('tool_id', tool_info.get('name', 'unknown')),
+                        'type': 'physics_tool',
+                        'confidence': tool_info.get('relevance_score', 0.8),
+                        'physics_specific': True,
+                        'engine_enhanced': tool_info.get('engine_enhanced', False),
+                        'domain': self.physics_domain,
+                        'capabilities': tool_info.get('capabilities', []),
+                        'computational_level': tool_info.get('computational_level', 'standard')
+                    }
+                    physics_tools.append(physics_tool)
+                
+                logger.info(f"Found {len(physics_tools)} physics tools for research")
+                
+            except Exception as e:
+                logger.warning(f"Physics tools discovery failed: {e}")
         
-        # Combine and score tools
-        all_tools = base_tools + physics_tools
+        # Add legacy physics-specific tool discovery
+        legacy_physics_tools = self._discover_physics_specific_tools(research_question)
+        
+        # Combine all tools
+        all_tools = base_tools + physics_tools + legacy_physics_tools
         
         # Apply physics-specific scoring
         scored_tools = self._score_tools_for_physics(all_tools, research_question)
@@ -141,7 +304,7 @@ class BasePhysicsAgent(BaseAgent, ABC):
         # Cache results
         self.physics_tools_cache[cache_key] = scored_tools
         
-        logger.info(f"Physics agent {self.agent_id} discovered {len(scored_tools)} tools")
+        logger.info(f"Physics agent {self.agent_id} discovered {len(scored_tools)} total tools")
         return scored_tools
     
     def optimize_tool_usage(self, research_question: str, 
@@ -674,3 +837,34 @@ class BasePhysicsAgent(BaseAgent, ABC):
                 requirements.append(scale)
         
         return requirements
+    
+    def get_physics_integration_status(self) -> Dict[str, Any]:
+        """
+        Get the current physics tools and engine integration status.
+        
+        Returns:
+            Dictionary with integration status information
+        """
+        return {
+            'physics_tools_available': self.physics_tools_available,
+            'physics_domain': self.physics_domain,
+            'engine_enhanced_tools': list(self.engine_enhanced_tools.keys()),
+            'total_enhanced_tools': len(self.engine_enhanced_tools),
+            'physics_metrics': self.physics_metrics.copy(),
+            'scales_supported': [scale.value for scale in self.physics_scales],
+            'methodologies_supported': [method.value for method in self.physics_methodologies],
+            'integration_health': self._check_integration_health()
+        }
+    
+    def _check_integration_health(self) -> str:
+        """Check the health status of physics integration."""
+        if not self.physics_tools_available:
+            return "physics_tools_unavailable"
+        
+        if not self.physics_tool_registry:
+            return "registry_unavailable"
+        
+        if len(self.engine_enhanced_tools) == 0:
+            return "no_enhanced_tools"
+        
+        return "healthy"

@@ -131,6 +131,45 @@ class QuantumPhysicsAgent(BasePhysicsAgent):
         Returns:
             Solution including energy levels, wave functions, and analysis
         """
+        # Try using physics tools first for enhanced accuracy
+        if self.physics_tools_available:
+            try:
+                # Prepare parameters for quantum chemistry tool
+                quantum_params = {
+                    'type': 'schrodinger_equation',
+                    'system': system_type,
+                    'parameters': parameters,
+                    'method': 'variational' if system_type in ['hydrogen_atom', 'harmonic_oscillator'] else 'numerical'
+                }
+                
+                # Use quantum chemistry tool with engine integration
+                tool_result = self.use_physics_tool('quantum_chemistry_tool', quantum_params)
+                
+                if tool_result.get('success', False):
+                    logger.info(f"Solved Schrödinger equation using {tool_result.get('method', 'physics tool')}")
+                    
+                    # Convert tool result to expected format
+                    result = {
+                        'success': True,
+                        'system_type': system_type,
+                        'energy_levels': tool_result.get('energy_levels', []),
+                        'wave_functions': tool_result.get('wave_functions', []),
+                        'quantum_numbers': tool_result.get('quantum_numbers', {}),
+                        'probability_distributions': tool_result.get('probability_distributions', {}),
+                        'expectation_values': tool_result.get('expectation_values', {}),
+                        'uncertainties': tool_result.get('uncertainties', {}),
+                        'engine_enhanced': tool_result.get('engine_enhanced', False),
+                        'computational_method': tool_result.get('method', 'unknown'),
+                        'accuracy': tool_result.get('accuracy', 'standard')
+                    }
+                    
+                    self.physics_metrics['equations_solved'] += 1
+                    return result
+                
+            except Exception as e:
+                logger.debug(f"Physics tools failed for Schrödinger equation: {e}")
+        
+        # Fallback to legacy implementation
         result = {
             'success': False,
             'system_type': system_type,
@@ -139,7 +178,9 @@ class QuantumPhysicsAgent(BasePhysicsAgent):
             'quantum_numbers': {},
             'probability_distributions': {},
             'expectation_values': {},
-            'uncertainties': {}
+            'uncertainties': {},
+            'engine_enhanced': False,
+            'computational_method': 'analytical_approximation'
         }
         
         try:
@@ -155,6 +196,8 @@ class QuantumPhysicsAgent(BasePhysicsAgent):
                 result = self._solve_general_system(system_type, parameters)
             
             result['success'] = True
+            result['engine_enhanced'] = False
+            result['computational_method'] = 'analytical_approximation'
             self.physics_metrics['equations_solved'] += 1
             
         except Exception as e:
