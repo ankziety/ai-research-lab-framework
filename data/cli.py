@@ -12,8 +12,15 @@ import sys
 from pathlib import Path
 from typing import Dict, Any
 
-from ..core.ai_research_lab import create_framework
-from ..core.virtual_lab import MeetingRecord, MeetingAgenda
+# Import framework components - make conditional to avoid circular imports
+try:
+    from core.ai_research_lab import create_framework
+    from core.virtual_lab import MeetingRecord, MeetingAgenda
+except ImportError:
+    # Handle case where imports fail due to circular dependencies
+    create_framework = None
+    MeetingRecord = None
+    MeetingAgenda = None
 
 
 def make_json_serializable(obj: Any) -> Any:
