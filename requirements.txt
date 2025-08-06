@@ -17,6 +17,9 @@ anthropic>=0.7.0  # For Claude models
 google-api-python-client>=2.0.0  # For Google Search API
 serpapi>=0.1.0  # For Google Scholar via SerpAPI (optional)
 
-# Optional: For better embedding models and GPU support
-# faiss-gpu>=1.7.0  # For GPU-accelerated FAISS (optional)
-# torch>=1.11.0  # Required by sentence-transformers
+# Real Accuracy Evaluation System Dependencies
+torch>=1.11.0  # PyTorch for deep learning models
+torchmetrics>=0.11.0  # PyTorch metrics for evaluation
+scikit-learn>=1.0.0  # For traditional ML models and metrics
+langchain>=0.1.0  # For NLP evaluation (optional)
+langchain-openai>=0.1.0  # For OpenAI integration with LangChain

@@ -24,13 +24,13 @@ from memory import VectorDatabase, ContextManager, KnowledgeRepository
 from .virtual_lab import VirtualLabMeetingSystem
 
 # Import cost management
-from ..data.cost_manager import CostManager
+from data.cost_manager import CostManager
 
 # Import original framework components for backward compatibility
-from ..data.manuscript_drafter import draft as draft_manuscript
-from ..data.literature_retriever import LiteratureRetriever
-from ..data.critic import Critic
-from ..data.results_visualizer import visualize as visualize_results
+from data.manuscript_drafter import draft as draft_manuscript
+from data.literature_retriever import LiteratureRetriever
+from data.critic import Critic
+from data.results_visualizer import visualize as visualize_results
 from experiments.experiment import ExperimentRunner
 
 logger = logging.getLogger(__name__)
