@@ -26,6 +26,7 @@ from enum import Enum
 
 from agents import PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
 from agents.base_agent import BaseAgent
+from data.literature_retriever import LiteratureRetriever
 
 logger = logging.getLogger(__name__)
 
@@ -593,7 +594,6 @@ class VirtualLabMeetingSystem:
         if isinstance(meeting_result, dict) and meeting_result.get('success'):
             # Perform actual literature search
             try:
-                from ..data.literature_retriever import LiteratureRetriever
                 literature_retriever = LiteratureRetriever(config=self.config)
                 search_results = literature_retriever.search(
                     query=research_question,

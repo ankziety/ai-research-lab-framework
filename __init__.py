@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 AI Research Lab Framework
 
@@ -5,73 +6,56 @@ A comprehensive multi-agent research framework for conducting AI-powered researc
 """
 
 __version__ = "1.0.0"
-__author__ = "AI Research Lab Team"
+__author__ = "Expression Neuroscience Institute"
 
 # Core framework components
-from .core import MultiAgentResearchFramework, create_framework, VirtualLabMeetingSystem, AIResearchLab
+try:
+    from .core import MultiAgentResearchFramework, create_framework, VirtualLabMeetingSystem, AIResearchLab
+    from .agents import AgentMarketplace, BaseAgent, DomainExpert, LLMClient, PrincipalInvestigator, ScientificCritic
+    from .tools import (
+        AccuracyEvaluator, AnalysisTool, BaseTool, CollaborationTool, 
+        DynamicToolBuilder, ExperimentalTool, GenericTool, LiteratureTool, ToolRegistry
+    )
+    from .data import (
+        CLI, CostManager, Critic, LiteratureRetriever, ManuscriptDrafter, 
+        ResultsVisualizer, SpecialistRegistry
+    )
+    from .memory import ContextManager, KnowledgeRepository, VectorDatabase
+    from .experiments import Experiment
+except ImportError:
+    # Handle case where this module is imported directly (e.g., by pytest)
+    # In this case, we can't use relative imports, so we'll just define the version
+    pass
 
-# Data management components
-from .data import (
-    LiteratureRetriever,
-    CostManager,
-    CLI,
-    ResultsVisualizer,
-    SpecialistRegistry,
-    ManuscriptDrafter,
-    Critic
-)
-
-# Agent system
-from .agents import BaseAgent, PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
-
-# Memory system
-from .memory import VectorDatabase, ContextManager, KnowledgeRepository
-
-# Tools system
-from .tools import ToolRegistry, BaseTool
-
-# Experiments
-from .experiments import ExperimentRunner
-
-# Convenience functions
-def draft_manuscript(results, context):
-    """Draft a manuscript from research results."""
-    drafter = ManuscriptDrafter()
-    return drafter.draft(results, context)
-
-def visualize_results(results, out_path):
-    """Visualize research results."""
-    visualizer = ResultsVisualizer()
-    return visualizer.visualize(results, out_path)
-
-# Main framework creation
-def create_research_framework(config=None):
-    """Create a new research framework instance."""
-    return create_framework(config)
-
+# Export main components for easy access
 __all__ = [
     'MultiAgentResearchFramework',
-    'create_framework',
-    'create_research_framework',
+    'create_framework', 
     'VirtualLabMeetingSystem',
     'AIResearchLab',
-    'LiteratureRetriever',
-    'CostManager',
+    'AgentMarketplace',
+    'BaseAgent',
+    'DomainExpert',
+    'LLMClient',
+    'PrincipalInvestigator',
+    'ScientificCritic',
+    'AccuracyEvaluator',
+    'AnalysisTool',
+    'BaseTool',
+    'CollaborationTool',
+    'DynamicToolBuilder',
+    'ExperimentalTool',
+    'GenericTool',
+    'LiteratureTool',
+    'ToolRegistry',
     'CLI',
+    'CostManager',
+    'Critic',
+    'LiteratureRetriever',
+    'ManuscriptDrafter',
     'ResultsVisualizer',
     'SpecialistRegistry',
-    'ManuscriptDrafter',
-    'Critic',
-    'BaseAgent',
-    'PrincipalInvestigatorAgent',
-    'ScientificCriticAgent',
-    'AgentMarketplace',
-    'VectorDatabase',
     'ContextManager',
     'KnowledgeRepository',
-    'ToolRegistry',
-    'BaseTool',
-    'ExperimentRunner',
-    'draft_manuscript',
-    'visualize_results'
+    'VectorDatabase',
 ]
