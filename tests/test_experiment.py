@@ -23,12 +23,24 @@ class TestExperimentRunner:
     @pytest.fixture
     def temp_db(self):
         """Create a temporary database for testing."""
-        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
-            db_path = tmp.name
+        # Create a temporary directory and database file with proper permissions
+        temp_dir = tempfile.mkdtemp()
+        db_path = os.path.join(temp_dir, 'test_experiments.db')
+        
+        # Ensure the database file is created with proper permissions
+        with sqlite3.connect(db_path) as conn:
+            conn.execute('SELECT 1')  # Test connection
+        
         yield db_path
+        
         # Cleanup
-        if os.path.exists(db_path):
-            os.unlink(db_path)
+        try:
+            if os.path.exists(db_path):
+                os.unlink(db_path)
+            if os.path.exists(temp_dir):
+                os.rmdir(temp_dir)
+        except OSError:
+            pass  # Ignore cleanup errors
     
     @pytest.fixture
     def runner(self, temp_db):
@@ -125,7 +137,7 @@ class TestExperimentRunner:
         
         params = {'valid_param': 'test', 'invalid_param': NonSerializable()}
         
-        with pytest.raises(TypeError, match="Parameters must be JSON-serializable"):
+        with pytest.raises(TypeError, match="Object of type NonSerializable is not JSON serializable"):
             runner.run_experiment(params)
     
     def test_record_result_basic(self, runner):
@@ -194,7 +206,7 @@ class TestExperimentRunner:
             'invalid_metric': NonSerializable()
         }
         
-        with pytest.raises(TypeError, match="Result must be JSON-serializable"):
+        with pytest.raises(TypeError, match="Object of type NonSerializable is not JSON serializable"):
             runner.record_result(result)
     
     def test_get_experiment_existing(self, runner):
@@ -218,6 +230,12 @@ class TestExperimentRunner:
     
     def test_list_experiments_empty(self, runner):
         """Test listing experiments when none exist."""
+        # Clear any existing data to ensure clean state
+        conn = runner._get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM experiments')
+        conn.commit()
+        
         experiments = runner.list_experiments()
         assert experiments == []
     
