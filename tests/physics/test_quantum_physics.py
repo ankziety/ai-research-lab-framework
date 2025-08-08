@@ -25,7 +25,7 @@ class MockQuantumPhysicsAgent:
     
     def solve_schrodinger_equation(self, hamiltonian: np.ndarray, 
                                  initial_state: Optional[np.ndarray] = None) -> Dict[str, Any]:
-        """Mock Schrödinger equation solver."""
+        """Mock Schrodinger equation solver."""
         eigenvalues, eigenvectors = np.linalg.eigh(hamiltonian)
         
         return {
