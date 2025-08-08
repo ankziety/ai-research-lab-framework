@@ -9,7 +9,7 @@ This package contains the main framework components including:
 
 from .multi_agent_framework import MultiAgentResearchFramework, create_framework
 from .virtual_lab import VirtualLabMeetingSystem
-from .ai_research_lab import AIResearchLab
+from .ai_research_lab import AIPoweredResearchFramework as AIResearchLab
 
 __all__ = [
     'MultiAgentResearchFramework',

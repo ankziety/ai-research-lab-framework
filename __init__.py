@@ -8,30 +8,54 @@ __version__ = "1.0.0"
 __author__ = "AI Research Lab Team"
 
 # Core framework components
-from .core import MultiAgentResearchFramework, create_framework, VirtualLabMeetingSystem, AIResearchLab
+try:
+    from core import MultiAgentResearchFramework, create_framework, VirtualLabMeetingSystem, AIResearchLab
+except ImportError:
+    from .core import MultiAgentResearchFramework, create_framework, VirtualLabMeetingSystem, AIResearchLab
 
 # Data management components
-from .data import (
-    LiteratureRetriever,
-    CostManager,
-    CLI,
-    ResultsVisualizer,
-    SpecialistRegistry,
-    ManuscriptDrafter,
-    Critic
-)
+try:
+    from data import (
+        LiteratureRetriever,
+        CostManager,
+        ResultsVisualizer,
+        SpecialistRegistry,
+        ManuscriptDrafter,
+        Critic
+    )
+except ImportError:
+    from .data import (
+        LiteratureRetriever,
+        CostManager,
+        ResultsVisualizer,
+        SpecialistRegistry,
+        ManuscriptDrafter,
+        Critic
+    )
 
 # Agent system
-from .agents import BaseAgent, PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
+try:
+    from agents import BaseAgent, PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
+except ImportError:
+    from .agents import BaseAgent, PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
 
 # Memory system
-from .memory import VectorDatabase, ContextManager, KnowledgeRepository
+try:
+    from memory import VectorDatabase, ContextManager, KnowledgeRepository
+except ImportError:
+    from .memory import VectorDatabase, ContextManager, KnowledgeRepository
 
 # Tools system
-from .tools import ToolRegistry, BaseTool
+try:
+    from tools import ToolRegistry, BaseTool
+except ImportError:
+    from .tools import ToolRegistry, BaseTool
 
 # Experiments
-from .experiments import ExperimentRunner
+try:
+    from experiments import ExperimentRunner
+except ImportError:
+    from .experiments import ExperimentRunner
 
 # Convenience functions
 def draft_manuscript(results, context):
@@ -57,7 +81,6 @@ __all__ = [
     'AIResearchLab',
     'LiteratureRetriever',
     'CostManager',
-    'CLI',
     'ResultsVisualizer',
     'SpecialistRegistry',
     'ManuscriptDrafter',

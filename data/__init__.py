@@ -13,16 +13,14 @@ This package contains data processing and management components including:
 
 from .literature_retriever import LiteratureRetriever
 from .cost_manager import CostManager
-from .cli import CLI
-from .results_visualizer import ResultsVisualizer
+from .results_visualizer import visualize as ResultsVisualizer
 from .specialist_registry import SpecialistRegistry
-from .manuscript_drafter import ManuscriptDrafter
+from .manuscript_drafter import draft as ManuscriptDrafter
 from .critic import Critic
 
 __all__ = [
     'LiteratureRetriever',
     'CostManager',
-    'CLI',
     'ResultsVisualizer',
     'SpecialistRegistry',
     'ManuscriptDrafter',

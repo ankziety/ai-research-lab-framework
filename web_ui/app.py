@@ -26,11 +26,22 @@ from pathlib import Path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
 
-from ..core.ai_research_lab import create_framework
-from ..core.virtual_lab import ResearchPhase, MeetingRecord, MeetingAgenda
-from ..core.multi_agent_framework import MultiAgentResearchFramework
-from data_manager import DataManager
-from data_migration import DataMigration
+# Use absolute imports instead of relative imports
+try:
+    from core.ai_research_lab import create_framework
+    from core.virtual_lab import ResearchPhase, MeetingRecord, MeetingAgenda
+    from core.multi_agent_framework import MultiAgentResearchFramework
+except ImportError:
+    # Fallback for when running as module
+    from ..core.ai_research_lab import create_framework
+    from ..core.virtual_lab import ResearchPhase, MeetingRecord, MeetingAgenda
+    from ..core.multi_agent_framework import MultiAgentResearchFramework
+try:
+    from .data_manager import DataManager
+    from .data_migration import DataMigration
+except ImportError:
+    from data_manager import DataManager
+    from data_migration import DataMigration
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

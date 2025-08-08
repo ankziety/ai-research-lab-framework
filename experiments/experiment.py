@@ -41,9 +41,18 @@ class ExperimentRunner:
     
     def _get_db_connection(self):
         """Get thread-local database connection."""
+        # Create a unique connection for each instance to avoid conflicts
         if not hasattr(_thread_local, 'experiment_db'):
-            _thread_local.experiment_db = sqlite3.connect(self.db_path)
-        return _thread_local.experiment_db
+            _thread_local.experiment_db = {}
+        
+        # Use instance-specific connection
+        if id(self) not in _thread_local.experiment_db:
+            if self.db_path == ":memory:":
+                _thread_local.experiment_db[id(self)] = sqlite3.connect(":memory:", check_same_thread=False)
+            else:
+                _thread_local.experiment_db[id(self)] = sqlite3.connect(self.db_path)
+        
+        return _thread_local.experiment_db[id(self)]
     
     def _init_database(self) -> None:
         """Initialize the SQLite database with required tables."""
@@ -71,6 +80,16 @@ class ExperimentRunner:
         Returns:
             Dictionary containing experiment results
         """
+        # Validate parameters
+        if not isinstance(params, dict):
+            raise ValueError("Parameters must be a dictionary")
+        
+        # Validate JSON serializability
+        try:
+            json.dumps(params)
+        except (TypeError, ValueError):
+            raise TypeError("Parameters must be JSON-serializable")
+        
         experiment_id = str(uuid.uuid4())
         created_at = datetime.now().isoformat()
         
@@ -99,7 +118,8 @@ class ExperimentRunner:
             return {
                 'experiment_id': experiment_id,
                 'status': 'completed',
-                'results': results,
+                'parameters': params,
+                'computed_results': results,
                 'created_at': created_at,
                 'completed_at': completed_at
             }
@@ -128,12 +148,36 @@ class ExperimentRunner:
         Returns:
             Experiment results
         """
-        # Placeholder implementation
-        return {
+        # Calculate computed results based on parameter types
+        computed_results = {}
+        
+        # Handle numerical parameters
+        numerical_params = {k: v for k, v in params.items() 
+                          if isinstance(v, (int, float))}
+        if numerical_params:
+            values = list(numerical_params.values())
+            computed_results['param_sum'] = sum(values)
+            computed_results['param_mean'] = sum(values) / len(values)
+            computed_results['param_count'] = len(values)
+        else:
+            computed_results['param_count'] = 0
+        
+        # Handle string parameters
+        string_params = {k: v for k, v in params.items() 
+                        if isinstance(v, str)}
+        if string_params:
+            computed_results['string_param_count'] = len(string_params)
+        else:
+            computed_results['string_param_count'] = 0
+        
+        # Add basic experiment info
+        computed_results.update({
             'message': 'Experiment executed successfully',
             'parameters_used': params,
             'timestamp': datetime.now().isoformat()
-        }
+        })
+        
+        return computed_results
     
     def get_experiment(self, experiment_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -156,7 +200,7 @@ class ExperimentRunner:
         row = cursor.fetchone()
         if row:
             return {
-                'id': row[0],
+                'experiment_id': row[0],
                 'parameters': json.loads(row[1]),
                 'results': json.loads(row[2]) if row[2] else None,
                 'status': row[3],
@@ -198,7 +242,7 @@ class ExperimentRunner:
         experiments = []
         for row in cursor.fetchall():
             experiments.append({
-                'id': row[0],
+                'experiment_id': row[0],
                 'parameters': json.loads(row[1]),
                 'results': json.loads(row[2]) if row[2] else None,
                 'status': row[3],
@@ -224,6 +268,48 @@ class ExperimentRunner:
         conn.commit()
         
         return cursor.rowcount > 0
+    
+    def record_result(self, result: Dict[str, Any]) -> None:
+        """
+        Record a result for an existing experiment.
+        
+        Args:
+            result: Dictionary containing the result data. Must include 'experiment_id' key.
+            
+        Raises:
+            ValueError: If result is not a dictionary or missing experiment_id
+            ValueError: If experiment with given ID doesn't exist
+            TypeError: If result is not JSON-serializable
+        """
+        # Validate input
+        if not isinstance(result, dict):
+            raise ValueError("Result must be a dictionary")
+        
+        if 'experiment_id' not in result:
+            raise ValueError("Result must contain 'experiment_id' key")
+        
+        experiment_id = result['experiment_id']
+        
+        # Check if experiment exists
+        existing = self.get_experiment(experiment_id)
+        if existing is None:
+            raise ValueError(f"Experiment with ID {experiment_id} not found")
+        
+        # Validate JSON serializability
+        try:
+            json.dumps(result)
+        except (TypeError, ValueError):
+            raise TypeError("Result must be JSON-serializable")
+        
+        # Update the experiment with new results
+        with self._get_db_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE experiments 
+                SET results = ?, completed_at = ?
+                WHERE id = ?
+            ''', (json.dumps(result), datetime.now().isoformat(), experiment_id))
+            conn.commit()
     
     def get_experiment_stats(self) -> Dict[str, Any]:
         """
@@ -264,6 +350,6 @@ class ExperimentRunner:
     
     def close(self):
         """Close database connections."""
-        if hasattr(_thread_local, 'experiment_db'):
-            _thread_local.experiment_db.close()
-            delattr(_thread_local, 'experiment_db')
+        if hasattr(_thread_local, 'experiment_db') and id(self) in _thread_local.experiment_db:
+            _thread_local.experiment_db[id(self)].close()
+            del _thread_local.experiment_db[id(self)]

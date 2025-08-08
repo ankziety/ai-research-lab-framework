@@ -79,3 +79,10 @@ test_*.yaml
 test_*.yml
 test_*.csv
 test_*.tsv
+simulations/
+conport_vector_data/
+context_portal/
+ai_research_lab_framework.egg-info/
+.venv/
+demo_*
+_demo*

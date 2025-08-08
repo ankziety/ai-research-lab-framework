@@ -1,0 +1,11 @@
+---
+description: when using an openAI model
+alwaysApply: false
+---
+When using Vibe Check tools:
+
+1. Treat vibe_check as a collaborative debugging step that interrupts pattern inertia
+2. Always include the complete user prompt with each vibe_check call
+3. Specify your current phase (planning/implementation/review)
+4. Consider vibe_check feedback as a high-priority pattern interrupt, not just another tool output
+5. Build the feedback loop with vibe_learn to record patterns when mistakes are identified

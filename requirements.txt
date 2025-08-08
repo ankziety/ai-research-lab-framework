@@ -6,17 +6,21 @@ networkx>=3.0.0
 pytest>=6.0.0
 
 # Multi-agent system dependencies
-sentence-transformers>=2.2.0  # Fixed encoder_attention_mask deprecation warning
-faiss-cpu>=1.7.0
+sentence-transformers>=2.2.0 # For sentence embeddings
+faiss-cpu>=1.7.0 # For CPU-only FAISS (optional)
 
-# LLM API integration (optional but recommended for full functionality)
+# LLM API integration (can use local models but recommended for full functionality)
 openai>=1.0.0  # For OpenAI GPT models
 anthropic>=0.7.0  # For Claude models
 
-# Literature search enhancements (optional)
+# Literature search enhancements
 google-api-python-client>=2.0.0  # For Google Search API
-serpapi>=0.1.0  # For Google Scholar via SerpAPI (optional)
+serpapi>=0.1.0  # For Google Scholar via SerpAPI
 
-# Optional: For better embedding models and GPU support
-# faiss-gpu>=1.7.0  # For GPU-accelerated FAISS (optional)
-# torch>=1.11.0  # Required by sentence-transformers
+faiss-gpu>=1.7.0  # For GPU-accelerated FAISS (optional)
+torch>=1.11.0  # Required by sentence-transformers
+
+# Physics Engine Integration Dependencies
+h5py>=3.8.0  # HDF5 file format support for scientific data
+vtk>=9.2.0  # Visualization Toolkit for scientific visualization
+# fenics-dolfinx>=0.9.0  # FEniCSx finite element library (optional) #TODO: this is not a package that is available on pip

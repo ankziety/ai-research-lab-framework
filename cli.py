@@ -12,8 +12,13 @@ import sys
 from pathlib import Path
 from typing import Dict, Any
 
-from ..core.ai_research_lab import create_framework
-from ..core.virtual_lab import MeetingRecord, MeetingAgenda
+try:
+    from core.ai_research_lab import create_framework
+    from core.virtual_lab import MeetingRecord, MeetingAgenda
+except ImportError:
+    # Fallback for when running as module
+    from ..core.ai_research_lab import create_framework
+    from ..core.virtual_lab import MeetingRecord, MeetingAgenda
 
 
 def make_json_serializable(obj: Any) -> Any:

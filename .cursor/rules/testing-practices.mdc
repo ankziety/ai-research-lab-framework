@@ -1,0 +1,50 @@
+---
+description: "unit test rules and, testing philosophy for ai-research‑lab‑framework"
+alwaysApply: false
+---
+# Testing Philosophy: Behavioral / Black‑Box for **ai‑research‑lab‑framework**
+
+## Core Principle  
+This project requires **behavioral (black‑box) testing**: interactions with the **public API and expected outputs** only, never internal implementation details or private utilities.
+
+## ✅ What to Test – only public-facing behavior
+
+- **`create_framework(config)`** and `.conduct_research(...)` must:
+  - Honor mandatory, optional, and edge‑case **config** parameters: e.g. `openai_api_key`, `Vector DB path`, `embedding_model`, `max_agents_per_research`.
+  - Return a results dict that includes at least `status`, `key_findings`, and optionally `logs`, `agenda_history`.
+- **`conduct_virtual_lab_research(...)`** must:
+  - Progress through **Virtual Lab research phases**, using structured meetings and multi‑agent orchestration.
+  - Signal errors when expectations (like team size, budget limits, timeline) are violated.
+  - Return research synthesis summary under the same API contract.
+- **`LiteratureRetriever.search(query, max_results, sources)`** must:
+  - Combine outputs from PubMed, ArXiv, CrossRef, Semantic Scholar, without crashing on missing or invalid API credentials.
+  - De-duplicate, sort, and limit results by `max_results`.
+  - Provide structured dictionaries: `title`, `authors`, `url`, `source`.
+- **Edge cases / failure modes**:
+  - Invalid inputs: non‑string queries, negative `max_results`, unrecognized `sources` entries.
+  - Fallback behavior: missing PubMed credentials should still retrieve from ArXiv/Semantic Scholar.
+- **Configuration-only APIs (e.g. using Cached database, Embedding model)**:
+  - Test only via public methods; do not assert internal vector DB reads/writes directly.
+
+## ❌ What *NOT* to Test
+
+- **Private classes/methods** like `MultiAgentPlanner`, `AgentMarketplace.hire()`, internal serialization helpers (`make_json_serializable`).
+- **Vector repository storage shape**, memory indexing internals, or LLM prompt templates.
+- **"How" modules generate team or prompt text.**
+
+## Coverage Expectations  
+- Aim for **≥ 70% coverage overall**, with tests driving all **public API paths**.
+- Coverage should not artificially inflate via internals; it must come from your behavioral test suite focusing on public interfaces.
+
+## Test File Structure
+
+- **`tests/test_framework.py`**: testing `create_framework`, `.conduct_research`, `.conduct_virtual_lab_research`
+- **`tests/test_literature_retriever.py`**: testing `LiteratureRetriever.search(...)` edge cases & multi-source fallback
+- **`tests/test_session_and_memory.py`**: testing session lifecycle via public onboarding/reuse methods
+- **Mock external API calls** (e.g. PubMed/ArXiv) realistically; do not test internal request generation or internal caching.
+
+## CI and Coverage
+
+- **`fail_under` in `pyproject.toml` should remain ≥ 65**
+- CI should run behavioral tests only; internal test coverage is allowed but should not be the majority.
+- Tests must be run in the root directory .venv, this only needs to be done once per terminal session

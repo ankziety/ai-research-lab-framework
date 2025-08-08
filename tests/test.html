@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Research Lab - Test Page</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div class="app-container">
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-flask"></i>
+                    <span>AI Research Lab - Test</span>
+                </div>
+            </div>
+        </header>
+        
+        <main class="main-content">
+            <div class="content-area">
+                <section class="panel active">
+                    <div class="panel-header">
+                        <h2>Web UI Test</h2>
+                    </div>
+                    
+                    <div style="padding: 20px;">
+                        <h3>Test Results</h3>
+                        <div id="testResults">
+                            <p>Loading test results...</p>
+                        </div>
+                        
+                        <h3>Test Buttons</h3>
+                        <button class="btn btn-primary" onclick="testNotification()">
+                            Test Notification
+                        </button>
+                        <button class="btn btn-secondary" onclick="testAPI()">
+                            Test API
+                        </button>
+                        <button class="btn btn-ghost" onclick="testWebSocket()">
+                            Test WebSocket
+                        </button>
+                    </div>
+                </section>
+            </div>
+        </main>
+        
+        <div class="notifications-container" id="notificationsContainer">
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <script>
+        // Simple test functions
+        function testNotification() {
+            showNotification('success', 'Test', 'Notification test successful!');
+        }
+        
+        function testAPI() {
+            fetch('/test')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('testResults').innerHTML = `
+                        <p><strong>API Test:</strong> ${data.message}</p>
+                        <p><strong>Framework:</strong> ${data.framework_initialized ? 'Initialized' : 'Not initialized'}</p>
+                        <p><strong>Timestamp:</strong> ${new Date(data.timestamp * 1000).toLocaleString()}</p>
+                    `;
+                })
+                .catch(error => {
+                    document.getElementById('testResults').innerHTML = `
+                        <p><strong>API Test Error:</strong> ${error.message}</p>
+                    `;
+                });
+        }
+        
+        function testWebSocket() {
+            const socket = io();
+            socket.on('connect', () => {
+                showNotification('success', 'WebSocket', 'Connected successfully!');
+                socket.disconnect();
+            });
+            socket.on('connect_error', (error) => {
+                showNotification('error', 'WebSocket', 'Connection failed: ' + error.message);
+            });
+        }
+        
+        function showNotification(type, title, message) {
+            const container = document.getElementById('notificationsContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            
+            notification.innerHTML = `
+                <div class="notification-header">
+                    <span class="notification-title">${title}</span>
+                    <button class="notification-close">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="notification-message">${message}</div>
+            `;
+            
+            container.appendChild(notification);
+            
+            setTimeout(() => notification.classList.add('show'), 100);
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 5000);
+            
+            notification.querySelector('.notification-close').addEventListener('click', () => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            });
+        }
+        
+        // Run initial tests
+        window.addEventListener('load', () => {
+            testAPI();
+        });
+    </script>
+</body>
+</html> 
