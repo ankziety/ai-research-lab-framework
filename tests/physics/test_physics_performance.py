@@ -81,36 +81,59 @@ class PhysicsPerformanceBenchmark:
         sizes = np.array(list(scaling_results.keys()))
         times = np.array([r['execution_time'] for r in scaling_results.values()])
         
+        def safe_corrcoef(x, y):
+            # Check for NaN, inf, and zero variance
+            if (
+                np.any(np.isnan(x)) or np.any(np.isnan(y)) or
+                np.any(np.isinf(x)) or np.any(np.isinf(y)) or
+                np.all(x == x[0]) or np.all(y == y[0])
+            ):
+                return np.nan
+            try:
+                r = np.corrcoef(x, y)[0, 1]
+                if np.isnan(r):
+                    return np.nan
+                return r
+            except Exception:
+                return np.nan
+        
         # Try different complexity models
         complexities = {}
         
         # Linear: O(n)
         if len(sizes) > 1:
             linear_coeff = np.polyfit(sizes, times, 1)
-            linear_r2 = np.corrcoef(sizes, times)[0, 1]**2
+            linear_r2 = safe_corrcoef(sizes, times)
+            linear_r2 = linear_r2**2 if not np.isnan(linear_r2) else np.nan
             complexities['O(n)'] = {'r_squared': linear_r2, 'coefficients': linear_coeff}
         
         # Quadratic: O(n²)
         if len(sizes) > 1:
-            quad_coeff = np.polyfit(sizes**2, times, 1)
-            quad_r2 = np.corrcoef(sizes**2, times)[0, 1]**2
+            quad_x = sizes**2
+            quad_coeff = np.polyfit(quad_x, times, 1)
+            quad_r2 = safe_corrcoef(quad_x, times)
+            quad_r2 = quad_r2**2 if not np.isnan(quad_r2) else np.nan
             complexities['O(n²)'] = {'r_squared': quad_r2, 'coefficients': quad_coeff}
         
         # Cubic: O(n³)
         if len(sizes) > 1:
-            cubic_coeff = np.polyfit(sizes**3, times, 1)
-            cubic_r2 = np.corrcoef(sizes**3, times)[0, 1]**2
+            cubic_x = sizes**3
+            cubic_coeff = np.polyfit(cubic_x, times, 1)
+            cubic_r2 = safe_corrcoef(cubic_x, times)
+            cubic_r2 = cubic_r2**2 if not np.isnan(cubic_r2) else np.nan
             complexities['O(n³)'] = {'r_squared': cubic_r2, 'coefficients': cubic_coeff}
         
         # Logarithmic: O(log n)
         if len(sizes) > 1 and all(s > 0 for s in sizes):
-            log_coeff = np.polyfit(np.log(sizes), times, 1)
-            log_r2 = np.corrcoef(np.log(sizes), times)[0, 1]**2
+            log_x = np.log(sizes)
+            log_coeff = np.polyfit(log_x, times, 1)
+            log_r2 = safe_corrcoef(log_x, times)
+            log_r2 = log_r2**2 if not np.isnan(log_r2) else np.nan
             complexities['O(log n)'] = {'r_squared': log_r2, 'coefficients': log_coeff}
         
         # Find best fit
         if complexities:
-            best_complexity = max(complexities.keys(), key=lambda k: complexities[k]['r_squared'])
+            best_complexity = max(complexities.keys(), key=lambda k: complexities[k]['r_squared'] if not np.isnan(complexities[k]['r_squared']) else -np.inf)
             return best_complexity, complexities
         else:
             return 'Unknown', {}
