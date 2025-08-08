@@ -25,18 +25,27 @@ class PhysicsPerformanceBenchmark:
         self.benchmark_results = {}
         self.memory_tracker = []
         
+    def _average_rss_mb(self, samples: int = 5, delay: float = 0.01) -> float:
+        """Sample RSS memory several times and return the average in MB."""
+        process = psutil.Process()
+        rss_samples = []
+        for _ in range(samples):
+            rss_samples.append(process.memory_info().rss / 1024 / 1024)
+            time.sleep(delay)
+        return sum(rss_samples) / len(rss_samples)
+
     def time_function(self, func, *args, **kwargs):
         """Time function execution and track memory usage."""
-        # Record initial memory
-        initial_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        # Record initial memory (average of several samples)
+        initial_memory = self._average_rss_mb()
         
         # Time execution
         start_time = time.time()
         result = func(*args, **kwargs)
         end_time = time.time()
         
-        # Record final memory
-        final_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+        # Record final memory (average of several samples)
+        final_memory = self._average_rss_mb()
         
         execution_time = end_time - start_time
         memory_delta = final_memory - initial_memory
