@@ -127,19 +127,21 @@ class PhysicsValidationSuite:
         # This is a simplified dimensional analysis
         # In a full implementation, this would check units properly
         
-        order_of_magnitude = np.log10(abs(calculated_quantity)) if calculated_quantity != 0 else -np.inf
-        reference_order = np.log10(abs(reference_scale)) if reference_scale != 0 else 0
-        
-        # Check if order of magnitude is reasonable
-        order_difference = abs(order_of_magnitude - reference_order)
-        
-        is_reasonable = order_difference < 10  # Within 10 orders of magnitude
+        if calculated_quantity == 0:
+            order_of_magnitude = None  # Order of magnitude undefined for zero
+            order_difference = None
+            is_reasonable = False
+        else:
+            order_of_magnitude = np.log10(abs(calculated_quantity))
+            reference_order = np.log10(abs(reference_scale)) if reference_scale != 0 else 0
+            order_difference = abs(order_of_magnitude - reference_order)
+            is_reasonable = order_difference < 10  # Within 10 orders of magnitude
         
         return {
             'calculated_quantity': calculated_quantity,
             'expected_dimensions': expected_dimensions,
             'order_of_magnitude': order_of_magnitude,
-            'reference_order': reference_order,
+            'reference_order': reference_order if calculated_quantity != 0 else None,
             'order_difference': order_difference,
             'is_reasonable': is_reasonable
         }
