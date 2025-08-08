@@ -1,8 +1,8 @@
 """Virtual Lab package."""
 
-from virtual_lab.__about__ import __version__
-from virtual_lab.agent import Agent
-from virtual_lab.run_meeting import run_meeting
+from .__about__ import __version__
+from .agent import Agent
+from .run_meeting import run_meeting
 
 
 __all__ = [

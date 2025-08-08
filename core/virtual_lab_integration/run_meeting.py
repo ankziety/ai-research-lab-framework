@@ -7,9 +7,9 @@ from typing import Literal
 from openai import OpenAI
 from tqdm import trange, tqdm
 
-from virtual_lab.agent import Agent
-from virtual_lab.constants import CONSISTENT_TEMPERATURE, PUBMED_TOOL_DESCRIPTION
-from virtual_lab.prompts import (
+from .agent import Agent
+from .constants import CONSISTENT_TEMPERATURE, PUBMED_TOOL_DESCRIPTION
+from .prompts import (
     individual_meeting_agent_prompt,
     individual_meeting_critic_prompt,
     individual_meeting_start_prompt,
@@ -20,7 +20,7 @@ from virtual_lab.prompts import (
     team_meeting_team_lead_final_prompt,
     team_meeting_team_member_prompt,
 )
-from virtual_lab.utils import (
+from .utils import (
     convert_messages_to_discussion,
     count_discussion_tokens,
     count_tokens,

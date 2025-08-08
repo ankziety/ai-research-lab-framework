@@ -9,14 +9,14 @@ import tiktoken
 from openai import AsyncOpenAI, OpenAI
 from openai.types.beta.threads.run import Run
 
-from virtual_lab.constants import (
+from .constants import (
     DEFAULT_FINETUNING_EPOCHS,
     MODEL_TO_INPUT_PRICE_PER_TOKEN,
     MODEL_TO_OUTPUT_PRICE_PER_TOKEN,
     FINETUNING_MODEL_TO_TRAINING_PRICE_PER_TOKEN,
     PUBMED_TOOL_NAME,
 )
-from virtual_lab.prompts import format_references
+from .prompts import format_references
 
 
 def get_pubmed_central_article(
