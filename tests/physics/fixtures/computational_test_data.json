@@ -1,0 +1,262 @@
+{
+  "ode_test_cases": {
+    "harmonic_oscillator": {
+      "equation": "d\u00b2x/dt\u00b2 = -\u03c9\u00b2x",
+      "omega": 1.0,
+      "initial_conditions": [
+        1.0,
+        0.0
+      ],
+      "analytical_solution": "x(t) = cos(\u03c9t)",
+      "time_span": [
+        0,
+        6.283185307179586
+      ],
+      "expected_final_state": [
+        1.0,
+        0.0
+      ]
+    },
+    "exponential_decay": {
+      "equation": "dy/dt = -\u03bby",
+      "lambda": 0.5,
+      "initial_conditions": [
+        1.0
+      ],
+      "analytical_solution": "y(t) = exp(-\u03bbt)",
+      "time_span": [
+        0,
+        2.0
+      ],
+      "expected_final_state": [
+        0.36787944117144233
+      ]
+    },
+    "pendulum": {
+      "equation": "d\u00b2\u03b8/dt\u00b2 = -(g/L)sin(\u03b8)",
+      "g": 9.81,
+      "L": 1.0,
+      "initial_conditions": [
+        0.1,
+        0.0
+      ],
+      "analytical_solution": "\u03b8(t) \u2248 \u03b8\u2080cos(\u221a(g/L)t)",
+      "time_span": [
+        0,
+        2.0
+      ],
+      "expected_period": 2.006
+    }
+  },
+  "integration_test_cases": {
+    "polynomial": {
+      "function": "x\u00b3",
+      "bounds": [
+        0,
+        2
+      ],
+      "analytical_result": 4.0,
+      "tolerance": 1e-06
+    },
+    "exponential": {
+      "function": "exp(-x\u00b2)",
+      "bounds": [
+        -3,
+        3
+      ],
+      "analytical_result": 1.7724538509055159,
+      "tolerance": 0.001
+    },
+    "oscillatory": {
+      "function": "sin(10x)",
+      "bounds": [
+        0,
+        3.141592653589793
+      ],
+      "analytical_result": 0.0,
+      "tolerance": 1e-06
+    }
+  },
+  "linear_algebra_test_cases": {
+    "eigenvalue_problems": [
+      {
+        "matrix": [
+          [
+            2,
+            1
+          ],
+          [
+            1,
+            2
+          ]
+        ],
+        "expected_eigenvalues": [
+          3,
+          1
+        ],
+        "expected_eigenvectors": [
+          [
+            0.7071067811865476,
+            0.7071067811865476
+          ],
+          [
+            0.7071067811865476,
+            -0.7071067811865476
+          ]
+        ]
+      },
+      {
+        "matrix": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            2,
+            0
+          ],
+          [
+            0,
+            0,
+            3
+          ]
+        ],
+        "expected_eigenvalues": [
+          1,
+          2,
+          3
+        ],
+        "expected_eigenvectors": [
+          [
+            1,
+            0,
+            0
+          ],
+          [
+            0,
+            1,
+            0
+          ],
+          [
+            0,
+            0,
+            1
+          ]
+        ]
+      }
+    ],
+    "matrix_operations": {
+      "matrix_mult": {
+        "A": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ],
+        "B": [
+          [
+            5,
+            6
+          ],
+          [
+            7,
+            8
+          ]
+        ],
+        "expected_result": [
+          [
+            19,
+            22
+          ],
+          [
+            43,
+            50
+          ]
+        ]
+      },
+      "matrix_inv": {
+        "A": [
+          [
+            4,
+            7
+          ],
+          [
+            2,
+            6
+          ]
+        ],
+        "expected_inverse": [
+          [
+            0.6,
+            -0.7
+          ],
+          [
+            -0.2,
+            0.4
+          ]
+        ]
+      }
+    }
+  },
+  "fft_test_cases": {
+    "pure_sine_wave": {
+      "frequency_Hz": 10,
+      "sampling_rate_Hz": 100,
+      "duration_s": 1.0,
+      "amplitude": 1.0,
+      "expected_peak_frequency": 10
+    },
+    "two_tone_signal": {
+      "frequencies_Hz": [
+        5,
+        25
+      ],
+      "amplitudes": [
+        1.0,
+        0.5
+      ],
+      "sampling_rate_Hz": 100,
+      "duration_s": 2.0,
+      "expected_peak_frequencies": [
+        5,
+        25
+      ]
+    }
+  },
+  "monte_carlo_test_cases": {
+    "pi_estimation": {
+      "method": "quarter_circle",
+      "bounds": [
+        [
+          0,
+          1
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "analytical_result": 0.7853981633974483,
+      "min_samples": 10000,
+      "expected_accuracy": 0.01
+    },
+    "gaussian_integral": {
+      "method": "normal_distribution",
+      "bounds": [
+        [
+          -3,
+          3
+        ]
+      ],
+      "analytical_result": 1.0,
+      "min_samples": 50000,
+      "expected_accuracy": 0.05
+    }
+  }
+}
