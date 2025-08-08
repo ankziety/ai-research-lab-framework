@@ -40,8 +40,14 @@ class MockMaterialsPhysicsAgent:
         beta_rad = np.radians(beta)
         gamma_rad = np.radians(gamma)
         
-        volume = a * b * c * np.sqrt(1 + 2*np.cos(alpha_rad)*np.cos(beta_rad)*np.cos(gamma_rad) -
-                                   np.cos(alpha_rad)**2 - np.cos(beta_rad)**2 - np.cos(gamma_rad)**2)
+        sqrt_arg = 1 + 2*np.cos(alpha_rad)*np.cos(beta_rad)*np.cos(gamma_rad) - \
+                   np.cos(alpha_rad)**2 - np.cos(beta_rad)**2 - np.cos(gamma_rad)**2
+        if sqrt_arg < -1e-8:
+            raise ValueError(
+                f"Invalid lattice parameters: expression under sqrt is negative ({sqrt_arg}). "
+                "Check that the lattice angles and lengths are physically valid."
+            )
+        volume = a * b * c * np.sqrt(max(sqrt_arg, 0.0))
         
         # Determine crystal system
         crystal_system = self._determine_crystal_system(a, b, c, alpha, beta, gamma)
