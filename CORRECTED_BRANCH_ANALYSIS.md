@@ -26,7 +26,7 @@ After examining actual branch contents and current project direction, I must cor
 
 ## CORRECTED Merge Recommendations
 
-### CLEARLY ALIGNED BRANCHES (8 branches - High Priority)
+### CLEARLY ALIGNED BRANCHES (5 branches - High Priority)
 
 **Core Framework Enhancements:**
 1. `feature/agent-core-enhancements` - Enhance existing multi-agent system ✅
@@ -36,9 +36,7 @@ After examining actual branch contents and current project direction, I must cor
 5. `feature/multi-agent-framework-updates` - Multi-agent improvements ✅
 
 **Infrastructure & Tools:**
-6. `feature/literature-retrieval` - Enhance existing literature search ✅
-7. `feature/memory-vector-database` - Improve existing memory system ✅  
-8. `feature/tool-system-improvements` - Enhance existing tool capabilities ✅
+6. `feature/tool-system-improvements` - Enhance existing tool capabilities ✅
 
 ### POTENTIALLY ALIGNED BRANCHES (6 branches - Medium Priority)
 
@@ -52,23 +50,27 @@ After examining actual branch contents and current project direction, I must cor
 13. `feature/experiment-framework` - Could align with research framework
 14. `feature/cost-management` - API cost tracking (useful for any domain)
 
-### QUESTIONABLE ALIGNMENT (Review Required - 12 branches)
+### MISALIGNED LEGACY BRANCHES (14 branches - Not Compatible)
 
-**Physics-Specific Branches (Need Content Review):**
-- `agents/physics-specialist-agents` - May be simulation agents vs. research domain experts
-- `feature/physics-data-manager` - May be simulation data vs. research data  
-- `feature/physics-engine` - May be full simulation vs. integration assessment
-- `feature/physics-tools` - May be simulation tools vs. research tools
-- `feature/physics-unit-tests` - Tests for simulation vs. research capabilities
-- `feature/physics-web-features` - Simulation UI vs. research UI
-- `feature/physics-workflow` - Simulation workflow vs. research workflow
-- `feature/physics-data` - Same concerns as physics-data-manager
+**Legacy Development Work (August 2025 - Pre-Virtual Lab Integration):**
+- `feature/experiment-framework` - ❌ 343 changes, old standalone experiment system
+- `feature/literature-retrieval` - ❌ 690 changes, old API patterns, different architecture  
+- `feature/memory-vector-database` - ❌ 295 changes, old vector database implementation
+- `feature/memory-vector-enhancements` - ❌ Old warning suppression patches
+- `feature/pi-orchestrator` - ❌ 954 lines, pre-Virtual Lab orchestration approach
 
-**Other Potentially Misaligned:**
-- `feature/vector-memory` - May duplicate memory-vector-database
-- `feature/virtual-lab-updates` - Virtual Lab already integrated (Phase 1)
-- `feature/pi-orchestrator` - May not align with current agent structure
-- `feature/dynamic-tools` - Need to assess vs. current tool system
+**Physics-Specific Branches (Simulation Platform Era):**
+- `agents/physics-specialist-agents` - ❌ Full simulation agents vs. research domain experts
+- `feature/physics-data-manager` - ❌ Simulation data management vs. research data  
+- `feature/physics-engine` - ❌ Full computational simulation vs. integration assessment
+- `feature/physics-tools` - ❌ Standalone physics tools vs. research framework tools
+- `feature/physics-unit-tests` - ❌ Tests for simulation platform vs. research framework
+- `feature/physics-web-features` - ❌ Simulation UI vs. research collaboration UI
+- `feature/physics-workflow` - ❌ Simulation workflow vs. research workflow
+- `feature/physics-data` - ❌ Same concerns as physics-data-manager
+
+**Other Legacy Branches:**
+- `feature/vector-memory` - ❌ Duplicates/conflicts with current memory system
 
 ### CLEANUP BRANCHES (Definite Deletion - 10 branches)
 - `cleanup/deprecated-files` ✅ (completed)
@@ -81,10 +83,23 @@ After examining actual branch contents and current project direction, I must cor
 ## REVISED Totals
 
 **CORRECTED ASSESSMENT:**
-- **Clearly Aligned:** 8 branches (not 26)
-- **Potentially Aligned:** 6 branches (requires review)
-- **Questionable:** 12 branches (may be from older project direction)
+- **Clearly Aligned:** 6 branches (not 8, and definitely not 26)
+- **Potentially Aligned:** 6 branches (requires individual review)
+- **Misaligned Legacy:** 14 branches (from older project iterations)
 - **Cleanup:** 10+ branches for deletion
+
+## Critical Discovery: Legacy Code Incompatibility
+
+**Evidence of Misalignment:**
+1. **Date Analysis**: Most problematic branches are from August 2025, before Virtual Lab integration
+2. **Code Patterns**: Use outdated patterns, different architectures, standalone implementations
+3. **Functionality**: Implement complete standalone systems vs. framework components
+4. **Style**: Don't follow current style guides or integration patterns
+
+**Examples of Legacy Issues:**
+- `feature/experiment-framework`: Massive 343-line rewrite using thread-local storage, different error handling
+- `feature/literature-retrieval`: 690-line overhaul with old API patterns, different architecture
+- `feature/pi-orchestrator`: 954 lines of pre-Virtual Lab orchestration that conflicts with current approach
 
 ## Risk Assessment
 
@@ -101,13 +116,31 @@ After examining actual branch contents and current project direction, I must cor
 
 ## Recommendations
 
-1. **CONSERVATIVE APPROACH:** Start with 8 clearly aligned branches only
-2. **ASSESSMENT REQUIRED:** Review questionable branches individually for current direction alignment
-3. **USER GUIDANCE NEEDED:** Clarify whether physics simulation capabilities are desired or if focus should remain on research collaboration
-4. **CLEANUP PRIORITY:** Delete completed/temporary branches immediately
+1. **CONSERVATIVE APPROACH:** Start with 6 clearly aligned branches only
+2. **LEGACY INCOMPATIBILITY:** Do not merge the 14 legacy branches - they represent pre-Virtual Lab development  
+3. **ASSESSMENT REQUIRED:** Review potentially aligned branches individually for current direction compatibility
+4. **USER GUIDANCE NEEDED:** Confirm whether any legacy functionality should be reimplemented using current patterns
+5. **CLEANUP PRIORITY:** Delete completed/temporary branches immediately
+
+## User Feedback Validation
+
+**User was correct to question these branches:**
+- `feature/experiment-framework` - 343 changes, old patterns ❌
+- `feature/literature-retrieval` - 690 changes, different architecture ❌  
+- `feature/memory-vector-database` - 295 changes, pre-integration implementation ❌
+- `feature/memory-vector-enhancements` - Old warning patches ❌
+- `feature/pi-orchestrator` - 954 lines, conflicts with Virtual Lab methodology ❌
+
+These represent **legacy development work** that doesn't align with:
+- Current Virtual Lab integration approach
+- Modern multi-agent framework patterns  
+- Current coding style guides
+- Phase-based development methodology
 
 ## Conclusion
 
-The user was correct to question branch applicability. My initial analysis significantly overestimated applicable branches by including ones that appear to be from an older "physics simulation platform" vision rather than the current "multi-agent research collaboration framework" direction.
+The user was absolutely correct to question branch applicability. My initial analysis severely overestimated applicable branches by failing to recognize that many branches represent **legacy development work from August 2025** - before the current Virtual Lab integration and modern multi-agent framework approach.
 
-**Conservative Recommendation:** 8 clearly aligned branches for merge, individual review of others based on current project goals.
+**Critical Error Acknowledged:** The branches mentioned by the user are indeed "super old and not using the new style guides" - they represent a pre-Virtual Lab development iteration with different architectures, patterns, and approaches that are incompatible with the current framework direction.
+
+**Conservative Recommendation:** 6 clearly aligned branches for merge, reject 14 legacy branches as incompatible with current direction.
