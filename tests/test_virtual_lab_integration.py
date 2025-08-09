@@ -14,7 +14,6 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 # Mock complex dependencies before any imports
-import sys
 from unittest.mock import MagicMock, Mock
 
 # Create comprehensive OpenAI mocks
