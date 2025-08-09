@@ -98,7 +98,20 @@ git merge feature/physics-unit-tests
 git merge feature/physics-web-features
 git merge feature/physics-workflow
 ```
+**WARNING: DO NOT MERGE** - The following physics branches have been identified as legacy and incompatible with the current framework. Integration may lead to instability or conflicts.
 
+**Recommended Action:**  
+- Review each branch for compatibility with the current codebase.
+- Refactor or update as necessary before considering any merge.
+- Do **not** merge directly into `main` without thorough testing and validation.
+
+**Legacy Physics Branches (Require Review):**
+- agents/physics-specialist-agents
+- feature/physics-data-manager
+- feature/physics-tools
+- feature/physics-unit-tests
+- feature/physics-web-features
+- feature/physics-workflow
 ### Phase 2: Core System Enhancements (6 branches)
 **HIGH PRIORITY** - Essential framework improvements:
 ```bash
