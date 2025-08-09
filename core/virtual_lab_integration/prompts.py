@@ -2,8 +2,8 @@
 
 from typing import Iterable
 
-from virtual_lab.agent import Agent
-from virtual_lab.constants import DEFAULT_MODEL
+from .agent import Agent
+from .constants import DEFAULT_MODEL
 
 
 PRINCIPAL_INVESTIGATOR = Agent(
