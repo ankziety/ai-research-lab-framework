@@ -88,7 +88,7 @@ class TestVirtualLabAgent(unittest.TestCase):
             "You are a Test Researcher. "
             "Your expertise is in Machine Learning. "
             "Your goal is to conduct experiments. "
-            "Your role is to research scientist."
+            "Your role is to be a research scientist."
         )
         self.assertEqual(self.agent.prompt, expected_prompt)
     
