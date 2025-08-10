@@ -1,6 +1,6 @@
 """Prompts for the language model agents and meetings."""
 
-from typing import Iterable
+from typing import Iterable, Tuple
 
 from .agent import Agent
 from .constants import DEFAULT_MODEL
@@ -33,8 +33,8 @@ REWRITE_PROMPT = "This script needs to be improved. Please rewrite the script to
 
 def create_merge_prompt(
     agenda: str,
-    agenda_questions: tuple[str, ...] = (),
-    agenda_rules: tuple[str, ...] = (),
+    agenda_questions: Tuple[str, ...] = (),
+    agenda_rules: Tuple[str, ...] = (),
 ) -> str:
     """Creates a merge prompt for merging the best components of multiple separate meeting answers.
 
@@ -90,7 +90,8 @@ def format_prompt_list(prompts: Iterable[str]) -> str:
     :param prompts: The prompts.
     :return: The prompts formatted as a numbered list.
     """
-    return f"{'\n\n'.join(f'{i + 1}. {prompt}' for i, prompt in enumerate(prompts))}"
+    # Avoid nested f-strings and backslashes inside f-string expressions
+    return "\n\n".join(f"{i + 1}. {prompt}" for i, prompt in enumerate(prompts))
 
 
 def format_agenda(
@@ -106,7 +107,7 @@ def format_agenda(
 
 
 def format_agenda_questions(
-    agenda_questions: tuple[str, ...],
+    agenda_questions: Tuple[str, ...],
     intro: str = "Here are the agenda questions that must be answered:",
 ) -> str:
     """Formats the agenda questions for the prompt as a numbered list.
@@ -123,7 +124,7 @@ def format_agenda_questions(
 
 
 def format_agenda_rules(
-    agenda_rules: tuple[str, ...],
+    agenda_rules: Tuple[str, ...],
     intro: str = "Here are the agenda rules that must be followed:",
 ) -> str:
     """Formats the agenda rules for the prompt as a numbered list.
@@ -132,11 +133,11 @@ def format_agenda_rules(
     :param intro: The introduction to the agenda rules.
     :return: The formatted agenda rules.
     """
-    return f"{intro}\n\n{format_prompt_list(agenda_rules)}\n\n" if agenda_rules else ""
+    return (f"{intro}\n\n{format_prompt_list(agenda_rules)}\n\n" if agenda_rules else "")
 
 
 def format_references(
-    references: tuple[str, ...], reference_type: str, intro: str
+    references: Tuple[str, ...], reference_type: str, intro: str
 ) -> str:
     """Formats references (e.g., contexts, summaries) for the prompt.
 
@@ -153,18 +154,20 @@ def format_references(
         for reference_index, reference in enumerate(references)
     ]
 
-    return f"{intro}\n\n{'\n\n'.join(formatted_references)}\n\n"
+    # Precompute joined references to avoid backslashes in f-string expression
+    joined_refs = "\n\n".join(formatted_references)
+    return f"{intro}\n\n{joined_refs}\n\n"
 
 
 # Team meeting prompts
 def team_meeting_start_prompt(
     team_lead: Agent,
-    team_members: tuple[Agent, ...],
+    team_members: Tuple[Agent, ...],
     agenda: str,
-    agenda_questions: tuple[str, ...] = (),
-    agenda_rules: tuple[str, ...] = (),
-    summaries: tuple[str, ...] = (),
-    contexts: tuple[str, ...] = (),
+    agenda_questions: Tuple[str, ...] = (),
+    agenda_rules: Tuple[str, ...] = (),
+    summaries: Tuple[str, ...] = (),
+    contexts: Tuple[str, ...] = (),
     num_rounds: int = 1,
 ) -> str:
     """Generates the start prompt for a tean meeting.
@@ -237,8 +240,8 @@ def team_meeting_team_lead_intermediate_prompt(
 def team_meeting_team_lead_final_prompt(
     team_lead: Agent,
     agenda: str,
-    agenda_questions: tuple[str, ...] = (),
-    agenda_rules: tuple[str, ...] = (),
+    agenda_questions: Tuple[str, ...] = (),
+    agenda_rules: Tuple[str, ...] = (),
 ) -> str:
     """Generates the final prompt for the team lead in a team meeting to summarize the discussion.
 
@@ -262,10 +265,10 @@ def team_meeting_team_lead_final_prompt(
 def individual_meeting_start_prompt(
     team_member: Agent,
     agenda: str,
-    agenda_questions: tuple[str, ...] = (),
-    agenda_rules: tuple[str, ...] = (),
-    summaries: tuple[str, ...] = (),
-    contexts: tuple[str, ...] = (),
+    agenda_questions: Tuple[str, ...] = (),
+    agenda_rules: Tuple[str, ...] = (),
+    summaries: Tuple[str, ...] = (),
+    contexts: Tuple[str, ...] = (),
 ) -> str:
     """Generates the start prompt for an individual meeting.
 

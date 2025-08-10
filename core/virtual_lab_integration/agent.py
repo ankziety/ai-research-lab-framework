@@ -25,11 +25,11 @@ class Agent:
             f"You are a {self.title}. "
             f"Your expertise is in {self.expertise}. "
             f"Your goal is to {self.goal}. "
-            f"Your role is to {self.role}."
+            f"Your role is to be a {self.role}."
         )
 
     @property
-    def message(self) -> dict[str, str]:
+    def message(self) -> dict:
         """Returns the message for the agent in OpenAI API form."""
         return {
             "role": "system",

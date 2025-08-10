@@ -72,22 +72,7 @@ demo_*.ipynb
 *demo_*
 *demo.*
 
-# Test files - comprehensive patterns
-test_*.py
-test_*.js
-test_*.html
-test_*.md
-test_*.json
-test_*.yaml
-test_*.yml
-test_*.txt
-test_*.csv
-test_*.tsv
-test_*.ipynb
-*test*
-*test_*
-*test.*
-
+# Tests: do not ignore tests (tracked in repo)
 # Example files
 example_*.py
 example_*.js
@@ -120,11 +105,9 @@ sample_*.ipynb
 *sample_*
 *sample.*
 
-# Temporary demo/test directories
+# Temporary demo directories
 demo/
 demos/
-test/
-tests/
 example/
 examples/
 sample/
