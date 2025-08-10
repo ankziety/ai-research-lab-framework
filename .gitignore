@@ -134,3 +134,22 @@ tmp/
 context_portal/
 ai_research_lab_framework.egg-info/
 temp_virtual_lab/
+
+# Build and test artifacts - prevent accidental commits
+.coverage
+*.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Analysis and planning documents - prevent accidental commits
+*.pdf
+*_analysis.pdf
+*_strategy.pdf
+branch_*.pdf
+test_results_*.png
+*_results_*.png
+analysis_*.png
