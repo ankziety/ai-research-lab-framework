@@ -3,25 +3,26 @@
 import json
 import urllib.parse
 from pathlib import Path
+from typing import Optional, List, Dict
 
 import requests
 import tiktoken
 from openai import AsyncOpenAI, OpenAI
 from openai.types.beta.threads.run import Run
 
-from virtual_lab.constants import (
+from .constants import (
     DEFAULT_FINETUNING_EPOCHS,
     MODEL_TO_INPUT_PRICE_PER_TOKEN,
     MODEL_TO_OUTPUT_PRICE_PER_TOKEN,
     FINETUNING_MODEL_TO_TRAINING_PRICE_PER_TOKEN,
     PUBMED_TOOL_NAME,
 )
-from virtual_lab.prompts import format_references
+from .prompts import format_references
 
 
 def get_pubmed_central_article(
     pmcid: str, abstract_only: bool = False
-) -> tuple[str | None, list[str] | None]:
+) -> tuple[Optional[str], Optional[List[str]]]:
     """Gets the title and content (abstract or full text) of a PubMed Central article given a PMC ID.
 
     Note: This only returns main text, ignoring tables, figures, and references.
@@ -91,9 +92,9 @@ def run_pubmed_search(
     :return: The full text of the top matching article.
     """
     # Print search query
-    print(
-        f'Searching PubMed Central for {num_articles} articles ({'abstracts' if abstract_only else 'full text'}) with query: "{query}"'
-    )
+    # Build mode string separately to avoid nested quotes in f-string
+    mode = 'abstracts' if abstract_only else 'full text'
+    print(f"Searching PubMed Central for {num_articles} articles ({mode}) with query: \"{query}\"")
 
     # Perform PubMed Central search for query to get PMC ID
     search_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term={urllib.parse.quote_plus(query)}&retmax={2 * num_articles}&retmode=json&sort=relevance"
@@ -119,7 +120,8 @@ def run_pubmed_search(
         if title is None:
             continue
 
-        texts.append(f"PMCID = {pmcid}\n\nTitle = {title}\n\n{'\n\n'.join(content)}")
+        joined_content = "\n\n".join(content)
+        texts.append(f"PMCID = {pmcid}\n\nTitle = {title}\n\n{joined_content}")
         titles.append(title)
         pmcids.append(pmcid)
 
@@ -141,7 +143,7 @@ def run_pubmed_search(
     return combined_text
 
 
-def run_tools(run: Run) -> list[dict[str, str]]:
+def run_tools(run: Run) -> List[Dict[str, str]]:
     """Runs the tools in a required action.
 
     :param run: The run to run tools for.
@@ -169,7 +171,7 @@ def run_tools(run: Run) -> list[dict[str, str]]:
     return tool_outputs
 
 
-def get_messages(client: OpenAI, thread_id: str) -> list[dict]:
+def get_messages(client: OpenAI, thread_id: str) -> List[dict]:
     """Gets messages from a thread.
 
     :param client: The OpenAI client.
@@ -214,7 +216,7 @@ def get_messages(client: OpenAI, thread_id: str) -> list[dict]:
     return messages
 
 
-async def async_get_messages(client: AsyncOpenAI, thread_id: str) -> list[dict]:
+async def async_get_messages(client: AsyncOpenAI, thread_id: str) -> List[dict]:
     """Gets messages from a thread.
 
     :param client: The async OpenAI client.
@@ -274,8 +276,8 @@ def count_tokens(string: str, encoding_name: str = "cl100k_base") -> int:
 
 
 def update_token_counts(
-    token_counts: dict[str, int],
-    discussion: list[dict[str, str]],
+    token_counts: Dict[str, int],
+    discussion: List[Dict[str, str]],
     response: str,
 ) -> None:
     """Updates the token counts (in place) with a discussion and response.
@@ -296,8 +298,8 @@ def update_token_counts(
 
 
 def count_discussion_tokens(
-    discussion: list[dict[str, str]],
-) -> dict[str, int]:
+    discussion: List[Dict[str, str]],
+) -> Dict[str, int]:
     """Counts the number of tokens in a discussion.
 
     :param discussion: The discussion to count tokens in.
@@ -343,7 +345,7 @@ def compute_token_cost(
 
 
 def print_cost_and_time(
-    token_counts: dict[str, int],
+    token_counts: Dict[str, int],
     model: str,
     elapsed_time: float,
 ) -> None:
@@ -387,8 +389,8 @@ def compute_finetuning_cost(
 
 
 def convert_messages_to_discussion(
-    messages: list[dict], assistant_id_to_title: dict[str, str]
-) -> list[dict[str, str]]:
+    messages: List[dict], assistant_id_to_title: Dict[str, str]
+) -> List[Dict[str, str]]:
     """Converts OpenAI messages into discussion format (list of message dictionaries).
 
     :param messages: The messages to convert.
@@ -408,7 +410,7 @@ def convert_messages_to_discussion(
     ]
 
 
-def get_summary(discussion: list[dict[str, str]]) -> str:
+def get_summary(discussion: List[Dict[str, str]]) -> str:
     """Get the summary from a discussion.
 
     :param discussion: The discussion to extract the summary from.
@@ -417,7 +419,7 @@ def get_summary(discussion: list[dict[str, str]]) -> str:
     return discussion[-1]["message"]
 
 
-def load_summaries(discussion_paths: list[Path]) -> tuple[str, ...]:
+def load_summaries(discussion_paths: List[Path]) -> tuple[str, ...]:
     """Load summaries from a list of discussion paths.
 
     :param discussion_paths: The paths to the discussion JSON files. The summary is the last entry in the discussion.
@@ -433,7 +435,7 @@ def load_summaries(discussion_paths: list[Path]) -> tuple[str, ...]:
 
 
 def save_meeting(
-    save_dir: Path, save_name: str, discussion: list[dict[str, str]]
+    save_dir: Path, save_name: str, discussion: List[Dict[str, str]]
 ) -> None:
     """Save a meeting discussion to JSON and Markdown files.
 

@@ -2,14 +2,14 @@
 
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Optional, Tuple
 
 from openai import OpenAI
 from tqdm import trange, tqdm
 
-from virtual_lab.agent import Agent
-from virtual_lab.constants import CONSISTENT_TEMPERATURE, PUBMED_TOOL_DESCRIPTION
-from virtual_lab.prompts import (
+from .agent import Agent
+from .constants import CONSISTENT_TEMPERATURE, PUBMED_TOOL_DESCRIPTION
+from .prompts import (
     individual_meeting_agent_prompt,
     individual_meeting_critic_prompt,
     individual_meeting_start_prompt,
@@ -20,7 +20,7 @@ from virtual_lab.prompts import (
     team_meeting_team_lead_final_prompt,
     team_meeting_team_member_prompt,
 )
-from virtual_lab.utils import (
+from .utils import (
     convert_messages_to_discussion,
     count_discussion_tokens,
     count_tokens,
@@ -37,13 +37,13 @@ def run_meeting(
     agenda: str,
     save_dir: Path,
     save_name: str = "discussion",
-    team_lead: Agent | None = None,
-    team_members: tuple[Agent, ...] | None = None,
-    team_member: Agent | None = None,
-    agenda_questions: tuple[str, ...] = (),
-    agenda_rules: tuple[str, ...] = (),
-    summaries: tuple[str, ...] = (),
-    contexts: tuple[str, ...] = (),
+    team_lead: Optional[Agent] = None,
+    team_members: Optional[Tuple[Agent, ...]] = None,
+    team_member: Optional[Agent] = None,
+    agenda_questions: Tuple[str, ...] = (),
+    agenda_rules: Tuple[str, ...] = (),
+    summaries: Tuple[str, ...] = (),
+    contexts: Tuple[str, ...] = (),
     num_rounds: int = 0,
     temperature: float = CONSISTENT_TEMPERATURE,
     pubmed_search: bool = False,

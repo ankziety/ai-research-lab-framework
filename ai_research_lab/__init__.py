@@ -1,31 +1,33 @@
-#!/usr/bin/env python3
 """
-AI Research Lab Framework
+Top-level aggregator package for AI Research Lab Framework.
 
-A comprehensive multi-agent research framework for conducting AI-powered research.
+Provides a stable import surface: `from ai_research_lab import create_framework, MultiAgentResearchFramework, ...`.
+
+Note: This module re-exports objects from top-level packages (`core`, `agents`,
+`data`, `tools`, `memory`, `experiments`). Keep imports absolute to avoid
+creating artificial package nesting.
 """
 
 __version__ = "1.0.0"
-__author__ = "Expression Neuroscience Institute"
 
 # Core framework components
 try:
-    from .core import (
+    from core import (
         MultiAgentResearchFramework,
         create_framework,
         VirtualLabMeetingSystem,
         AIResearchLab,
     )
 
-    from .agents import (
+    from agents import (
         AgentMarketplace,
         BaseAgent,
         PrincipalInvestigatorAgent,
         ScientificCriticAgent,
     )
-    from .agents.llm_client import LLMClient, get_llm_client
+    from agents.llm_client import LLMClient, get_llm_client
 
-    from .tools import (
+    from tools import (
         ToolRegistry,
         BaseTool,
         ExperimentRunner,
@@ -40,7 +42,7 @@ try:
         TaskCoordinator,
     )
 
-    from .data import (
+    from data import (
         CLI,
         CostManager,
         Critic,
@@ -50,16 +52,14 @@ try:
         SpecialistRegistry,
     )
 
-    from .memory import ContextManager, KnowledgeRepository, VectorDatabase
+    from memory import ContextManager, KnowledgeRepository, VectorDatabase
 
-    # Backward-compatible alias
-    from .experiments import ExperimentRunner as Experiment
-except ImportError:
-    # Handle case where this module is imported directly (e.g., by pytest)
-    # In this case, we can't use relative imports, so we'll just define the version
+    # Backward-compatible alias for experiments
+    from experiments import ExperimentRunner as Experiment
+except Exception:
+    # Allow import in constrained environments; symbols may be None if imports fail
     pass
 
-# Export main components for easy access
 __all__ = [
     'MultiAgentResearchFramework',
     'create_framework',
@@ -95,3 +95,5 @@ __all__ = [
     'VectorDatabase',
     'Experiment',
 ]
+
+

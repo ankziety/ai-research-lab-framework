@@ -16,6 +16,7 @@ __pycache__/
 
 # Environment files
 .env
+.venv/
 
 # Database files
 *.db
@@ -71,22 +72,7 @@ demo_*.ipynb
 *demo_*
 *demo.*
 
-# Test files - comprehensive patterns
-test_*.py
-test_*.js
-test_*.html
-test_*.md
-test_*.json
-test_*.yaml
-test_*.yml
-test_*.txt
-test_*.csv
-test_*.tsv
-test_*.ipynb
-*test*
-*test_*
-*test.*
-
+# Tests: do not ignore tests (tracked in repo)
 # Example files
 example_*.py
 example_*.js
@@ -119,11 +105,9 @@ sample_*.ipynb
 *sample_*
 *sample.*
 
-# Temporary demo/test directories
+# Temporary demo directories
 demo/
 demos/
-test/
-tests/
 example/
 examples/
 sample/
@@ -135,3 +119,22 @@ context_portal/
 ai_research_lab_framework.egg-info/
 temp_virtual_lab/
 simulations/
+
+# Build and test artifacts - prevent accidental commits
+.coverage
+*.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Analysis and planning documents - prevent accidental commits
+*.pdf
+*_analysis.pdf
+*_strategy.pdf
+branch_*.pdf
+test_results_*.png
+*_results_*.png
+analysis_*.png
