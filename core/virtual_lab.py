@@ -1842,6 +1842,7 @@ class VirtualLabMeetingSystem:
                              research_question: str, constraints: Dict[str, Any]) -> Dict[str, Any]:
         """
         Conduct a team meeting with all hired agents.
+        Enhanced with round-based discussion pattern from Virtual Lab (Swanson et al., 2023).
         
         Args:
             agenda: Meeting agenda
@@ -1874,171 +1875,302 @@ class VirtualLabMeetingSystem:
         action_items = []
         
         try:
-            # PI introduces the meeting
-            pi_intro = f"Welcome to our {agenda.meeting_type.value} meeting. Today we're working on: {research_question}"
-            self.log_chat_message('communication', self.pi_agent.agent_id, pi_intro, session_id)
-            discussion_transcript.append({
-                'speaker': self.pi_agent.agent_id,
-                'message': pi_intro,
-                'timestamp': time.time()
-            })
-            
-            # Each agent contributes based on their expertise
-            for agent_id, agent in hired_agents.items():
-                # Log agent thinking
-                self.log_agent_activity(agent_id, 'thinking', f'Preparing contribution for {agenda.meeting_type.value}', session_id)
-                
-                # Simulate agent thinking time (minimum 5 seconds for quality)
-                time.sleep(5)
-                
-                # Generate agent contribution
-                contribution_prompt = f"""
-                You are participating in a {agenda.meeting_type.value} meeting about: {research_question}
-                
-                Your expertise areas: {', '.join(agent.expertise)}
-                Meeting objectives: {', '.join(agenda.objectives)}
-                
-                Please provide a thoughtful contribution based on your expertise. Consider:
-                1. How your expertise relates to this research question
-                2. Potential approaches or methodologies you could contribute
-                3. Any concerns or considerations from your perspective
-                4. Specific suggestions for moving forward
-                
-                Provide a detailed, professional response.
-                """
-                
-                agent_response = agent.generate_response(contribution_prompt, {
-                    'research_question': research_question,
-                    'meeting_type': agenda.meeting_type.value,
-                    'objectives': agenda.objectives,
-                    'constraints': constraints
-                })
-                
-                # Calculate text metrics
-                text_metrics = self.calculate_text_metrics(agent_response)
-                
-                # Log agent contribution
-                self.log_chat_message('communication', agent_id, agent_response, session_id, text_metrics)
-                self.log_agent_activity(agent_id, 'speaking', f'Contributed to {agenda.meeting_type.value} meeting', session_id, text_metrics)
-                
-                discussion_transcript.append({
-                    'speaker': agent_id,
-                    'message': agent_response,
-                    'timestamp': time.time(),
-                    'metrics': text_metrics
-                })
-                
-                # Track agent performance
-                if agent_id not in self.agent_performance:
-                    self.agent_performance[agent_id] = {
-                        'contributions': 0,
-                        'total_words': 0,
-                        'avg_sentence_length': 0
-                    }
-                
-                self.agent_performance[agent_id]['contributions'] += 1
-                self.agent_performance[agent_id]['total_words'] += text_metrics['word_count']
-                self.agent_performance[agent_id]['avg_sentence_length'] = (
-                    self.agent_performance[agent_id]['total_words'] / 
-                    self.agent_performance[agent_id]['contributions']
-                )
-            
-            # PI facilitates discussion and synthesis
-            synthesis_prompt = f"""
-            Based on the team discussion about: {research_question}
-            
-            Discussion points covered:
-            {chr(10).join([f"- {entry['speaker']}: {entry['message'][:100]}..." for entry in discussion_transcript[1:]])}
-            
-            Please provide a synthesis of the key points, decisions made, and action items.
-            """
-            
-            # Log PI synthesis
-            self.log_agent_activity(self.pi_agent.agent_id, 'thinking', 'Synthesizing team discussion', session_id)
-            time.sleep(3)  # Minimum thinking time
-            
-            pi_synthesis = self.pi_agent.generate_response(synthesis_prompt, {
-                'discussion_transcript': discussion_transcript,
-                'research_question': research_question
-            })
-            
-            # Calculate synthesis metrics
-            synthesis_metrics = self.calculate_text_metrics(pi_synthesis)
-            
-            self.log_chat_message('communication', self.pi_agent.agent_id, pi_synthesis, session_id, synthesis_metrics)
-            self.log_agent_activity(self.pi_agent.agent_id, 'speaking', 'Provided meeting synthesis', session_id, synthesis_metrics)
-            
-            discussion_transcript.append({
-                'speaker': self.pi_agent.agent_id,
-                'message': pi_synthesis,
-                'timestamp': time.time(),
-                'metrics': synthesis_metrics
-            })
-            
-            # Parse synthesis for outcomes
-            synthesis_data = self._parse_meeting_synthesis(pi_synthesis)
-            outcomes = synthesis_data[0]
-            decisions = synthesis_data[1]
-            action_items = synthesis_data[2]
-            
-            # Log meeting completion
-            end_time = time.time()
-            duration = end_time - start_time
-            
-            self.log_chat_message('communication', 'System', f'Team meeting completed in {duration:.1f}s', session_id)
-            self.log_agent_activity('system', 'meeting_complete', f'Team meeting {meeting_id} completed successfully', session_id)
-            
-            # Create meeting record
-            meeting_record = MeetingRecord(
-                meeting_id=meeting_id,
-                meeting_type=agenda.meeting_type,
-                phase=agenda.phase,
-                participants=participants,
-                agenda=agenda,
-                discussion_transcript=discussion_transcript,
-                outcomes=outcomes,
-                decisions=decisions,
-                action_items=action_items,
-                start_time=start_time,
-                end_time=end_time,
-                success=True
+            # Round-based team meeting structure from Virtual Lab (Swanson et al., 2023)
+            meeting_result = self._conduct_vl_style_team_meeting(
+                agenda, hired_agents, research_question, constraints, session_id
             )
             
-            # Emit meeting end to web UI
-            self._emit_meeting_event('meeting_end', {
-                'meeting_id': meeting_id,
-                'meeting_type': 'team_meeting',
-                'phase': agenda.phase.value,
-                'participants': participants,
-                'duration': duration,
-                'topic': f"{agenda.phase.value.replace('_', ' ').title()} Team Meeting",
-                'outcome': str(outcomes) if outcomes else 'Meeting completed',
-                'transcript': '\n'.join([f"{entry['speaker']}: {entry['message']}" for entry in discussion_transcript]),
-                'success': True
-            })
-            
-            return {
-                'success': True,
-                'meeting_record': meeting_record,
-                'outcomes': outcomes,
-                'decisions': decisions,
-                'action_items': action_items,
-                'duration': duration,
-                'participant_count': len(participants)
-            }
+            # Extract results from round-based meeting
+            discussion_transcript = meeting_result.get('discussion_transcript', [])
+            outcomes = meeting_result.get('outcomes', {})
+            decisions = meeting_result.get('decisions', [])
+            action_items = meeting_result.get('action_items', [])
             
         except Exception as e:
-            logger.error(f"Error in team meeting {meeting_id}: {e}")
-            end_time = time.time()
+            logger.error(f"Error in team meeting: {e}")
+            # Fallback to original meeting method
+            meeting_result = self._conduct_fallback_team_meeting(
+                agenda, hired_agents, research_question, constraints, session_id
+            )
+            discussion_transcript = meeting_result.get('discussion_transcript', [])
+            outcomes = meeting_result.get('outcomes', {})
+            decisions = meeting_result.get('decisions', [])
+            action_items = meeting_result.get('action_items', [])
+        
+        end_time = time.time()
+        
+        # Create meeting record
+        meeting_record = MeetingRecord(
+            meeting_id=meeting_id,
+            meeting_type=agenda.meeting_type,
+            phase=agenda.phase,
+            participants=participants,
+            agenda=agenda,
+            discussion_transcript=discussion_transcript,
+            outcomes=outcomes,
+            decisions=decisions,
+            action_items=action_items,
+            start_time=start_time,
+            end_time=end_time,
+            success=True
+        )
+        
+        # Log meeting completion
+        self.log_agent_activity('system', 'meeting_complete', f'Team meeting {meeting_id} completed', session_id)
+        
+        return {
+            'success': True,
+            'meeting_record': meeting_record
+        }
+    
+    def _conduct_vl_style_team_meeting(self, agenda: MeetingAgenda, hired_agents: Dict[str, BaseAgent],
+                                     research_question: str, constraints: Dict[str, Any], 
+                                     session_id: str) -> Dict[str, Any]:
+        """
+        Conduct team meeting using round-based discussion pattern from Virtual Lab (Swanson et al., 2023).
+        
+        Args:
+            agenda: Meeting agenda
+            hired_agents: Dictionary of hired agents
+            research_question: Research question
+            constraints: Research constraints
+            session_id: Session ID
             
-            self.log_chat_message('system', 'System', f'Team meeting error: {str(e)}', session_id)
-            self.log_agent_activity('system', 'meeting_error', f'Team meeting {meeting_id} failed: {str(e)}', session_id)
-            
-            return {
-                'success': False,
-                'error': str(e),
-                'duration': end_time - start_time
+        Returns:
+            Meeting results with discussion transcript and outcomes
+        """
+        discussion_transcript = []
+        outcomes = {}
+        decisions = []
+        action_items = []
+        
+        # Round-based meeting structure from Virtual Lab (Swanson et al., 2023)
+        num_rounds = 3
+        
+        # Round 0: Team Lead Introduction
+        pi_intro = self.pi_agent.generate_team_lead_response(
+            agenda=f"Research Question: {research_question}\nObjectives: {', '.join(agenda.objectives)}",
+            team_members=[agent.role for agent in hired_agents.values()],
+            context={
+                'research_question': research_question,
+                'constraints': constraints,
+                'phase': agenda.phase.value
             }
+        )
+        
+        self.log_chat_message('communication', self.pi_agent.agent_id, pi_intro, session_id)
+        discussion_transcript.append({
+            'speaker': self.pi_agent.agent_id,
+            'message': pi_intro,
+            'timestamp': time.time(),
+            'round': 0
+        })
+        
+        # Team member introductions
+        team_intros = []
+        for agent_id, agent in hired_agents.items():
+            self.log_agent_activity(agent_id, 'thinking', 'Preparing introduction', session_id)
+            time.sleep(2)  # Simulate thinking time
+            
+            intro_response = agent.generate_response(
+                f"Introduce yourself and your relevant expertise for this research topic: {research_question}",
+                context={
+                    'research_question': research_question,
+                    'agenda': agenda.objectives,
+                    'expectations': 'Provide a brief introduction of your role and expertise'
+                }
+            )
+            
+            self.log_chat_message('communication', agent_id, intro_response, session_id)
+            discussion_transcript.append({
+                'speaker': agent_id,
+                'message': intro_response,
+                'timestamp': time.time(),
+                'round': 0
+            })
+            team_intros.append(intro_response)
+        
+        # Rounds 1-3: Structured discussion
+        round_responses = []
+        for round_num in range(1, num_rounds + 1):
+            self.log_agent_activity('system', 'round_start', f'Starting round {round_num}', session_id)
+            
+            # Team lead guides the round
+            if round_num == 1:
+                round_guidance = f"Let's begin our discussion. Round {round_num}: Please provide your initial thoughts on {research_question}"
+            elif round_num == 2:
+                round_guidance = f"Round {round_num}: Let's dive deeper into the technical aspects and implementation considerations"
+            else:  # round_num == 3
+                round_guidance = f"Final round {round_num}: Let's synthesize our findings and make concrete recommendations"
+            
+            self.log_chat_message('communication', self.pi_agent.agent_id, round_guidance, session_id)
+            discussion_transcript.append({
+                'speaker': self.pi_agent.agent_id,
+                'message': round_guidance,
+                'timestamp': time.time(),
+                'round': round_num
+            })
+            
+            # Each team member contributes
+            round_contributions = []
+            for agent_id, agent in hired_agents.items():
+                self.log_agent_activity(agent_id, 'thinking', f'Preparing round {round_num} contribution', session_id)
+                time.sleep(3)  # Simulate thinking time
+                
+                # Team member response
+                contribution = agent.generate_team_member_response(
+                    agenda=research_question,
+                    round_num=round_num,
+                    total_rounds=num_rounds,
+                    context={
+                        'research_question': research_question,
+                        'constraints': constraints,
+                        'previous_rounds': round_responses,
+                        'expectations': f'Provide insights for round {round_num} of {num_rounds}'
+                    }
+                )
+                
+                self.log_chat_message('communication', agent_id, contribution, session_id)
+                discussion_transcript.append({
+                    'speaker': agent_id,
+                    'message': contribution,
+                    'timestamp': time.time(),
+                    'round': round_num
+                })
+                round_contributions.append(contribution)
+            
+            round_responses.append(round_contributions)
+        
+        # Final synthesis
+        self.log_agent_activity('system', 'synthesis_start', 'Starting final synthesis', session_id)
+        
+        # Collect all team inputs for synthesis
+        all_team_inputs = []
+        for round_contributions in round_responses:
+            all_team_inputs.extend(round_contributions)
+        
+        # Team lead provides synthesis
+        synthesis = self.pi_agent.generate_synthesis_response(
+            agenda=research_question,
+            team_inputs=all_team_inputs,
+            context={
+                'research_question': research_question,
+                'constraints': constraints,
+                'expectations': 'Provide final synthesis, recommendations, and next steps'
+            }
+        )
+        
+        self.log_chat_message('communication', self.pi_agent.agent_id, synthesis, session_id)
+        discussion_transcript.append({
+            'speaker': self.pi_agent.agent_id,
+            'message': synthesis,
+            'timestamp': time.time(),
+            'round': 'synthesis'
+        })
+        
+        # Parse synthesis for outcomes, decisions, and action items
+        parsed_results = self._parse_meeting_synthesis(synthesis)
+        outcomes.update(parsed_results[0])
+        decisions.extend(parsed_results[1])
+        action_items.extend(parsed_results[2])
+        
+        return {
+            'discussion_transcript': discussion_transcript,
+            'outcomes': outcomes,
+            'decisions': decisions,
+            'action_items': action_items
+        }
+    
+    def _conduct_fallback_team_meeting(self, agenda: MeetingAgenda, hired_agents: Dict[str, BaseAgent],
+                                     research_question: str, constraints: Dict[str, Any], 
+                                     session_id: str) -> Dict[str, Any]:
+        """
+        Fallback team meeting method using original approach.
+        """
+        # Original team meeting implementation
+        discussion_transcript = []
+        outcomes = {}
+        decisions = []
+        action_items = []
+        
+        # PI introduces the meeting
+        pi_intro = f"Welcome to our {agenda.meeting_type.value} meeting. Today we're working on: {research_question}"
+        self.log_chat_message('communication', self.pi_agent.agent_id, pi_intro, session_id)
+        discussion_transcript.append({
+            'speaker': self.pi_agent.agent_id,
+            'message': pi_intro,
+            'timestamp': time.time()
+        })
+        
+        # Each agent contributes based on their expertise
+        for agent_id, agent in hired_agents.items():
+            # Log agent thinking
+            self.log_agent_activity(agent_id, 'thinking', f'Preparing contribution for {agenda.meeting_type.value}', session_id)
+            
+            # Simulate agent thinking time (minimum 5 seconds for quality)
+            time.sleep(5)
+            
+            # Generate agent contribution
+            contribution_prompt = f"""
+            You are participating in a {agenda.meeting_type.value} meeting about: {research_question}
+            
+            Your expertise areas: {', '.join(agent.expertise)}
+            Meeting objectives: {', '.join(agenda.objectives)}
+            
+            Please provide your insights and recommendations based on your expertise.
+            Focus on aspects most relevant to your role and the meeting objectives.
+            """
+            
+            contribution = agent.generate_response(contribution_prompt, {
+                'research_question': research_question,
+                'constraints': constraints,
+                'meeting_type': agenda.meeting_type.value,
+                'objectives': agenda.objectives
+            })
+            
+            self.log_chat_message('communication', agent_id, contribution, session_id)
+            discussion_transcript.append({
+                'speaker': agent_id,
+                'message': contribution,
+                'timestamp': time.time()
+            })
+        
+        # PI provides synthesis
+        synthesis_prompt = f"""
+        Based on the team discussion about: {research_question}
+        
+        Please provide:
+        1. Summary of key points from each team member
+        2. Your expert recommendation based on team input
+        3. Clear next steps for the team
+        4. Any decisions made or conclusions reached
+        """
+        
+        synthesis = self.pi_agent.generate_response(synthesis_prompt, {
+            'research_question': research_question,
+            'team_discussion': discussion_transcript,
+            'constraints': constraints
+        })
+        
+        self.log_chat_message('communication', self.pi_agent.agent_id, synthesis, session_id)
+        discussion_transcript.append({
+            'speaker': self.pi_agent.agent_id,
+            'message': synthesis,
+            'timestamp': time.time()
+        })
+        
+        # Parse synthesis for outcomes, decisions, and action items
+        parsed_results = self._parse_meeting_synthesis(synthesis)
+        outcomes.update(parsed_results[0])
+        decisions.extend(parsed_results[1])
+        action_items.extend(parsed_results[2])
+        
+        return {
+            'discussion_transcript': discussion_transcript,
+            'outcomes': outcomes,
+            'decisions': decisions,
+            'action_items': action_items
+        }
     
     def _conduct_individual_meeting(self, agenda: MeetingAgenda, research_question: str,
                                    constraints: Dict[str, Any]) -> Dict[str, Any]:

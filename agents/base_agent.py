@@ -1,5 +1,6 @@
 """
 Base Agent class for the multi-agent AI research framework.
+Enhanced with role-first prompting patterns from Virtual Lab (Swanson et al., 2023).
 """
 
 import logging
@@ -16,6 +17,7 @@ class BaseAgent:
     
     Each agent has a specific role, expertise, and can participate in
     collaborative research through structured communication.
+    Enhanced with role-first prompting patterns from Virtual Lab (Swanson et al., 2023).
     """
     
     def __init__(self, agent_id: str, role: str, expertise: List[str], 
@@ -51,34 +53,32 @@ class BaseAgent:
     
     def generate_response(self, prompt: str, context: Dict[str, Any]) -> str:
         """
-        Generate a response to a given prompt with context.
+        Generate response using role-first prompting from Virtual Lab (Swanson et al., 2023).
         
         Args:
-            prompt: The input prompt or question
+            prompt: Input prompt or question
             context: Additional context information
             
         Returns:
             Generated response string
         """
-        # Default implementation uses role and expertise for specialized responses
-        specialized_prompt = f"""
-        You are a {self.role} with expertise in: {', '.join(self.expertise)}.
-        Please provide a detailed analysis of the following:
+        # Role-first prompting from Virtual Lab (Swanson et al., 2023)
+        role_prompt = self._format_role_prompt(context)
         
-        {prompt}
-        
-        Focus on aspects relevant to your expertise and provide evidence-based insights.
-        
-        IMPORTANT: Format your response using Markdown for better readability:
-        - Use **bold** for emphasis on key points
-        - Use bullet points or numbered lists for multiple items
-        - Use `code` formatting for technical terms, function names, or code snippets
-        - Use ### for section headers when organizing longer responses
-        - Use > for important quotes or highlights
-        - Use tables when presenting comparative data
-        
-        This will ensure your response is well-structured and easy to read.
-        """
+        # Enhanced prompt with structured sections
+        enhanced_prompt = f"""
+{role_prompt}
+
+{self._format_context_section(context)}
+
+{self._format_agenda_section(context)}
+
+{self._format_expectations_section(context)}
+
+{prompt}
+
+{self._format_structure_section(context)}
+        """.strip()
         
         # Add agent context for cost tracking
         context_with_agent = {
@@ -88,11 +88,137 @@ class BaseAgent:
         }
         
         return self.llm_client.generate_response(
-            specialized_prompt, 
+            enhanced_prompt, 
             context_with_agent, 
             agent_role=self.role,
             cost_manager=self.cost_manager
         )
+    
+    def _format_role_prompt(self, context: Dict[str, Any]) -> str:
+        """Format role-first prompt from Virtual Lab (Swanson et al., 2023)."""
+        expertise_str = ', '.join(self.expertise)
+        goal = context.get('goal', 'contribute your specialized knowledge to research collaboration')
+        
+        return f"""You are a {self.role}. Your expertise is in {expertise_str}.
+Your goal is to {goal}.
+Your role is to be a {self.role}."""
+    
+    def _format_context_section(self, context: Dict[str, Any]) -> str:
+        """Format context section if available."""
+        if 'previous_discussion' in context or 'context' in context:
+            context_info = context.get('previous_discussion', context.get('context', ''))
+            if context_info:
+                return f"Context: {context_info}"
+        return ""
+    
+    def _format_agenda_section(self, context: Dict[str, Any]) -> str:
+        """Format agenda section if available."""
+        agenda = context.get('agenda', '')
+        if agenda:
+            return f"Agenda: {agenda}"
+        return ""
+    
+    def _format_expectations_section(self, context: Dict[str, Any]) -> str:
+        """Format expectations section."""
+        expectations = context.get('expectations', 'Provide detailed, evidence-based insights relevant to your expertise.')
+        return f"Expectations: {expectations}"
+    
+    def _format_structure_section(self, context: Dict[str, Any]) -> str:
+        """Format structure section."""
+        structure = context.get('structure', 'Format your response using Markdown for better readability.')
+        return f"Structure: {structure}"
+    
+    def generate_team_lead_response(self, agenda: str, team_members: List[str], 
+                                  context: Dict[str, Any]) -> str:
+        """
+        Generate team lead response using team lead pattern from Virtual Lab (Swanson et al., 2023).
+        
+        Args:
+            agenda: Meeting agenda
+            team_members: List of team member roles
+            context: Additional context
+            
+        Returns:
+            Team lead response
+        """
+        team_lead_prompt = f"""
+You are leading a team meeting. Your role is to orchestrate the discussion and make key decisions.
+
+Agenda: {agenda}
+
+Team Members: {', '.join(team_members)}
+
+Please:
+1. Welcome the team and introduce the agenda
+2. Ask each team member to introduce themselves and their relevant expertise
+3. Guide the discussion to address the agenda
+4. Synthesize team input and make decisions
+5. Outline next steps
+
+{self._format_context_section(context)}
+        """.strip()
+        
+        return self.generate_response(team_lead_prompt, context)
+    
+    def generate_team_member_response(self, agenda: str, round_num: int, 
+                                    total_rounds: int, context: Dict[str, Any]) -> str:
+        """
+        Generate team member response using team member pattern from Virtual Lab (Swanson et al., 2023).
+        
+        Args:
+            agenda: Meeting agenda
+            round_num: Current round number
+            total_rounds: Total number of rounds
+            context: Additional context
+            
+        Returns:
+            Team member response
+        """
+        member_prompt = f"""
+You are participating in round {round_num} of {total_rounds}.
+
+Agenda: {agenda}
+
+Please provide your specialized insights on this topic based on your expertise.
+Focus on aspects most relevant to your role and expertise.
+Be specific and actionable in your contributions.
+
+{self._format_context_section(context)}
+        """.strip()
+        
+        return self.generate_response(member_prompt, context)
+    
+    def generate_synthesis_response(self, agenda: str, team_inputs: List[str], 
+                                  context: Dict[str, Any]) -> str:
+        """
+        Generate synthesis response using synthesis pattern from Virtual Lab (Swanson et al., 2023).
+        
+        Args:
+            agenda: Meeting agenda
+            team_inputs: List of team member inputs
+            context: Additional context
+            
+        Returns:
+            Synthesis response
+        """
+        synthesis_prompt = f"""
+Synthesize the team discussion and provide final recommendations.
+
+Agenda: {agenda}
+
+Team Inputs:
+{chr(10).join(f"- {input_text}" for input_text in team_inputs)}
+
+Please provide:
+1. Summary of key points from each team member
+2. Your expert recommendation based on team input
+3. Clear next steps for the team
+4. Any decisions made or conclusions reached
+
+{self._format_context_section(context)}
+        """.strip()
+        
+        return self.generate_response(synthesis_prompt, context)
     
     def assess_task_relevance(self, task_description: str) -> float:
         """
