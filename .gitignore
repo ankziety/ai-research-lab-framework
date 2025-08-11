@@ -7,6 +7,8 @@ __pycache__/
 
 # Logs
 *.log
+logs/
+web_ui/logs/
 
 # OS-specific files
 .DS_Store
