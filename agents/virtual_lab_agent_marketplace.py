@@ -52,7 +52,7 @@ class VirtualLabAgentMarketplace:
             expertise="research coordination, project management, scientific leadership",
             goal="Coordinate research teams and ensure scientific rigor",
             role="Research Coordinator",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Scientific Critic
@@ -61,7 +61,7 @@ class VirtualLabAgentMarketplace:
             expertise="scientific validation, quality assurance, peer review",
             goal="Ensure scientific rigor and validate research outputs",
             role="Quality Assurance Expert",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Research Methodology Expert
@@ -70,7 +70,7 @@ class VirtualLabAgentMarketplace:
             expertise="experimental design, statistical analysis, research methods",
             goal="Design robust research methodologies and experimental protocols",
             role="Methodology Specialist",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Literature Research Expert
@@ -79,7 +79,7 @@ class VirtualLabAgentMarketplace:
             expertise="literature review, citation analysis, academic research",
             goal="Conduct comprehensive literature reviews and identify research gaps",
             role="Literature Specialist",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Data Science Expert
@@ -88,7 +88,7 @@ class VirtualLabAgentMarketplace:
             expertise="data analysis, machine learning, statistical modeling",
             goal="Analyze data and develop predictive models",
             role="Data Analyst",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Critical Analysis Expert
@@ -97,7 +97,7 @@ class VirtualLabAgentMarketplace:
             expertise="logical reasoning, argument analysis, critical thinking",
             goal="Provide critical analysis and identify logical flaws",
             role="Critical Analyst",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Register default agents

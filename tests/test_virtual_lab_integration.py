@@ -33,12 +33,14 @@ class TestVirtualLabAgent(unittest.TestCase):
             self.skipTest(f"Import failed: {IMPORT_ERROR}")
             
         self.agent = VirtualLabAgent(
-            title="Test Researcher",
-            expertise="Machine Learning",
-            goal="conduct experiments",
-            role="research scientist",
-            model="gpt-4"
+            name="Test Agent",
+            role="Test Role",
+            model="gpt-4o"
         )
+        
+        self.assertEqual(self.agent.name, "Test Agent")
+        self.assertEqual(self.agent.role, "Test Role")
+        self.assertEqual(self.agent.model, "gpt-4o")
     
     def test_agent_initialization(self):
         """Test agent initialization with all required parameters."""
@@ -46,7 +48,7 @@ class TestVirtualLabAgent(unittest.TestCase):
         self.assertEqual(self.agent.expertise, "Machine Learning")
         self.assertEqual(self.agent.goal, "conduct experiments")
         self.assertEqual(self.agent.role, "research scientist")
-        self.assertEqual(self.agent.model, "gpt-4")
+        self.assertEqual(self.agent.model, "gpt-4o")
     
     def test_agent_prompt_generation(self):
         """Test that agent generates proper prompt string."""
@@ -76,21 +78,21 @@ class TestVirtualLabAgent(unittest.TestCase):
             expertise="Machine Learning",
             goal="conduct experiments",
             role="research scientist",
-            model="gpt-4"
+            model="gpt-4o"
         )
         agent2 = VirtualLabAgent(
             title="Test Researcher",
             expertise="Machine Learning",
             goal="conduct experiments",
             role="research scientist",
-            model="gpt-4"
+            model="gpt-4o"
         )
         agent3 = VirtualLabAgent(
             title="Different Researcher",
             expertise="Machine Learning",
             goal="conduct experiments",
             role="research scientist",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         self.assertEqual(agent1, agent2)
@@ -117,7 +119,7 @@ class TestVirtualLabIntegration(unittest.TestCase):
             expertise="Testing",
             goal="test functionality",
             role="tester",
-            model="gpt-4"
+            model="gpt-4o"
         )
         self.assertIsInstance(agent, VirtualLabAgent)
     
@@ -141,7 +143,7 @@ class TestVirtualLabIntegration(unittest.TestCase):
             expertise="Testing",
             goal="test functionality",
             role="tester",
-            model="gpt-4"
+            model="gpt-4o"
         )
         
         # Test that prompt is generated correctly

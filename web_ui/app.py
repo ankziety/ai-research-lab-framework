@@ -204,7 +204,7 @@ def load_system_config():
             'visualization_dir': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'visualizations'),
             'max_literature_results': 10,
             'default_llm_provider': 'openai',
-            'default_model': 'gpt-4',
+            'default_model': 'gpt-4o',
             'enable_free_search': True,
             'enable_mock_responses': False
         }

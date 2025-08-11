@@ -72,7 +72,7 @@ class LLMClient:
         
         # Model configuration
         self.provider = self.config.get('default_llm_provider', 'openai')
-        self.model = self.config.get('default_model', 'gpt-4')
+        self.model = self.config.get('default_model', 'gpt-4o')
         
         # Provider pricing for cost optimization
         self.provider_costs = {
@@ -523,7 +523,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                     
                     config = {
                         'default_llm_provider': framework.get('default_llm_provider', 'openai'),
-                        'default_model': framework.get('default_model', 'gpt-4'),
+                        'default_model': framework.get('default_model', 'gpt-4o'),
                         'openai_api_key': (
                             framework.get('openai_api_key') or 
                             api_keys.get('openai') or
@@ -554,7 +554,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                     # Fallback to environment variables only
                     config = {
                         'default_llm_provider': 'openai',
-                        'default_model': 'gpt-4',
+                        'default_model': 'gpt-4o',
                         'openai_api_key': os.getenv('OPENAI_API_KEY'),
                         'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
                         'gemini_api_key': os.getenv('GEMINI_API_KEY'),
@@ -566,7 +566,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                 # Fallback to environment variables only
                 config = {
                     'default_llm_provider': 'openai',
-                    'default_model': 'gpt-4',
+                    'default_model': 'gpt-4o',
                     'openai_api_key': os.getenv('OPENAI_API_KEY'),
                     'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
                     'gemini_api_key': os.getenv('GEMINI_API_KEY'),

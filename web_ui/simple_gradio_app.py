@@ -61,7 +61,7 @@ class SimpleAIResearchLabGradio:
                 'enable_free_search': True,
                 'max_literature_results': 10,
                 'default_llm_provider': 'openai',
-                'default_model': 'gpt-4'
+                'default_model': 'gpt-4o'
             }
             
             # Add API keys from loaded config

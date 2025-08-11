@@ -92,7 +92,7 @@ class AIResearchLabGradio:
                 'enable_free_search': True,
                 'max_literature_results': 10,
                 'default_llm_provider': 'openai',
-                'default_model': 'gpt-4',
+                'default_model': 'gpt-4o',
                 'vector_db_path': 'memory/vector_memory.db',
                 'embedding_model': 'all-MiniLM-L6-v2',
                 'max_context_length': 100000,
@@ -261,7 +261,7 @@ class AIResearchLabGradio:
                 'visualization_dir': os.path.join(os.path.dirname(os.path.dirname(__file__)), 'visualizations'),
                 'max_literature_results': 10,
                 'default_llm_provider': 'openai',
-                'default_model': 'gpt-4',
+                'default_model': 'gpt-4o',
                 'enable_free_search': True,
                 'enable_mock_responses': False
             }
