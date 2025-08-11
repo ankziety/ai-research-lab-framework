@@ -932,7 +932,7 @@ class CostManager:
             Optimal model name
         """
         if not self.optimization_enabled:
-            return 'gpt-5'  # Default to most capable new model
+            return 'gpt-5-nano'  # Default to most cost-efficient model
         
         # Filter models by required capabilities
         available_models = []
@@ -944,7 +944,7 @@ class CostManager:
         
         if not available_models:
             logger.warning("No models available with required capabilities")
-            return 'gpt-5'
+            return 'gpt-5-nano'
         
         # Budget protection: Avoid expensive models when budget is low
         expensive_models = ['gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview', 'gpt-4o']  # Legacy expensive models
@@ -961,7 +961,7 @@ class CostManager:
         
         if not available_models:
             logger.error("No affordable models available")
-            return 'gpt-5-nano'  # Fallback to cheapest option
+            return 'gpt-5-nano'  # Fallback to most cost-efficient option
         
         # Score models based on cost efficiency and capability
         model_scores = []
@@ -986,11 +986,17 @@ class CostManager:
             if model_name in expensive_models:
                 cost_score *= 0.1  # 90% penalty for expensive models
             
-            # Bonus for new GPT-5 models
-            if model_name.startswith('gpt-5'):
-                cost_score *= 1.3  # 30% bonus for latest models
+            # Bonus for cost-efficient models
+            if model_name == 'gpt-5-nano':
+                cost_score *= 1.5  # 50% bonus for most cost-efficient model
+            elif model_name == 'gpt-5-mini':
+                cost_score *= 1.3  # 30% bonus for very cost-efficient model
+            elif model_name.startswith('gpt-5'):
+                cost_score *= 1.2  # 20% bonus for other GPT-5 models
+            elif model_name == 'gpt-4o-mini':
+                cost_score *= 1.1  # 10% bonus for cost-efficient GPT-4o
             elif model_name.startswith('gpt-4.1'):
-                cost_score *= 1.1  # 10% bonus for fine-tuning models
+                cost_score *= 1.05  # 5% bonus for fine-tuning models
             
             # Combined score
             total_score = cost_score * capability_score * budget_score

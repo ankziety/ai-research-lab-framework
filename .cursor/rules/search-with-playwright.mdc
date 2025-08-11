@@ -1,5 +1,19 @@
 ---
-description:
-globs:
+description: Searching for the most up to date information on the live web
 alwaysApply: false
 ---
+- Must use Playwright MCP for all web-based interactions.
+- Workflow:
+  1. Capture a **screenshot** (`browser_take_screenshot`).
+  2. Analyze the screenshot for visual context.
+  3. Based on that analysis, proceed with structured tools:
+     - Navigate (`browser_navigate`)
+     - Click (`browser_click`)
+     - Type (`browser_type`)
+     - Hover (`browser_hover`)
+     - Select (`browser_select_option`)
+     - Capture accessibility-tree snapshot
+     - Execute JavaScript
+     - Monitor console or network as needed
+  4. Use accessibility-mode by default. Use Vision Mode only when required to interpret layout visually.
+- All decisions must derive from the screenshot analysis. No assumptions.
