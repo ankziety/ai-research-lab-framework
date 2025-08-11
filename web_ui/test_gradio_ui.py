@@ -13,8 +13,14 @@ import json
 import time
 import unittest
 import threading
+import warnings
 from datetime import datetime
 from pathlib import Path
+
+# Suppress known deprecation warnings from third-party libraries
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="importlib._bootstrap")
+warnings.filterwarnings("ignore", category=PendingDeprecationWarning, message="Please use `import python_multipart`")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message="on_event is deprecated")
 
 # Add parent directory to path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -115,8 +121,8 @@ class TestGradioUI(unittest.TestCase):
             self.assertIn(self.app.current_session['status'], ['running', 'failed'])
         
         # Test 2: Verify session persistence
-        if self.app.data_manager and self.current_session_id:
-            session_data = self.app.data_manager.get_session(self.current_session_id)
+        if self.app.data_manager and hasattr(self, 'test_session_id') and self.test_session_id:
+            session_data = self.app.data_manager.get_session(self.test_session_id)
             if session_data:
                 self.assertEqual(session_data['research_question'], research_question)
         
@@ -281,8 +287,8 @@ class TestGradioUI(unittest.TestCase):
         
         # Test 2: Handle framework errors gracefully
         # Temporarily break framework
-        original_framework = self.app.research_framework
-        self.app.research_framework = None
+        original_framework = self.app.framework
+        self.app.framework = None
         
         try:
             stats = self.app.get_agent_statistics()
@@ -291,7 +297,7 @@ class TestGradioUI(unittest.TestCase):
             self.assertEqual(stats['active_agents'], 0)
         finally:
             # Restore framework
-            self.app.research_framework = original_framework
+            self.app.framework = original_framework
         
         print(f"✅ Error handling test passed")
     

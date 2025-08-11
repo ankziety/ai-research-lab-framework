@@ -138,3 +138,7 @@ branch_*.pdf
 test_results_*.png
 *_results_*.png
 analysis_*.png
+logs/chat_session*.jsonl
+logs/chat_test*.jsonl
+web_ui/logs/chat_session*.jsonl
+web_ui/logs/chat_test*.jsonl

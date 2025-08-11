@@ -8,7 +8,7 @@ Virtual Lab methodology for structured meeting-based research collaboration.
 
 import logging
 import time
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Callable
 from pathlib import Path
 
 # Import multi-agent components
@@ -131,7 +131,41 @@ class MultiAgentResearchFramework:
         # Setup directories
         self._setup_directories()
         
+        # Message callback system for UI integration
+        self.message_callback = None
+        self.debug_callback = None
+        
         logger.info("Multi-Agent Research Framework with Virtual Lab initialized successfully")
+    
+    def set_message_callback(self, callback: Callable[[Dict[str, Any]], None]):
+        """Set callback for capturing agent messages."""
+        self.message_callback = callback
+    
+    def set_debug_callback(self, callback: Callable[[str, str, Optional[Dict]], None]):
+        """Set callback for capturing debug information."""
+        self.debug_callback = callback
+    
+    def _capture_agent_message(self, agent_id: str, message: str, message_type: str = "research", metadata: Optional[Dict] = None):
+        """Capture agent message for UI display."""
+        if self.message_callback:
+            try:
+                self.message_callback({
+                    'agent_id': agent_id,
+                    'message': message,
+                    'type': message_type,
+                    'metadata': metadata or {},
+                    'timestamp': time.time()
+                })
+            except Exception as e:
+                logger.error(f"Error in message callback: {e}")
+    
+    def _capture_debug_info(self, debug_type: str, content: str, metadata: Optional[Dict] = None):
+        """Capture debug information for UI display."""
+        if self.debug_callback:
+            try:
+                self.debug_callback(debug_type, content, metadata)
+            except Exception as e:
+                logger.error(f"Error in debug callback: {e}")
     
     def _load_config(self, config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         """Load configuration with defaults."""
@@ -203,85 +237,34 @@ class MultiAgentResearchFramework:
     
     def _init_agent_system(self):
         """Initialize the multi-agent system."""
-        logger.info("Initializing multi-agent system...")
+        # Initialize agent marketplace
+        self.agent_marketplace = AgentMarketplace(llm_config=self.config)
         
-        # Prepare LLM configuration for agents
-        llm_config = {
-            'default_llm_provider': self.config.get('default_llm_provider', 'openai'),
-            'default_model': self.config.get('default_model', 'gpt-4o')
-        }
+        # Initialize Principal Investigator agent
+        self.pi_agent = PrincipalInvestigatorAgent(model_config=self.config)
         
-        # Add API keys from config - check both direct keys and api_keys dictionary
-        api_keys = self.config.get('api_keys', {})
-        llm_config['openai_api_key'] = (
-            self.config.get('openai_api_key') or 
-            api_keys.get('openai')
-        )
-        llm_config['anthropic_api_key'] = (
-            self.config.get('anthropic_api_key') or 
-            api_keys.get('anthropic')
-        )
-        llm_config['gemini_api_key'] = (
-            self.config.get('gemini_api_key') or 
-            api_keys.get('gemini')
-        )
-        llm_config['huggingface_api_key'] = (
-            self.config.get('huggingface_api_key') or 
-            api_keys.get('huggingface')
-        )
-        llm_config['ollama_endpoint'] = (
-            self.config.get('ollama_endpoint') or 
-            api_keys.get('ollama_endpoint', 'http://localhost:11434')
-        )
+        # Initialize Scientific Critic agent
+        self.scientific_critic = ScientificCriticAgent(model_config=self.config)
         
-        # Also add the API keys directly to the config for backward compatibility
-        llm_config.update(api_keys)
-        
-        # Initialize cost manager
-        self.cost_config = {
-            'budget_limit': self.config.get('budget_limit', 20.0),
-            'cost_optimization': self.config.get('cost_optimization', True),
-            'enable_dynamic_tools': self.config.get('enable_dynamic_tools', True),
-            'default_model': self.config.get('default_model', 'gpt-4o-mini'),
-            'premium_model': self.config.get('premium_model', 'gpt-4o'),
-            'web_search_apis': self.config.get('web_search_apis', {}),
-            'code_execution': self.config.get('code_execution', {
-                'sandbox_enabled': True,
-                'timeout_seconds': 30,
-                'memory_limit_mb': 512
-            })
-        }
-        
-        self.cost_manager = CostManager(
-            budget_limit=self.cost_config['budget_limit'],
-            config=self.cost_config
-        )
-        
-        # Initialize agent marketplace with LLM configuration and cost manager
-        self.agent_marketplace = AgentMarketplace(
-            llm_config=llm_config,
-            cost_manager=self.cost_manager
-        )
-        
-        # Initialize Principal Investigator with LLM configuration and cost manager
-        pi_model_config = self.config.get('pi_model_config', {})
-        pi_model_config.update(llm_config)
-        self.pi_agent = PrincipalInvestigatorAgent(
-            agent_id="PI_main",
-            model_config=pi_model_config,
-            cost_manager=self.cost_manager
-        )
-        
-        # Initialize Scientific Critic with LLM configuration and cost manager
-        critic_model_config = self.config.get('critic_model_config', {})
-        critic_model_config.update(llm_config)
-        self.scientific_critic = ScientificCriticAgent(
-            agent_id="critic_main",
-            model_config=critic_model_config,
-            cost_manager=self.cost_manager
-        )
+        # Set up debug callbacks for all agents
+        self._setup_agent_debug_callbacks()
         
         logger.info("Multi-agent system initialized")
+    
+    def _setup_agent_debug_callbacks(self):
+        """Set up debug callbacks for all agents to capture API calls."""
+        # Set debug callback for PI agent
+        if hasattr(self.pi_agent, 'llm_client'):
+            self.pi_agent.llm_client.set_debug_callback(self._capture_debug_info)
+        
+        # Set debug callback for scientific critic
+        if hasattr(self.scientific_critic, 'llm_client'):
+            self.scientific_critic.llm_client.set_debug_callback(self._capture_debug_info)
+        
+        # Set debug callback for agent marketplace agents
+        for agent_id, agent in self.agent_marketplace.agent_registry.items():
+            if hasattr(agent, 'llm_client'):
+                agent.llm_client.set_debug_callback(self._capture_debug_info)
     
     def _init_virtual_lab(self):
         """Initialize the Virtual Lab meeting system with cost management."""
@@ -292,8 +275,7 @@ class MultiAgentResearchFramework:
             pi_agent=self.pi_agent,
             scientific_critic=self.scientific_critic,
             agent_marketplace=self.agent_marketplace,
-            config=self.cost_config,
-            cost_manager=self.cost_manager
+            config=self.config
         )
         
         logger.info(f"Virtual Lab meeting system initialized with budget: ${self.config.get('budget_limit', 100.0):.2f}")
@@ -467,6 +449,9 @@ class MultiAgentResearchFramework:
         """
         logger.info(f"Starting Virtual Lab research: {research_question[:100]}...")
         
+        # Capture research start
+        self._capture_debug_info("research_start", f"Starting Virtual Lab research: {research_question}")
+        
         try:
             # Use Virtual Lab meeting system for structured research
             vlab_results = self.virtual_lab.conduct_research_session(
@@ -475,6 +460,9 @@ class MultiAgentResearchFramework:
                 context=context,
                 session_id=session_id
             )
+            
+            # Capture research completion
+            self._capture_debug_info("research_complete", f"Virtual Lab research completed: {str(vlab_results)[:200]}...")
             
             # Store results in context manager if enabled
             if self.config['store_all_interactions'] and vlab_results.get('session_id'):
@@ -495,6 +483,7 @@ class MultiAgentResearchFramework:
             
         except Exception as e:
             logger.error(f"Virtual Lab research failed: {e}")
+            self._capture_debug_info("research_error", f"Virtual Lab research failed: {str(e)}")
             return {
                 'success': False,
                 'error': str(e),

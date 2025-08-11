@@ -323,6 +323,284 @@
             margin-bottom: 20px;
             font-size: 14px;
         }
+
+        /* Enhanced message types for comprehensive chat display */
+        .message.system-message {
+            background: #f3f4f6;
+            border-left: 4px solid #6b7280;
+        }
+
+        .message.llm-prompt {
+            background: #dbeafe;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .message.llm-response {
+            background: #dcfce7;
+            border-left: 4px solid #16a34a;
+        }
+
+        .message.tool-call {
+            background: #fef3c7;
+            border-left: 4px solid #f59e0b;
+        }
+
+        .message.thought {
+            background: #f3e8ff;
+            border-left: 4px solid #9333ea;
+        }
+
+        .message.agent-communication {
+            background: #e0f2fe;
+            border-left: 4px solid #0284c7;
+        }
+
+        .message-prefix {
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            opacity: 0.8;
+        }
+
+        .message-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .collapsible-content {
+            max-height: 200px;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .collapsible-content.expanded {
+            max-height: none;
+        }
+
+        .expand-button {
+            background: none;
+            border: none;
+            color: #6b7280;
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 8px;
+            margin-top: 8px;
+        }
+
+        .expand-button:hover {
+            color: #374151;
+        }
+
+        /* Debug tab styles */
+        .debug-tab {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 100vh;
+            background: #1f2937;
+            color: #f9fafb;
+            z-index: 1000;
+            transform: translateX(100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .debug-tab.open {
+            transform: translateX(0);
+        }
+
+        .debug-header {
+            background: #374151;
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #4b5563;
+        }
+
+        .debug-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .debug-close {
+            background: none;
+            border: none;
+            color: #f9fafb;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .debug-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .debug-entry {
+            background: #374151;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+            border-left: 4px solid #3b82f6;
+        }
+
+        .debug-entry.error {
+            border-left-color: #ef4444;
+        }
+
+        .debug-entry.success {
+            border-left-color: #16a34a;
+        }
+
+        .debug-entry.warning {
+            border-left-color: #f59e0b;
+        }
+
+        .debug-timestamp {
+            font-size: 11px;
+            color: #9ca3af;
+            margin-bottom: 4px;
+        }
+
+        .debug-type {
+            font-size: 12px;
+            font-weight: 600;
+            color: #60a5fa;
+            margin-bottom: 4px;
+        }
+
+        .debug-message {
+            font-size: 13px;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .debug-toggle {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #374151;
+            color: #f9fafb;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .debug-toggle:hover {
+            background: #4b5563;
+        }
+
+        /* History panel styles */
+        .history-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 350px;
+            height: 100vh;
+            background: #ffffff;
+            border-right: 1px solid #e5e7eb;
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .history-panel.open {
+            transform: translateX(0);
+        }
+
+        .history-header {
+            background: #f9fafb;
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .history-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #374151;
+        }
+
+        .history-close {
+            background: none;
+            border: none;
+            color: #6b7280;
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .history-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .history-item {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .history-item:hover {
+            background: #f3f4f6;
+        }
+
+        .history-item.active {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+        }
+
+        .history-title-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 4px;
+        }
+
+        .history-meta {
+            font-size: 12px;
+            color: #6b7280;
+        }
+
+        .history-toggle {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: #3b82f6;
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .history-toggle:hover {
+            background: #2563eb;
+        }
     </style>
 </head>
 <body>
@@ -385,6 +663,43 @@
         </div>
     </div>
 
+    <!-- Debug Tab -->
+    <button class="debug-toggle" id="debugToggle" onclick="toggleDebugTab()">
+        🔧 Debug
+    </button>
+    
+    <div class="debug-tab" id="debugTab">
+        <div class="debug-header">
+            <div class="debug-title">Debug Console</div>
+            <button class="debug-close" onclick="toggleDebugTab()">×</button>
+        </div>
+        <div class="debug-content" id="debugContent">
+            <div class="debug-entry">
+                <div class="debug-timestamp">System initialized</div>
+                <div class="debug-type">INFO</div>
+                <div class="debug-message">Debug console ready. All system messages, prompts, and LLM communications will be logged here.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Panel -->
+    <button class="history-toggle" id="historyToggle" onclick="toggleHistoryPanel()">
+        📚 History
+    </button>
+    
+    <div class="history-panel" id="historyPanel">
+        <div class="history-header">
+            <div class="history-title">Research Sessions</div>
+            <button class="history-close" onclick="toggleHistoryPanel()">×</button>
+        </div>
+        <div class="history-content" id="historyContent">
+            <div class="history-item">
+                <div class="history-title-text">Loading sessions...</div>
+                <div class="history-meta">Please wait</div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
     <script>
         class ChatInterface {
@@ -392,6 +707,9 @@
                 this.socket = null;
                 this.isResearchMode = false;
                 this.isTyping = false;
+                this.currentSessionId = null;
+                this.debugEntries = [];
+                this.historySessions = [];
                 this.init();
             }
 
@@ -400,6 +718,7 @@
                 this.initializeEventListeners();
                 this.initializeWebSocket();
                 this.autoResizeTextarea();
+                this.loadHistorySessions();
             }
 
             initializeElements() {
@@ -409,6 +728,8 @@
                 this.typingIndicator = document.getElementById('typingIndicator');
                 this.researchModeToggle = document.getElementById('researchModeToggle');
                 this.connectionStatus = document.getElementById('connectionStatus');
+                this.debugContent = document.getElementById('debugContent');
+                this.historyContent = document.getElementById('historyContent');
             }
 
             initializeEventListeners() {
@@ -450,6 +771,14 @@
                 this.socket.on('system_metrics', (data) => {
                     this.handleSystemMetrics(data);
                 });
+
+                this.socket.on('chat_log', (data) => {
+                    this.handleChatLog(data);
+                });
+
+                this.socket.on('debug_log', (data) => {
+                    this.handleDebugLog(data);
+                });
             }
 
             updateConnectionStatus(status, connected) {
@@ -474,7 +803,7 @@
                 if (!message) return;
 
                 // Add user message to chat
-                this.addMessage(message, 'user');
+                this.addMessage(message, 'user', 'communication');
                 this.chatInput.value = '';
                 this.autoResizeTextarea();
 
@@ -501,21 +830,27 @@
                     const data = await response.json();
                     
                     if (data.success) {
-                        this.addMessage('Research session started! I\'ll begin working on your question.', 'assistant');
+                        this.currentSessionId = data.session_id;
+                        this.addMessage('Research session started! I\'ll begin working on your question.', 'assistant', 'communication');
                     } else {
-                        this.addMessage('Sorry, I encountered an error starting the research session. Please try again.', 'assistant');
+                        this.addMessage('Sorry, I encountered an error starting the research session. Please try again.', 'assistant', 'communication');
                     }
                 } catch (error) {
                     console.error('Error sending message:', error);
-                    this.addMessage('Sorry, I\'m having trouble connecting to the research system. Please check your connection.', 'assistant');
+                    this.addMessage('Sorry, I\'m having trouble connecting to the research system. Please check your connection.', 'assistant', 'communication');
                 }
 
                 this.hideTypingIndicator();
             }
 
-            addMessage(content, sender) {
+            addMessage(content, sender, messageType = 'communication') {
                 const messageDiv = document.createElement('div');
                 messageDiv.className = `message ${sender}`;
+                
+                // Add message type class for styling
+                if (messageType && messageType !== 'communication') {
+                    messageDiv.classList.add(messageType);
+                }
                 
                 const avatar = document.createElement('div');
                 avatar.className = 'message-avatar';
@@ -523,7 +858,30 @@
                 
                 const messageContent = document.createElement('div');
                 messageContent.className = 'message-content';
-                messageContent.textContent = content;
+                
+                // Add message prefix for special types
+                if (messageType && messageType !== 'communication') {
+                    const prefix = document.createElement('div');
+                    prefix.className = 'message-prefix';
+                    prefix.textContent = this.getMessageTypePrefix(messageType);
+                    messageContent.appendChild(prefix);
+                }
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.className = 'message-content';
+                contentDiv.textContent = content;
+                
+                // Make long content collapsible
+                if (content.length > 500) {
+                    contentDiv.classList.add('collapsible-content');
+                    const expandButton = document.createElement('button');
+                    expandButton.className = 'expand-button';
+                    expandButton.textContent = 'Show more';
+                    expandButton.onclick = () => this.toggleContent(contentDiv, expandButton);
+                    messageContent.appendChild(expandButton);
+                }
+                
+                messageContent.appendChild(contentDiv);
                 
                 const messageTime = document.createElement('div');
                 messageTime.className = 'message-time';
@@ -537,12 +895,26 @@
                 this.scrollToBottom();
             }
 
+            getMessageTypePrefix(messageType) {
+                const prefixes = {
+                    'system': '🔧 System',
+                    'llm_prompt': '🤖 Prompt',
+                    'llm_response': '🤖 Response',
+                    'tool_call': '🛠️ Tool',
+                    'thought': '💭 Thought',
+                    'agent_communication': '🤝 Agent',
+                    'debug': '🐛 Debug'
+                };
+                return prefixes[messageType] || '💬 Message';
+            }
+
+            toggleContent(contentDiv, button) {
+                contentDiv.classList.toggle('expanded');
+                button.textContent = contentDiv.classList.contains('expanded') ? 'Show less' : 'Show more';
+            }
+
             addSystemMessage(content) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = 'system-message';
-                messageDiv.textContent = content;
-                this.chatMessages.appendChild(messageDiv);
-                this.scrollToBottom();
+                this.addMessage(content, 'system', 'system');
             }
 
             showTypingIndicator() {
@@ -555,16 +927,155 @@
             }
 
             handleAgentActivity(data) {
-                this.addMessage(`Agent ${data.agent_id}: ${data.activity}`, 'assistant');
+                this.addMessage(`Agent ${data.agent_id}: ${data.activity}`, 'assistant', 'agent_communication');
             }
 
             handleResearchProgress(data) {
-                this.addMessage(`Research progress: ${data.phase} - ${data.status}`, 'assistant');
+                this.addMessage(`Research progress: ${data.phase} - ${data.status}`, 'assistant', 'system');
             }
 
             handleSystemMetrics(data) {
                 // Update system status if needed
                 console.log('System metrics:', data);
+            }
+
+            handleChatLog(data) {
+                // Handle incoming chat logs from WebSocket
+                if (data.type === 'llm_prompt' || data.type === 'llm_response') {
+                    this.addMessage(data.message, data.author, data.type);
+                }
+            }
+
+            handleDebugLog(data) {
+                // Add debug entry to debug tab
+                this.addDebugEntry(data.debug_type, data.content, data.metadata);
+            }
+
+            addDebugEntry(debugType, content, metadata = {}) {
+                const entry = document.createElement('div');
+                entry.className = 'debug-entry';
+                
+                // Add error/success/warning styling
+                if (debugType.includes('error')) {
+                    entry.classList.add('error');
+                } else if (debugType.includes('success')) {
+                    entry.classList.add('success');
+                } else if (debugType.includes('warning')) {
+                    entry.classList.add('warning');
+                }
+                
+                const timestamp = document.createElement('div');
+                timestamp.className = 'debug-timestamp';
+                timestamp.textContent = new Date().toLocaleTimeString();
+                
+                const type = document.createElement('div');
+                type.className = 'debug-type';
+                type.textContent = debugType.toUpperCase();
+                
+                const message = document.createElement('div');
+                message.className = 'debug-message';
+                message.textContent = content;
+                
+                entry.appendChild(timestamp);
+                entry.appendChild(type);
+                entry.appendChild(message);
+                
+                this.debugContent.appendChild(entry);
+                this.debugContent.scrollTop = this.debugContent.scrollHeight;
+                
+                // Keep only last 100 debug entries
+                while (this.debugContent.children.length > 100) {
+                    this.debugContent.removeChild(this.debugContent.firstChild);
+                }
+            }
+
+            async loadHistorySessions() {
+                try {
+                    const response = await fetch('/api/sessions');
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.historySessions = data.sessions;
+                        this.renderHistorySessions();
+                    }
+                } catch (error) {
+                    console.error('Error loading history sessions:', error);
+                }
+            }
+
+            renderHistorySessions() {
+                this.historyContent.innerHTML = '';
+                
+                if (this.historySessions.length === 0) {
+                    this.historyContent.innerHTML = '<div class="history-item"><div class="history-title-text">No sessions found</div></div>';
+                    return;
+                }
+                
+                this.historySessions.forEach(session => {
+                    const item = document.createElement('div');
+                    item.className = 'history-item';
+                    item.onclick = () => this.loadSession(session.id);
+                    
+                    const title = document.createElement('div');
+                    title.className = 'history-title-text';
+                    title.textContent = session.auto_title || session.research_question || 'Untitled Session';
+                    
+                    const meta = document.createElement('div');
+                    meta.className = 'history-meta';
+                    meta.textContent = `${new Date(session.created_at).toLocaleDateString()} - ${session.status}`;
+                    
+                    item.appendChild(title);
+                    item.appendChild(meta);
+                    this.historyContent.appendChild(item);
+                });
+            }
+
+            async loadSession(sessionId) {
+                try {
+                    const response = await fetch(`/api/sessions/${sessionId}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.currentSessionId = sessionId;
+                        this.loadSessionChatLogs(sessionId);
+                        
+                        // Update active session in history
+                        document.querySelectorAll('.history-item').forEach(item => {
+                            item.classList.remove('active');
+                        });
+                        event.target.closest('.history-item').classList.add('active');
+                    }
+                } catch (error) {
+                    console.error('Error loading session:', error);
+                }
+            }
+
+            async loadSessionChatLogs(sessionId) {
+                try {
+                    const response = await fetch(`/api/chat-logs?session_id=${sessionId}&limit=50`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Clear current chat
+                        this.chatMessages.innerHTML = '';
+                        
+                        // Add welcome message
+                        const welcomeDiv = document.createElement('div');
+                        welcomeDiv.className = 'welcome-message';
+                        welcomeDiv.innerHTML = '<h2>Session History</h2><p>Loading previous conversation...</p>';
+                        this.chatMessages.appendChild(welcomeDiv);
+                        
+                        // Add chat logs in chronological order
+                        data.logs.reverse().forEach(log => {
+                            this.addMessage(log.message, log.author, log.log_type);
+                        });
+                        
+                        // Remove welcome message
+                        this.chatMessages.removeChild(welcomeDiv);
+                    }
+                } catch (error) {
+                    console.error('Error loading chat logs:', error);
+                }
             }
 
             autoResizeTextarea() {
@@ -580,10 +1091,20 @@
         // Initialize the chat interface
         const chatInterface = new ChatInterface();
 
-        // Global function for quick actions
+        // Global functions for UI controls
         function sendQuickMessage(message) {
             chatInterface.chatInput.value = message;
             chatInterface.sendMessage();
+        }
+
+        function toggleDebugTab() {
+            const debugTab = document.getElementById('debugTab');
+            debugTab.classList.toggle('open');
+        }
+
+        function toggleHistoryPanel() {
+            const historyPanel = document.getElementById('historyPanel');
+            historyPanel.classList.toggle('open');
         }
 
         // Auto-focus the input

@@ -75,11 +75,28 @@ class DataManager:
             logger.info(f"Created directory: {directory}")
     
     def _init_database(self):
-        """Initialize the SQLite database with proper schema."""
+        """Initialize database with proper migration handling."""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # Create sessions table
+        # Create schema version table for migration tracking
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS schema_version (
+                id INTEGER PRIMARY KEY,
+                version INTEGER NOT NULL,
+                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Get current schema version
+        cursor.execute('SELECT version FROM schema_version ORDER BY id DESC LIMIT 1')
+        result = cursor.fetchone()
+        current_version = result[0] if result else 0
+        
+        # Run migrations if needed
+        self._run_migrations(cursor, current_version)
+        
+        # Create base tables (these will be created if they don't exist)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS sessions (
                 id TEXT PRIMARY KEY,
@@ -93,13 +110,6 @@ class DataManager:
                 metadata TEXT
             )
         ''')
-        
-        # Add metadata column if it doesn't exist
-        try:
-            cursor.execute('ALTER TABLE sessions ADD COLUMN metadata TEXT')
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
         
         # Create system metrics table
         cursor.execute('''
@@ -129,16 +139,38 @@ class DataManager:
             )
         ''')
         
-        # Create chat logs table
+        # Create chat logs table with enhanced schema
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS chat_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 session_id TEXT,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                log_type TEXT CHECK(log_type IN ('thought', 'choice', 'communication', 'tool_call', 'system')),
+                log_type TEXT CHECK(log_type IN ('thought', 'choice', 'communication', 'tool_call', 'system', 'llm_prompt', 'llm_response', 'llm_api_call', 'debug', 'agent_communication')),
                 author TEXT,
                 message TEXT,
                 metadata TEXT,
+                raw_request TEXT,
+                raw_response TEXT,
+                performance_metrics TEXT,
+                message_category TEXT,
+                priority INTEGER DEFAULT 0,
+                FOREIGN KEY (session_id) REFERENCES sessions(id)
+            )
+        ''')
+        
+        # Create debug logs table for comprehensive debugging
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS debug_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                debug_type TEXT,
+                content TEXT,
+                metadata TEXT,
+                request_data TEXT,
+                response_data TEXT,
+                error_info TEXT,
+                performance_data TEXT,
                 FOREIGN KEY (session_id) REFERENCES sessions(id)
             )
         ''')
@@ -175,31 +207,6 @@ class DataManager:
             )
         ''')
         
-        # Add missing columns if they don't exist
-        try:
-            cursor.execute('ALTER TABLE meetings ADD COLUMN agenda TEXT')
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
-        
-        try:
-            cursor.execute('ALTER TABLE meetings ADD COLUMN transcript TEXT')
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
-        
-        try:
-            cursor.execute('ALTER TABLE meetings ADD COLUMN outcomes TEXT')
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
-        
-        try:
-            cursor.execute('ALTER TABLE meetings ADD COLUMN metadata TEXT')
-        except sqlite3.OperationalError:
-            # Column already exists
-            pass
-        
         # Create data integrity table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS data_integrity (
@@ -212,9 +219,14 @@ class DataManager:
             )
         ''')
         
-        # Create indexes for better performance
+        # Create indexes for performance
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_logs_session_id ON chat_logs(session_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_logs_timestamp ON chat_logs(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_chat_logs_log_type ON chat_logs(log_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_debug_logs_session_id ON debug_logs(session_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_debug_logs_timestamp ON debug_logs(timestamp)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_activity_session_id ON agent_activity(session_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_agent_activity_timestamp ON agent_activity(timestamp)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_meetings_session_id ON meetings(session_id)')
@@ -227,6 +239,77 @@ class DataManager:
         
         logger.info(f"Database initialized at: {self.db_path}")
     
+    def _run_migrations(self, cursor, current_version: int):
+        """Run database migrations to bring schema up to date."""
+        target_version = 2  # Current schema version
+        
+        if current_version >= target_version:
+            logger.info(f"Database schema is up to date (version {current_version})")
+            return
+        
+        logger.info(f"Running database migrations from version {current_version} to {target_version}")
+        
+        # Migration 1: Add enhanced columns to sessions table
+        if current_version < 1:
+            self._migrate_to_version_1(cursor)
+            current_version = 1
+        
+        # Migration 2: Add enhanced columns to chat_logs table
+        if current_version < 2:
+            self._migrate_to_version_2(cursor)
+            current_version = 2
+        
+        # Update schema version
+        cursor.execute('INSERT INTO schema_version (version) VALUES (?)', (target_version,))
+        logger.info(f"Database migration completed to version {target_version}")
+    
+    def _migrate_to_version_1(self, cursor):
+        """Migration to version 1: Add enhanced columns to sessions table."""
+        logger.info("Running migration to version 1: Adding enhanced session columns")
+        
+        # Add enhanced columns to sessions table
+        columns_to_add = [
+            ('auto_title', 'TEXT'),
+            ('session_category', 'TEXT'),
+            ('total_cost', 'REAL DEFAULT 0.0'),
+            ('agent_count', 'INTEGER DEFAULT 0'),
+            ('message_count', 'INTEGER DEFAULT 0'),
+            ('duration_minutes', 'INTEGER DEFAULT 0')
+        ]
+        
+        for column_name, column_type in columns_to_add:
+            try:
+                cursor.execute(f'ALTER TABLE sessions ADD COLUMN {column_name} {column_type}')
+                logger.info(f"Added column {column_name} to sessions table")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" in str(e):
+                    logger.info(f"Column {column_name} already exists in sessions table")
+                else:
+                    raise
+    
+    def _migrate_to_version_2(self, cursor):
+        """Migration to version 2: Add enhanced columns to chat_logs table."""
+        logger.info("Running migration to version 2: Adding enhanced chat_logs columns")
+        
+        # Add enhanced columns to chat_logs table
+        columns_to_add = [
+            ('raw_request', 'TEXT'),
+            ('raw_response', 'TEXT'),
+            ('performance_metrics', 'TEXT'),
+            ('message_category', 'TEXT'),
+            ('priority', 'INTEGER DEFAULT 0')
+        ]
+        
+        for column_name, column_type in columns_to_add:
+            try:
+                cursor.execute(f'ALTER TABLE chat_logs ADD COLUMN {column_name} {column_type}')
+                logger.info(f"Added column {column_name} to chat_logs table")
+            except sqlite3.OperationalError as e:
+                if "duplicate column name" in str(e):
+                    logger.info(f"Column {column_name} already exists in chat_logs table")
+                else:
+                    raise
+    
     def get_db_connection(self):
         """Get a database connection with proper configuration."""
         conn = sqlite3.connect(self.db_path)
@@ -235,18 +318,38 @@ class DataManager:
     
     # PERSISTENT STORAGE METHODS
     
-    def persist_chat_log(self, session_id: str, log_type: str, author: str, message: str, metadata: Optional[Dict] = None) -> bool:
-        """Persist a chat log entry to the database."""
+    def persist_chat_log(self, session_id: str, log_type: str, author: str, message: str, 
+                        metadata: Optional[Dict] = None, raw_request: Optional[str] = None, 
+                        raw_response: Optional[str] = None, performance_metrics: Optional[Dict] = None,
+                        message_category: Optional[str] = None, priority: int = 0) -> bool:
+        """Persist a chat log entry to the database with enhanced fields."""
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
             
+            # Map debug types to allowed constraint values
+            if log_type.startswith('debug_'):
+                mapped_log_type = 'system'  # Map debug types to system
+            elif log_type in ['research', 'research_start', 'research_complete', 'research_error']:
+                mapped_log_type = 'communication'  # Map research types to communication
+            elif log_type in ['llm_api_call', 'llm_prompt', 'llm_response']:
+                mapped_log_type = 'tool_call'  # Map LLM types to tool_call
+            elif log_type in ['user_input', 'assistant_response']:
+                mapped_log_type = 'communication'  # Map user/assistant types to communication
+            else:
+                mapped_log_type = log_type
+            
             metadata_json = json.dumps(metadata or {})
+            performance_metrics_json = json.dumps(performance_metrics or {})
             
             cursor.execute('''
-                INSERT INTO chat_logs (session_id, log_type, author, message, metadata)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (session_id, log_type, author, message, metadata_json))
+                INSERT INTO chat_logs (session_id, log_type, author, message, metadata, 
+                                     raw_request, raw_response, performance_metrics, 
+                                     message_category, priority)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (session_id, mapped_log_type, author, message, metadata_json,
+                  raw_request, raw_response, performance_metrics_json,
+                  message_category, priority))
             
             conn.commit()
             conn.close()
@@ -256,6 +359,35 @@ class DataManager:
             
         except Exception as e:
             logger.error(f"Error persisting chat log: {e}")
+            return False
+    
+    def persist_debug_log(self, session_id: str, debug_type: str, content: str, 
+                         metadata: Optional[Dict] = None, request_data: Optional[str] = None,
+                         response_data: Optional[str] = None, error_info: Optional[str] = None,
+                         performance_data: Optional[Dict] = None) -> bool:
+        """Persist debug information to the debug_logs table."""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            metadata_json = json.dumps(metadata or {})
+            performance_data_json = json.dumps(performance_data or {})
+            
+            cursor.execute('''
+                INSERT INTO debug_logs (session_id, debug_type, content, metadata,
+                                      request_data, response_data, error_info, performance_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (session_id, debug_type, content, metadata_json,
+                  request_data, response_data, error_info, performance_data_json))
+            
+            conn.commit()
+            conn.close()
+            
+            logger.debug(f"Persisted debug log: {session_id} - {debug_type}: {content[:50]}...")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error persisting debug log: {e}")
             return False
     
     def persist_agent_activity(self, session_id: str, agent_id: str, activity_type: str, message: str, status: str = 'active', metadata: Optional[Dict] = None) -> bool:
@@ -481,6 +613,36 @@ class DataManager:
             
         except Exception as e:
             logger.error(f"Error getting chat logs: {e}")
+            return []
+    
+    def get_debug_logs(self, session_id: Optional[str] = None, debug_type: Optional[str] = None, limit: int = 100) -> List[Dict[str, Any]]:
+        """Get debug logs with optional filtering."""
+        try:
+            conn = self.get_db_connection()
+            cursor = conn.cursor()
+            
+            query = 'SELECT * FROM debug_logs WHERE 1=1'
+            params = []
+            
+            if session_id:
+                query += ' AND session_id = ?'
+                params.append(session_id)
+            
+            if debug_type:
+                query += ' AND debug_type = ?'
+                params.append(debug_type)
+            
+            query += ' ORDER BY timestamp DESC LIMIT ?'
+            params.append(limit)
+            
+            cursor.execute(query, params)
+            logs = [dict(row) for row in cursor.fetchall()]
+            
+            conn.close()
+            return logs
+            
+        except Exception as e:
+            logger.error(f"Error getting debug logs: {e}")
             return []
     
     def get_agent_activity(self, session_id: Optional[str] = None, agent_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:

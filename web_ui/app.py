@@ -1096,6 +1096,114 @@ def get_chat_logs():
         logger.error(f"Error getting chat logs: {e}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/debug-logs', methods=['GET'])
+def get_debug_logs():
+    """Get debug logs for a session."""
+    try:
+        session_id = request.args.get('session_id')
+        debug_type = request.args.get('debug_type')
+        limit = int(request.args.get('limit', 100))
+        
+        if data_manager:
+            logs = data_manager.get_debug_logs(
+                session_id=session_id,
+                debug_type=debug_type,
+                limit=limit
+            )
+            return jsonify({
+                'logs': logs,
+                'total': len(logs)
+            })
+        else:
+            # Fallback to direct database access
+            db = get_db()
+            
+            query = '''
+                SELECT * FROM debug_logs 
+                WHERE 1=1
+            '''
+            params = []
+            
+            if session_id:
+                query += ' AND session_id = ?'
+                params.append(session_id)
+            
+            if debug_type:
+                query += ' AND debug_type = ?'
+                params.append(debug_type)
+            
+            query += ' ORDER BY timestamp DESC LIMIT ?'
+            params.append(limit)
+            
+            logs = db.execute(query, params).fetchall()
+            
+            return jsonify({
+                'logs': [dict(log) for log in logs],
+                'total': len(logs)
+            })
+        
+    except Exception as e:
+        logger.error(f"Error getting debug logs: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/debug-logs', methods=['POST'])
+def add_debug_log():
+    """Add a new debug log entry."""
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+        debug_type = data.get('debug_type')
+        content = data.get('content', '')
+        metadata = data.get('metadata', {})
+        request_data = data.get('request_data')
+        response_data = data.get('response_data')
+        error_info = data.get('error_info')
+        performance_data = data.get('performance_data')
+        
+        if not session_id or not debug_type or not content:
+            return jsonify({'error': 'session_id, debug_type, and content are required'}), 400
+        
+        # Persist to database
+        if data_manager:
+            success = data_manager.persist_debug_log(
+                session_id=session_id,
+                debug_type=debug_type,
+                content=content,
+                metadata=metadata,
+                request_data=request_data,
+                response_data=response_data,
+                error_info=error_info,
+                performance_data=performance_data
+            )
+        else:
+            # Fallback to direct database access
+            db = get_db()
+            db.execute('''
+                INSERT INTO debug_logs (session_id, debug_type, content, metadata,
+                                      request_data, response_data, error_info, performance_data)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (session_id, debug_type, content, json.dumps(metadata),
+                  request_data, response_data, error_info, json.dumps(performance_data or {})))
+            db.commit()
+            success = True
+        
+        if success:
+            # Emit to all clients
+            socketio.emit('debug_log', {
+                'session_id': session_id,
+                'debug_type': debug_type,
+                'content': content,
+                'timestamp': time.time()
+            }, namespace='/')
+            
+            return jsonify({'success': True, 'message': 'Debug log added'})
+        else:
+            return jsonify({'error': 'Failed to persist debug log'}), 500
+        
+    except Exception as e:
+        logger.error(f"Error adding debug log: {e}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/chat-logs', methods=['POST'])
 def add_chat_log():
     """Add a new chat log entry."""

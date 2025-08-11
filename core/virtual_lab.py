@@ -23,6 +23,7 @@ from typing import Dict, List, Any, Optional, Tuple
 from pathlib import Path
 from dataclasses import dataclass
 from enum import Enum
+from datetime import datetime
 
 from agents import PrincipalInvestigatorAgent, ScientificCriticAgent, AgentMarketplace
 from agents.base_agent import BaseAgent
@@ -192,32 +193,56 @@ class VirtualLabMeetingSystem:
         
         return activity
 
-    def log_chat_message(self, log_type: str, author: str, message: str, 
-                        session_id: Optional[str] = None, metadata: Optional[Dict[str, Any]] = None):
-        """Log chat messages for monitoring."""
-        session_id = session_id or self.current_session_id
+    def log_chat_message(self, log_type: str, author: str, message: str, session_id: Optional[str] = None, metrics: Optional[Dict[str, Any]] = None):
+        """Log a chat message with enhanced tracking."""
+        if not session_id:
+            session_id = self.current_session_id
         
-        chat_log = {
-            'log_type': log_type,
-            'author': author,
-            'message': message,
-            'timestamp': time.time(),
-            'session_id': session_id,
-            'metadata': metadata or {}
-        }
+        if not session_id:
+            return
         
-        self.chat_logs.append(chat_log)
+        # Store in session data
+        if session_id in self.session_data:
+            if 'chat_history' not in self.session_data[session_id]:
+                self.session_data[session_id]['chat_history'] = []
+            
+            chat_entry = {
+                'timestamp': time.time(),
+                'author': author,
+                'message': message,
+                'type': log_type,
+                'metrics': metrics or {}
+            }
+            
+            self.session_data[session_id]['chat_history'].append(chat_entry)
+            
+            # Capture agent message for UI if it's from an agent
+            if author != 'System' and author != 'user':
+                # Try to capture in parent framework if available
+                if hasattr(self, 'parent_framework') and self.parent_framework:
+                    self.parent_framework._capture_agent_message(
+                        agent_id=author,
+                        message=message,
+                        message_type=log_type,
+                        metadata={'session_id': session_id, 'metrics': metrics}
+                    )
         
-        # Keep only recent logs (last 2000)
-        if len(self.chat_logs) > 2000:
-            self.chat_logs = self.chat_logs[-2000:]
-        
-        logger.info(f"Chat log: {log_type} - {author}: {message[:100]}...")
-        
-        # Emit to web UI via websocket
-        self._emit_activity_to_web_ui('chat_log', chat_log)
-        
-        return chat_log
+        # Log to file if enabled
+        if self.config.get('log_chat_messages', True):
+            log_entry = {
+                'timestamp': datetime.now().isoformat(),
+                'session_id': session_id,
+                'author': author,
+                'message': message,
+                'type': log_type,
+                'metrics': metrics
+            }
+            
+            log_file = Path(self.config.get('log_dir', 'logs')) / f"chat_{session_id}.jsonl"
+            log_file.parent.mkdir(exist_ok=True)
+            
+            with open(log_file, 'a', encoding='utf-8') as f:
+                f.write(json.dumps(log_entry) + '\n')
 
     def calculate_text_metrics(self, text: str) -> Dict[str, Any]:
         """Calculate text analysis metrics."""

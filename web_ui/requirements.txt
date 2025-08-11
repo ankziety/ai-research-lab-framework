@@ -4,7 +4,7 @@ psutil>=5.9.0
 python-socketio>=5.8.0
 
 # Gradio for the new UI
-gradio>=4.0.0
+gradio>=4.44.0
 playwright>=1.40.0
 
 # Base requirements from parent project

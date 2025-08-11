@@ -7,7 +7,7 @@ Provides a unified interface for different LLM providers (OpenAI, Anthropic, etc
 import os
 import logging
 import json
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Callable
 import time
 
 logger = logging.getLogger(__name__)
@@ -33,51 +33,47 @@ class LLMClient:
         )
         return (tokens_input / 1000) * input_cost_per_1k + (tokens_output / 1000) * output_cost_per_1k
 
-    def __init__(self, config: Dict[str, Any]):
-        """
-        Initialize LLM client with configuration.
+    def __init__(self, config: Optional[Dict[str, Any]] = None, data_manager=None, session_id: Optional[str] = None):
+        """Initialize the LLM client with configuration and data manager integration."""
+        self.config = config or {}
         
-        Args:
-            config: Configuration dictionary containing API keys and settings
-        """
-        self.config = config
-        self.provider = config.get('default_llm_provider', 'openai')
-        self.model = config.get('default_model', 'gpt-4')
-
-        # API keys from config or environment
-        # Check both top-level and nested locations
-        api_keys = config.get('api_keys', {})
-        framework = config.get('framework', {})
+        # API keys - check both direct keys and api_keys dictionary
+        api_keys = self.config.get('api_keys', {})
+        framework = self.config.get('framework', {})
         
         self.openai_api_key = (
-            config.get('openai_api_key') or 
+            self.config.get('openai_api_key') or 
             framework.get('openai_api_key') or
             api_keys.get('openai') or
             os.getenv('OPENAI_API_KEY')
         )
         self.anthropic_api_key = (
-            config.get('anthropic_api_key') or 
+            self.config.get('anthropic_api_key') or 
             framework.get('anthropic_api_key') or
             api_keys.get('anthropic') or
             os.getenv('ANTHROPIC_API_KEY')
         )
         self.gemini_api_key = (
-            config.get('gemini_api_key') or
+            self.config.get('gemini_api_key') or
             framework.get('gemini_api_key') or
             api_keys.get('gemini') or
             os.getenv('GEMINI_API_KEY')
         )
         self.huggingface_api_key = (
-            config.get('huggingface_api_key') or
+            self.config.get('huggingface_api_key') or
             framework.get('huggingface_api_key') or
             api_keys.get('huggingface') or
             os.getenv('HUGGINGFACE_API_KEY')
         )
-
+        
         # Local model configurations
-        self.ollama_endpoint = config.get('ollama_endpoint', 'http://localhost:11434')
-        self.local_model_endpoint = config.get('local_model_endpoint', None)
-
+        self.ollama_endpoint = self.config.get('ollama_endpoint', 'http://localhost:11434')
+        self.local_model_endpoint = self.config.get('local_model_endpoint', None)
+        
+        # Model configuration
+        self.provider = self.config.get('default_llm_provider', 'openai')
+        self.model = self.config.get('default_model', 'gpt-4')
+        
         # Provider pricing for cost optimization
         self.provider_costs = {
             'openai': {'gpt-4o': 0.03, 'gpt-4o-mini': 0.00015},
@@ -86,8 +82,65 @@ class LLMClient:
             'huggingface': {'default': 0.0001},  # Typically cheaper
             'ollama': {'default': 0.0},  # Free local inference
         }
-
+        
+        # Debug callback for UI integration
+        self.debug_callback = None
+        
+        # Data manager integration for comprehensive logging
+        self.data_manager = data_manager
+        self.session_id = session_id
+        
         self._validate_configuration()
+        logger.info(f"LLM Client initialized with provider: {self.provider}, model: {self.model}")
+    
+    def set_debug_callback(self, callback: Callable[[str, str, Optional[Dict]], None]):
+        """Set callback for capturing debug information."""
+        self.debug_callback = callback
+    
+    def _capture_debug_info(self, debug_type: str, content: str, metadata: Optional[Dict] = None):
+        """Capture debug information for UI display and data manager."""
+        # Call debug callback for UI integration
+        if self.debug_callback:
+            try:
+                self.debug_callback(debug_type, content, metadata)
+            except Exception as e:
+                logger.error(f"Error in debug callback: {e}")
+        
+        # Log to data manager if available
+        if self.data_manager and self.session_id:
+            try:
+                # Extract request/response data from metadata
+                request_data = None
+                response_data = None
+                error_info = None
+                performance_data = None
+                
+                if metadata:
+                    if debug_type == 'llm_api_call':
+                        request_data = json.dumps(metadata, indent=2)
+                    elif debug_type == 'llm_response':
+                        response_data = content
+                        performance_data = {
+                            'tokens_input': metadata.get('tokens_input', 0),
+                            'tokens_output': metadata.get('tokens_output', 0),
+                            'execution_time': metadata.get('execution_time', 0),
+                            'actual_cost': metadata.get('actual_cost', 0)
+                        }
+                    elif debug_type == 'llm_error':
+                        error_info = content
+                
+                self.data_manager.persist_debug_log(
+                    session_id=self.session_id,
+                    debug_type=debug_type,
+                    content=content,
+                    metadata=metadata,
+                    request_data=request_data,
+                    response_data=response_data,
+                    error_info=error_info,
+                    performance_data=performance_data
+                )
+            except Exception as e:
+                logger.error(f"Error logging to data manager: {e}")
 
     def _validate_configuration(self):
         """Validate configuration and log available providers."""
@@ -138,6 +191,36 @@ class LLMClient:
         agent_id = context.get('agent_id', 'unknown')
         task_type = context.get('task_type', 'general')
         
+        # Capture API call for debug panel and data manager
+        api_call_info = {
+            'provider': self.provider,
+            'model': self.model,
+            'agent_role': agent_role,
+            'agent_id': agent_id,
+            'task_type': task_type,
+            'prompt_length': len(prompt),
+            'timestamp': time.time(),
+            'session_id': self.session_id
+        }
+        
+        # Log to data manager if available
+        if self.data_manager and self.session_id:
+            try:
+                self.data_manager.persist_chat_log(
+                    session_id=self.session_id,
+                    log_type='llm_prompt',
+                    author=f"{agent_id} ({self.provider})",
+                    message=prompt,
+                    metadata=api_call_info,
+                    message_category='llm_communication',
+                    priority=1
+                )
+            except Exception as e:
+                logger.error(f"Error logging LLM prompt to data manager: {e}")
+        
+        self._capture_debug_info("llm_api_call", f"API Call to {self.provider}/{self.model}", api_call_info)
+        self._capture_debug_info("llm_prompt", f"Prompt sent to {self.provider}/{self.model}:\n\n{prompt}", api_call_info)
+        
         # Estimate cost before generation
         estimated_tokens_output = tokens_input * 2  # Rough estimate
         if cost_manager:
@@ -179,6 +262,34 @@ class LLMClient:
             actual_cost = self._estimate_cost_local(tokens_input, tokens_output)
         
         execution_time = time.time() - start_time
+        
+        # Capture response for debug panel and data manager
+        response_info = {
+            **api_call_info,
+            'response_length': len(response),
+            'tokens_input': tokens_input,
+            'tokens_output': tokens_output,
+            'execution_time': execution_time,
+            'actual_cost': actual_cost
+        }
+        
+        # Log response to data manager if available
+        if self.data_manager and self.session_id:
+            try:
+                self.data_manager.persist_chat_log(
+                    session_id=self.session_id,
+                    log_type='llm_response',
+                    author=f"{self.provider} ({self.model})",
+                    message=response,
+                    metadata=response_info,
+                    message_category='llm_communication',
+                    priority=1
+                )
+            except Exception as e:
+                logger.error(f"Error logging LLM response to data manager: {e}")
+        
+        self._capture_debug_info("llm_response", f"Response from {self.provider}/{self.model}:\n\n{response[:500]}...", response_info)
+        
         logger.info(f"LLM response generated: {tokens_input + tokens_output} tokens, ${actual_cost:.4f}, {execution_time:.2f}s")
         
         return response
