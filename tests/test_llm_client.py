@@ -50,8 +50,8 @@ class TestLLMClientInitialization:
         
         client = LLMClient(config)
         assert client.provider == 'openai'
-        # The model should be 'gpt-5-nano' as the default (most cost-efficient)
-        assert client.model == 'gpt-5-nano'
+        # The model should be 'gpt-5' as the default (flagship model)
+        assert client.model == 'gpt-5'
     
     def test_initialization_with_environment_variables(self):
         """Test initialization with environment variables."""

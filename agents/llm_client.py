@@ -72,7 +72,7 @@ class LLMClient:
         
         # Model configuration
         self.provider = self.config.get('default_llm_provider', 'openai')
-        self.model = self.config.get('default_model', 'gpt-5-nano')
+        self.model = self.config.get('default_model', 'gpt-5')
         
         # Cost management integration
         self.cost_manager = None
