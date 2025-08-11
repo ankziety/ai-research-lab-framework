@@ -74,6 +74,11 @@ class LLMClient:
         self.provider = self.config.get('default_llm_provider', 'openai')
         self.model = self.config.get('default_model', 'gpt-4o')
         
+        # Cost management integration
+        self.cost_manager = None
+        self.budget_limit = self.config.get('budget_limit', 30.0)  # Default $30 budget
+        self._initialize_cost_manager()
+        
         # Provider pricing for cost optimization
         self.provider_costs = {
             'openai': {'gpt-4o': 0.03, 'gpt-4o-mini': 0.00015},
@@ -91,8 +96,18 @@ class LLMClient:
         self.session_id = session_id
         
         self._validate_configuration()
-        logger.info(f"LLM Client initialized with provider: {self.provider}, model: {self.model}")
+        logger.info(f"LLM Client initialized with provider: {self.provider}, model: {self.model}, budget: ${self.budget_limit}")
     
+    def _initialize_cost_manager(self):
+        """Initialize the cost manager for budget protection."""
+        try:
+            from data.cost_manager import CostManager
+            self.cost_manager = CostManager(self.budget_limit, self.config)
+            logger.info(f"Cost manager initialized with budget: ${self.budget_limit}")
+        except ImportError:
+            logger.warning("Cost manager not available - budget protection disabled")
+            self.cost_manager = None
+
     def set_debug_callback(self, callback: Callable[[str, str, Optional[Dict]], None]):
         """Set callback for capturing debug information."""
         self.debug_callback = callback
@@ -171,25 +186,57 @@ class LLMClient:
     def generate_response(self, prompt: str, context: Dict[str, Any], 
                          agent_role: str = "AI Assistant", cost_manager=None) -> str:
         """
-        Generate a response using the configured LLM provider with cost tracking.
+        Generate a response using the configured LLM provider with cost tracking and budget protection.
         
         Args:
             prompt: The input prompt
             context: Additional context information
             agent_role: The role/persona of the agent
-            cost_manager: Optional cost manager for tracking
+            cost_manager: Optional cost manager for tracking (uses internal if not provided)
             
         Returns:
             Generated response string
             
         Raises:
-            RuntimeError: If no valid LLM provider is available
+            RuntimeError: If no valid LLM provider is available or budget exceeded
             Exception: If LLM generation fails
         """
         start_time = time.time()
         tokens_input = len(prompt.split())
         agent_id = context.get('agent_id', 'unknown')
         task_type = context.get('task_type', 'general')
+        
+        # Use internal cost manager if none provided
+        if cost_manager is None:
+            cost_manager = self.cost_manager
+        
+        # Budget protection: Check if we can afford this request
+        estimated_tokens_output = tokens_input * 2  # Rough estimate
+        if cost_manager:
+            estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
+            
+            # Check if we can afford this request
+            if not cost_manager.can_afford(estimated_cost):
+                # Try to find a cheaper model
+                budget_remaining = cost_manager.get_budget_status().get('budget_remaining', 0)
+                cheaper_model = cost_manager.optimize_model_selection(
+                    task_complexity='medium', 
+                    budget_remaining=budget_remaining,
+                    required_capabilities=['reasoning', 'analysis']
+                )
+                
+                if cheaper_model != self.model:
+                    logger.warning(f"Budget exceeded for {self.model} (${estimated_cost:.4f}), switching to {cheaper_model}")
+                    original_model = self.model
+                    self.model = cheaper_model
+                    estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
+                    
+                    if not cost_manager.can_afford(estimated_cost):
+                        raise RuntimeError(f"Insufficient budget for any model. Required: ${estimated_cost:.4f}, Available: ${budget_remaining:.2f}")
+                else:
+                    raise RuntimeError(f"Insufficient budget for LLM request: ${estimated_cost:.4f}, Available: ${budget_remaining:.2f}")
+        else:
+            estimated_cost = self._estimate_cost_local(tokens_input, estimated_tokens_output)
         
         # Capture API call for debug panel and data manager
         api_call_info = {
@@ -199,6 +246,7 @@ class LLMClient:
             'agent_id': agent_id,
             'task_type': task_type,
             'prompt_length': len(prompt),
+            'estimated_cost': estimated_cost,
             'timestamp': time.time(),
             'session_id': self.session_id
         }
@@ -218,81 +266,72 @@ class LLMClient:
             except Exception as e:
                 logger.error(f"Error logging LLM prompt to data manager: {e}")
         
-        self._capture_debug_info("llm_api_call", f"API Call to {self.provider}/{self.model}", api_call_info)
+        self._capture_debug_info("llm_api_call", f"API Call to {self.provider}/{self.model} (est. ${estimated_cost:.4f})", api_call_info)
         self._capture_debug_info("llm_prompt", f"Prompt sent to {self.provider}/{self.model}:\n\n{prompt}", api_call_info)
         
-        # Estimate cost before generation
-        estimated_tokens_output = tokens_input * 2  # Rough estimate
-        if cost_manager:
-            estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
-            # Check if we can afford this request
-            if not cost_manager.can_afford(estimated_cost):
-                raise RuntimeError(f"Insufficient budget for LLM request: ${estimated_cost:.4f}")
-        else:
-            estimated_cost = self._estimate_cost_local(tokens_input, estimated_tokens_output)
-        
         # Generate response
-        if self.provider == 'openai' and self.openai_api_key:
-            response = self._generate_openai_response(prompt, context, agent_role)
-        elif self.provider == 'anthropic' and self.anthropic_api_key:
-            response = self._generate_anthropic_response(prompt, context, agent_role)
-        elif self.provider == 'gemini' and self.gemini_api_key:
-            response = self._generate_gemini_response(prompt, context, agent_role)
-        elif self.provider == 'huggingface' and self.huggingface_api_key:
-            response = self._generate_huggingface_response(prompt, context, agent_role)
-        elif self.provider == 'ollama':
-            response = self._generate_ollama_response(prompt, context, agent_role)
-        else:
-            raise RuntimeError(f"No valid LLM provider available for {self.provider}")
-        
-        # Track actual usage and cost
-        tokens_output = len(response.split())
-        if cost_manager:
-            actual_cost = cost_manager.estimate_cost(self.model, tokens_input, tokens_output)
-            cost_manager.track_usage(
-                model=self.model,
-                tokens_input=tokens_input,
-                tokens_output=tokens_output,
-                actual_cost=actual_cost,
-                task_type=task_type,
-                agent_id=agent_id,
-                success=True
-            )
-        else:
-            actual_cost = self._estimate_cost_local(tokens_input, tokens_output)
-        
-        execution_time = time.time() - start_time
-        
-        # Capture response for debug panel and data manager
-        response_info = {
-            **api_call_info,
-            'response_length': len(response),
-            'tokens_input': tokens_input,
-            'tokens_output': tokens_output,
-            'execution_time': execution_time,
-            'actual_cost': actual_cost
-        }
-        
-        # Log response to data manager if available
-        if self.data_manager and self.session_id:
-            try:
-                self.data_manager.persist_chat_log(
-                    session_id=self.session_id,
-                    log_type='llm_response',
-                    author=f"{self.provider} ({self.model})",
-                    message=response,
-                    metadata=response_info,
-                    message_category='llm_communication',
-                    priority=1
+        try:
+            if self.provider == 'openai' and self.openai_api_key:
+                response = self._generate_openai_response(prompt, context, agent_role)
+            elif self.provider == 'anthropic' and self.anthropic_api_key:
+                response = self._generate_anthropic_response(prompt, context, agent_role)
+            elif self.provider == 'gemini' and self.gemini_api_key:
+                response = self._generate_gemini_response(prompt, context, agent_role)
+            elif self.provider == 'huggingface' and self.huggingface_api_key:
+                response = self._generate_huggingface_response(prompt, context, agent_role)
+            elif self.provider == 'ollama':
+                response = self._generate_ollama_response(prompt, context, agent_role)
+            else:
+                raise RuntimeError(f"No valid LLM provider available for {self.provider}")
+            
+            # Track actual usage and cost
+            tokens_output = len(response.split())
+            if cost_manager:
+                actual_cost = cost_manager.estimate_cost(self.model, tokens_input, tokens_output)
+                cost_manager.track_usage(
+                    model=self.model,
+                    tokens_input=tokens_input,
+                    tokens_output=tokens_output,
+                    actual_cost=actual_cost,
+                    task_type=task_type,
+                    agent_id=agent_id,
+                    success=True
                 )
-            except Exception as e:
-                logger.error(f"Error logging LLM response to data manager: {e}")
-        
-        self._capture_debug_info("llm_response", f"Response from {self.provider}/{self.model}:\n\n{response[:500]}...", response_info)
-        
-        logger.info(f"LLM response generated: {tokens_input + tokens_output} tokens, ${actual_cost:.4f}, {execution_time:.2f}s")
-        
-        return response
+                logger.info(f"LLM response generated: {self.provider}/{self.model}, cost: ${actual_cost:.4f}")
+            
+            # Log response to data manager
+            if self.data_manager and self.session_id:
+                try:
+                    self.data_manager.persist_chat_log(
+                        session_id=self.session_id,
+                        log_type='llm_response',
+                        author=f"{self.provider} ({self.model})",
+                        message=response,
+                        metadata={'response_length': len(response), 'actual_cost': actual_cost if cost_manager else estimated_cost},
+                        message_category='llm_communication',
+                        priority=1
+                    )
+                except Exception as e:
+                    logger.error(f"Error logging LLM response to data manager: {e}")
+            
+            self._capture_debug_info("llm_response", f"Response from {self.provider}/{self.model}:\n\n{response}", api_call_info)
+            
+            return response
+            
+        except Exception as e:
+            # Track failed usage
+            if cost_manager:
+                cost_manager.track_usage(
+                    model=self.model,
+                    tokens_input=tokens_input,
+                    tokens_output=0,
+                    actual_cost=0.0,
+                    task_type=task_type,
+                    agent_id=agent_id,
+                    success=False,
+                    error_message=str(e)
+                )
+            raise
 
     def _generate_openai_response(self, prompt: str, context: Dict[str, Any], 
                                  agent_role: str) -> str:
@@ -465,7 +504,7 @@ class LLMClient:
                                   agent_role: str = "AI Assistant", 
                                   task_complexity: str = 'medium') -> str:
         """
-        Generate response using the most cost-effective provider for the task.
+        Generate response using the most cost-effective provider for the task with budget protection.
         
         Args:
             prompt: The input prompt
@@ -476,18 +515,60 @@ class LLMClient:
         Returns:
             Generated response string
         """
-        optimal_provider = self.select_optimal_provider(prompt, task_complexity)
+        # Use cost manager for optimal model selection if available
+        if self.cost_manager:
+            budget_status = self.cost_manager.get_budget_status()
+            budget_remaining = budget_status.get('budget_remaining', 0)
+            
+            # Get optimal model based on cost and budget
+            optimal_model = self.cost_manager.optimize_model_selection(
+                task_complexity=task_complexity,
+                budget_remaining=budget_remaining,
+                required_capabilities=['reasoning', 'analysis']
+            )
+            
+            # Temporarily switch to optimal model
+            original_model = self.model
+            self.model = optimal_model
+            
+            try:
+                response = self.generate_response(prompt, context, agent_role, self.cost_manager)
+                return response
+            finally:
+                # Restore original model
+                self.model = original_model
+        else:
+            # Fallback to provider-based selection
+            optimal_provider = self.select_optimal_provider(prompt, task_complexity)
+            original_provider = self.provider
+            self.provider = optimal_provider
+            
+            try:
+                response = self.generate_response(prompt, context, agent_role)
+                return response
+            finally:
+                # Restore original provider
+                self.provider = original_provider
 
-        # Temporarily switch to optimal provider
-        original_provider = self.provider
-        self.provider = optimal_provider
-
-        try:
-            response = self.generate_response(prompt, context, agent_role)
-            return response
-        finally:
-            # Restore original provider
-            self.provider = original_provider
+    def get_budget_status(self) -> Dict[str, Any]:
+        """Get current budget status and spending analytics."""
+        if self.cost_manager:
+            return self.cost_manager.get_budget_status()
+        else:
+            return {
+                'budget_limit': self.budget_limit,
+                'current_spending': 0.0,
+                'budget_remaining': self.budget_limit,
+                'budget_utilization': 0.0,
+                'cost_manager_available': False
+            }
+    
+    def set_budget_limit(self, budget_limit: float):
+        """Update the budget limit."""
+        self.budget_limit = budget_limit
+        if self.cost_manager:
+            self.cost_manager.reset_budget(budget_limit)
+        logger.info(f"Budget limit updated to: ${budget_limit}")
 
 
 # Global client instance
@@ -524,6 +605,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                     config = {
                         'default_llm_provider': framework.get('default_llm_provider', 'openai'),
                         'default_model': framework.get('default_model', 'gpt-4o'),
+                        'budget_limit': framework.get('budget_limit', 30.0),  # Default $30 budget
                         'openai_api_key': (
                             framework.get('openai_api_key') or 
                             api_keys.get('openai') or
@@ -555,6 +637,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                     config = {
                         'default_llm_provider': 'openai',
                         'default_model': 'gpt-4o',
+                        'budget_limit': 30.0, # Default budget
                         'openai_api_key': os.getenv('OPENAI_API_KEY'),
                         'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
                         'gemini_api_key': os.getenv('GEMINI_API_KEY'),
@@ -567,6 +650,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                 config = {
                     'default_llm_provider': 'openai',
                     'default_model': 'gpt-4o',
+                    'budget_limit': 30.0, # Default budget
                     'openai_api_key': os.getenv('OPENAI_API_KEY'),
                     'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
                     'gemini_api_key': os.getenv('GEMINI_API_KEY'),

@@ -90,6 +90,7 @@ class CostManager:
     def _load_model_costs(self, config: Dict[str, Any]) -> Dict[str, ModelCost]:
         """Load model cost configurations."""
         default_costs = {
+            # GPT-4o models (recommended - most cost-effective)
             'gpt-4o': ModelCost(
                 model_name='gpt-4o',
                 provider='openai',
@@ -108,6 +109,35 @@ class CostManager:
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.85
             ),
+            # GPT-4 models (expensive - use sparingly)
+            'gpt-4': ModelCost(
+                model_name='gpt-4',
+                provider='openai',
+                input_cost_per_1k=0.03,
+                output_cost_per_1k=0.06,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.95
+            ),
+            'gpt-4-turbo': ModelCost(
+                model_name='gpt-4-turbo',
+                provider='openai',
+                input_cost_per_1k=0.01,
+                output_cost_per_1k=0.03,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.95
+            ),
+            'gpt-4-turbo-preview': ModelCost(
+                model_name='gpt-4-turbo-preview',
+                provider='openai',
+                input_cost_per_1k=0.01,
+                output_cost_per_1k=0.03,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.95
+            ),
+            # Legacy models
             'gpt-3.5-turbo': ModelCost(
                 model_name='gpt-3.5-turbo',
                 provider='openai',
@@ -117,6 +147,7 @@ class CostManager:
                 capabilities=['reasoning', 'analysis'],
                 reliability_score=0.80
             ),
+            # Anthropic models
             'claude-3-sonnet': ModelCost(
                 model_name='claude-3-sonnet',
                 provider='anthropic',
@@ -135,6 +166,7 @@ class CostManager:
                 capabilities=['reasoning', 'analysis'],
                 reliability_score=0.75
             ),
+            # Google models
             'gemini-pro': ModelCost(
                 model_name='gemini-pro',
                 provider='google',
@@ -144,6 +176,7 @@ class CostManager:
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.85
             ),
+            # Local models
             'llama2': ModelCost(
                 model_name='llama2',
                 provider='ollama',
@@ -270,6 +303,7 @@ class CostManager:
                                required_capabilities: List[str] = None) -> str:
         """
         Select optimal model based on cost, capability, and budget.
+        Prioritizes cost-effective models to prevent budget overflow.
         
         Args:
             task_complexity: 'simple', 'medium', or 'complex'
@@ -294,6 +328,23 @@ class CostManager:
             logger.warning("No models available with required capabilities")
             return 'gpt-4o'
         
+        # Budget protection: Avoid expensive models when budget is low
+        expensive_models = ['gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview']
+        if budget_remaining < 5.0:  # Less than $5 remaining
+            available_models = [(name, cost) for name, cost in available_models 
+                              if name not in expensive_models]
+            logger.warning(f"Budget low (${budget_remaining:.2f}), excluding expensive models")
+        
+        if budget_remaining < 1.0:  # Less than $1 remaining
+            # Only use the cheapest models
+            available_models = [(name, cost) for name, cost in available_models 
+                              if cost.input_cost_per_1k < 0.001]
+            logger.warning(f"Budget very low (${budget_remaining:.2f}), using only cheapest models")
+        
+        if not available_models:
+            logger.error("No affordable models available")
+            return 'gpt-4o-mini'  # Fallback to cheapest option
+        
         # Score models based on cost efficiency and capability
         model_scores = []
         for model_name, model_cost in available_models:
@@ -308,10 +359,14 @@ class CostManager:
             elif task_complexity == 'simple':
                 capability_score = 0.5 + (model_cost.reliability_score * 0.5)
             
-            # Budget consideration
+            # Budget consideration - heavily weight cost when budget is low
             budget_score = 1.0
-            if budget_remaining < 1.0:  # Low budget
+            if budget_remaining < 10.0:  # Low budget threshold
                 budget_score = cost_score / max(cost_score for _, _ in available_models)
+            
+            # Penalize expensive models more heavily
+            if model_name in expensive_models:
+                cost_score *= 0.1  # 90% penalty for expensive models
             
             # Combined score
             total_score = cost_score * capability_score * budget_score
@@ -321,7 +376,7 @@ class CostManager:
         model_scores.sort(key=lambda x: x[1], reverse=True)
         optimal_model = model_scores[0][0]
         
-        logger.info(f"Selected optimal model: {optimal_model} for {task_complexity} task")
+        logger.info(f"Selected optimal model: {optimal_model} for {task_complexity} task (budget: ${budget_remaining:.2f})")
         return optimal_model
     
     def get_budget_status(self) -> Dict[str, Any]:
