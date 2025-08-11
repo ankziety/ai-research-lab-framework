@@ -465,11 +465,13 @@ Please provide:
         """
         try:
             from tools.tool_registry import ToolRegistry
+            from tools.mcp_tool_registry import MCPToolRegistry
             
-            # Get tool registry instance
+            # Get tool registry instances
             tool_registry = ToolRegistry()
+            mcp_tool_registry = MCPToolRegistry()
             
-            # Discover tools for this task
+            # Discover standard tools for this task
             available_tools = tool_registry.discover_tools(
                 agent_id=self.agent_id,
                 task_description=task_description,
@@ -493,11 +495,38 @@ Please provide:
                         'success_rate': tool.success_rate,
                         'usage_count': tool.usage_count,
                         'requirements': tool.requirements,
-                        'tool': tool  # Include the actual tool instance
+                        'tool': tool,  # Include the actual tool instance
+                        'tool_type': 'standard'
                     }
                     enhanced_tools.append(enhanced_tool)
             
-            logger.info(f"Agent {self.agent_id} discovered {len(enhanced_tools)} tools for task")
+            # Discover MCP-compatible tools
+            mcp_tools = mcp_tool_registry.recommend_tools_for_task(
+                task_description=task_description,
+                domain=self._get_primary_domain()
+            )
+            
+            for mcp_tool_info in mcp_tools:
+                enhanced_mcp_tool = {
+                    'tool_id': f"mcp_{mcp_tool_info['name']}",
+                    'name': mcp_tool_info['name'],
+                    'description': mcp_tool_info['mcp_description'].get('description', ''),
+                    'capabilities': mcp_tool_info.get('capabilities', []),
+                    'confidence': mcp_tool_info.get('confidence', 0.0),
+                    'success_rate': 1.0,  # MCP tools are new, assume high success rate
+                    'usage_count': 0,
+                    'requirements': {},
+                    'tool': None,  # MCP tools are loaded dynamically
+                    'tool_type': 'mcp',
+                    'mcp_description': mcp_tool_info['mcp_description'],
+                    'file_path': mcp_tool_info['file_path']
+                }
+                enhanced_tools.append(enhanced_mcp_tool)
+            
+            # Sort by confidence
+            enhanced_tools.sort(key=lambda x: x['confidence'], reverse=True)
+            
+            logger.info(f"Agent {self.agent_id} discovered {len(enhanced_tools)} tools for task ({len(mcp_tools)} MCP tools)")
             return enhanced_tools
             
         except Exception as e:
@@ -517,8 +546,15 @@ Please provide:
         """
         try:
             from tools.tool_registry import ToolRegistry
+            from tools.mcp_tool_registry import MCPToolRegistry
             
-            # Get tool registry instance
+            # Check if this is an MCP tool
+            if tool_id.startswith('mcp_'):
+                mcp_tool_name = tool_id[4:]  # Remove 'mcp_' prefix
+                mcp_tool_registry = MCPToolRegistry()
+                return mcp_tool_registry.get_mcp_tool(mcp_tool_name)
+            
+            # Get standard tool registry instance
             tool_registry = ToolRegistry()
             
             # Request tool with context
@@ -545,7 +581,7 @@ Please provide:
         
         Args:
             task: Task description
-            tools: List of tool instances to use
+            tools: List of tool instances or tool IDs to use
             
         Returns:
             Execution results with output and metadata
@@ -566,29 +602,42 @@ Please provide:
         
         try:
             # Execute each tool
-            for i, tool in enumerate(tools):
+            for i, tool_or_id in enumerate(tools):
                 try:
-                    # Prepare task for tool
-                    tool_task = {
-                        'description': task,
-                        'agent_id': self.agent_id,
-                        'tool_index': i
-                    }
-                    
-                    # Execute tool
-                    tool_result = tool.execute(tool_task, {
-                        'agent_id': self.agent_id,
-                        'agent_role': self.role,
-                        'agent_expertise': self.expertise
-                    })
+                    # Handle both tool instances and tool IDs
+                    if isinstance(tool_or_id, str):
+                        # It's a tool ID, execute it
+                        tool_result = self.execute_tool(tool_or_id, {
+                            'description': task,
+                            'agent_id': self.agent_id,
+                            'tool_index': i
+                        }, {
+                            'agent_id': self.agent_id,
+                            'agent_role': self.role,
+                            'agent_expertise': self.expertise
+                        })
+                    else:
+                        # It's a tool instance
+                        tool = tool_or_id
+                        tool_task = {
+                            'description': task,
+                            'agent_id': self.agent_id,
+                            'tool_index': i
+                        }
+                        
+                        tool_result = tool.execute(tool_task, {
+                            'agent_id': self.agent_id,
+                            'agent_role': self.role,
+                            'agent_expertise': self.expertise
+                        })
                     
                     # Track cost if available
                     if 'cost' in tool_result.get('metadata', {}):
                         results['metadata']['total_cost'] += tool_result['metadata']['cost']
                     
                     results['tool_results'].append({
-                        'tool_id': tool.tool_id,
-                        'tool_name': tool.name,
+                        'tool_id': tool_result.get('tool_id', f'tool_{i}'),
+                        'tool_name': tool_result.get('tool_name', f'tool_{i}'),
                         'result': tool_result,
                         'success': tool_result.get('success', False)
                     })
@@ -754,6 +803,72 @@ Please provide:
         else:
             return "Experimental tool - low confidence, use with caution"
     
+    def _get_primary_domain(self) -> str:
+        """Get the primary domain from agent expertise."""
+        if not self.expertise:
+            return 'general'
+        
+        # Return the first expertise area as primary domain
+        return self.expertise[0].lower().replace(' ', '_')
+    
+    def execute_tool(self, tool_id: str, task: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a specific tool.
+        
+        Args:
+            tool_id: ID of the tool to execute
+            task: Task parameters
+            context: Execution context
+            
+        Returns:
+            Tool execution result
+        """
+        try:
+            from tools.tool_registry import ToolRegistry
+            from tools.mcp_tool_registry import MCPToolRegistry
+            
+            # Check if this is an MCP tool
+            if tool_id.startswith('mcp_'):
+                mcp_tool_name = tool_id[4:]  # Remove 'mcp_' prefix
+                mcp_tool_registry = MCPToolRegistry()
+                return mcp_tool_registry.execute_mcp_tool(mcp_tool_name, task, context)
+            
+            # Get standard tool registry
+            tool_registry = ToolRegistry()
+            
+            # Get tool instance
+            tool = tool_registry.request_tool(self.agent_id, tool_id, context)
+            
+            if tool is None:
+                return {
+                    'success': False,
+                    'error': f'Tool {tool_id} not available',
+                    'tool_id': tool_id
+                }
+            
+            # Execute tool
+            result = tool.execute(task, context)
+            
+            # Update tool usage statistics
+            tool.usage_count += 1
+            
+            # Track performance
+            if result.get('success', False):
+                tool.success_rate = (tool.success_rate * (tool.usage_count - 1) + 1) / tool.usage_count
+            else:
+                tool.success_rate = (tool.success_rate * (tool.usage_count - 1)) / tool.usage_count
+            
+            logger.info(f"Agent {self.agent_id} executed tool {tool_id}")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Tool execution failed for agent {self.agent_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'tool_id': tool_id
+            }
+
     def __str__(self) -> str:
         return f"Agent({self.agent_id}, {self.role})"
     

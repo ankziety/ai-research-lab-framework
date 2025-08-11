@@ -24,12 +24,18 @@ def install_requirements():
 def launch_web_ui():
     """Launch the web interface."""
     print("Starting AI Research Lab Web Interface...")
-    print("The web interface will be available at: http://localhost:5000")
+    print("Available options:")
+    print("1. Simple Gradio Interface (Recommended): python simple_gradio_app.py")
+    print("2. Full-featured Gradio Interface: python gradio_app.py")
+    print("3. Flask Interface (Deprecated): python app.py")
+    print()
+    print("The Gradio interface will automatically open in your browser.")
     print("Press Ctrl+C to stop the server")
     
-    # Change to web_ui directory and run Flask app
+    # Change to web_ui directory and run simple Gradio app by default
     os.chdir("web_ui")
-    subprocess.run([sys.executable, "app.py"])
+    print("Launching Simple Gradio Interface...")
+    subprocess.run([sys.executable, "simple_gradio_app.py"])
 
 def launch_cli():
     """Launch the command line interface."""
@@ -80,6 +86,11 @@ AI Research Lab Framework - Usage Options
 1. Web Interface (Recommended for beginners):
    python launch.py --web
    
+   Options:
+   - Simple Gradio Interface (default): Streamlined chat interface
+   - Full-featured Gradio Interface: Comprehensive dashboard
+   - Flask Interface (deprecated): Legacy interface
+   
 2. Command Line Interface:
    python launch.py --cli
    
@@ -93,8 +104,14 @@ AI Research Lab Framework - Usage Options
    python launch.py --all
 
 Examples:
-   # Start web interface
+   # Start web interface (Simple Gradio)
    python launch.py --web
+   
+   # Start specific web interface
+   cd web_ui
+   python simple_gradio_app.py    # Simple interface
+   python gradio_app.py          # Full-featured interface
+   python app.py                 # Flask (deprecated)
    
    # Run CLI with research question
    python -m data.cli virtual-lab-research --question "What are the latest developments in AI?"

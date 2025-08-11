@@ -5,6 +5,10 @@ seaborn>=0.12.0
 networkx>=3.0.0
 pytest>=6.0.0
 
+# HTTP requests and API integration (CRITICAL for literature retriever)
+requests>=2.28.0
+urllib3>=1.26.0
+
 # Multi-agent system dependencies
 sentence-transformers>=2.2.0  # Fixed encoder_attention_mask deprecation warning
 faiss-cpu>=1.7.0
