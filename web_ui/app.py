@@ -206,7 +206,7 @@ def load_system_config():
             'default_llm_provider': 'openai',
             'default_model': 'gpt-4',
             'enable_free_search': True,
-            'enable_mock_responses': True
+            'enable_mock_responses': False
         }
     }
     
@@ -540,7 +540,7 @@ def update_config():
             ],
             'free_options': {
                 'enable_free_search': system_config.get('framework', {}).get('enable_free_search', True),
-                'enable_mock_responses': system_config.get('framework', {}).get('enable_mock_responses', True)
+                'enable_mock_responses': system_config.get('framework', {}).get('enable_mock_responses', False)
             }
         }
         # Remove None values from available_providers
