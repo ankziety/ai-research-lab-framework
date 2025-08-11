@@ -78,12 +78,41 @@ class CostManager:
     def _load_model_costs(self, config: Dict[str, Any]) -> Dict[str, ModelCost]:
         """Load model cost configurations with current OpenAI pricing."""
         default_costs = {
-            # GPT-4.1 models (latest - most cost-effective)
+            # ===== OPENAI MODELS =====
+            # GPT-5 models (latest flagship - August 2025)
+            'gpt-5': ModelCost(
+                model_name='gpt-5',
+                provider='openai',
+                input_cost_per_1k=0.00125,  # $1.25 per million tokens
+                output_cost_per_1k=0.01,    # $10.00 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.98
+            ),
+            'gpt-5-mini': ModelCost(
+                model_name='gpt-5-mini',
+                provider='openai',
+                input_cost_per_1k=0.00025,  # $0.25 per million tokens
+                output_cost_per_1k=0.002,   # $2.00 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.95
+            ),
+            'gpt-5-nano': ModelCost(
+                model_name='gpt-5-nano',
+                provider='openai',
+                input_cost_per_1k=0.00005,  # $0.05 per million tokens
+                output_cost_per_1k=0.0004,  # $0.40 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.90
+            ),
+            # GPT-4.1 models (fine-tuning models)
             'gpt-4.1': ModelCost(
                 model_name='gpt-4.1',
                 provider='openai',
-                input_cost_per_1k=0.002,  # $2.00 per million tokens
-                output_cost_per_1k=0.008,  # $8.00 per million tokens
+                input_cost_per_1k=0.003,    # $3.00 per million tokens
+                output_cost_per_1k=0.012,   # $12.00 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis', 'code', 'vision'],
                 reliability_score=0.95
@@ -91,27 +120,27 @@ class CostManager:
             'gpt-4.1-mini': ModelCost(
                 model_name='gpt-4.1-mini',
                 provider='openai',
-                input_cost_per_1k=0.0004,  # $0.40 per million tokens
-                output_cost_per_1k=0.0016,  # $1.60 per million tokens
+                input_cost_per_1k=0.0008,   # $0.80 per million tokens
+                output_cost_per_1k=0.0032,  # $3.20 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis', 'code'],
-                reliability_score=0.85
+                reliability_score=0.90
             ),
             'gpt-4.1-nano': ModelCost(
                 model_name='gpt-4.1-nano',
                 provider='openai',
-                input_cost_per_1k=0.0001,  # $0.10 per million tokens
-                output_cost_per_1k=0.0004,  # $0.40 per million tokens
+                input_cost_per_1k=0.0002,   # $0.20 per million tokens
+                output_cost_per_1k=0.0008,  # $0.80 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis'],
-                reliability_score=0.80
+                reliability_score=0.85
             ),
             # OpenAI o3/o4 models
             'o3': ModelCost(
                 model_name='o3',
                 provider='openai',
-                input_cost_per_1k=0.002,  # $2.00 per million tokens
-                output_cost_per_1k=0.008,  # $8.00 per million tokens
+                input_cost_per_1k=0.002,    # $2.00 per million tokens
+                output_cost_per_1k=0.008,   # $8.00 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis', 'code', 'vision'],
                 reliability_score=0.95
@@ -119,18 +148,18 @@ class CostManager:
             'o4-mini': ModelCost(
                 model_name='o4-mini',
                 provider='openai',
-                input_cost_per_1k=0.0011,  # $1.10 per million tokens
-                output_cost_per_1k=0.0044,  # $4.40 per million tokens
+                input_cost_per_1k=0.004,    # $4.00 per million tokens (fine-tuning)
+                output_cost_per_1k=0.016,   # $16.00 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.90
             ),
-            # Legacy GPT-4o models (still available)
+            # GPT-4o models (current generation)
             'gpt-4o': ModelCost(
                 model_name='gpt-4o',
                 provider='openai',
-                input_cost_per_1k=0.005,
-                output_cost_per_1k=0.015,
+                input_cost_per_1k=0.005,    # $5.00 per million tokens
+                output_cost_per_1k=0.02,    # $20.00 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis', 'code', 'vision'],
                 reliability_score=0.95
@@ -138,8 +167,8 @@ class CostManager:
             'gpt-4o-mini': ModelCost(
                 model_name='gpt-4o-mini',
                 provider='openai',
-                input_cost_per_1k=0.00015,
-                output_cost_per_1k=0.0006,
+                input_cost_per_1k=0.0006,   # $0.60 per million tokens
+                output_cost_per_1k=0.0024,  # $2.40 per million tokens
                 max_tokens=128000,
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.85
@@ -172,7 +201,7 @@ class CostManager:
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.95
             ),
-            # Legacy models
+            # Legacy GPT-3.5 models
             'gpt-3.5-turbo': ModelCost(
                 model_name='gpt-3.5-turbo',
                 provider='openai',
@@ -182,7 +211,44 @@ class CostManager:
                 capabilities=['reasoning', 'analysis'],
                 reliability_score=0.80
             ),
-            # Anthropic models
+            'gpt-3.5-turbo-16k': ModelCost(
+                model_name='gpt-3.5-turbo-16k',
+                provider='openai',
+                input_cost_per_1k=0.003,
+                output_cost_per_1k=0.004,
+                max_tokens=16385,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
+            'gpt-3.5-turbo-instruct': ModelCost(
+                model_name='gpt-3.5-turbo-instruct',
+                provider='openai',
+                input_cost_per_1k=0.0015,
+                output_cost_per_1k=0.002,
+                max_tokens=4096,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            
+            # ===== ANTHROPIC MODELS =====
+            'claude-3-5-sonnet': ModelCost(
+                model_name='claude-3-5-sonnet',
+                provider='anthropic',
+                input_cost_per_1k=0.003,
+                output_cost_per_1k=0.015,
+                max_tokens=200000,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.95
+            ),
+            'claude-3-5-haiku': ModelCost(
+                model_name='claude-3-5-haiku',
+                provider='anthropic',
+                input_cost_per_1k=0.00025,
+                output_cost_per_1k=0.00125,
+                max_tokens=200000,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
             'claude-3-sonnet': ModelCost(
                 model_name='claude-3-sonnet',
                 provider='anthropic',
@@ -201,7 +267,53 @@ class CostManager:
                 capabilities=['reasoning', 'analysis'],
                 reliability_score=0.75
             ),
-            # Google models
+            'claude-3-opus': ModelCost(
+                model_name='claude-3-opus',
+                provider='anthropic',
+                input_cost_per_1k=0.015,
+                output_cost_per_1k=0.075,
+                max_tokens=200000,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.95
+            ),
+            'claude-2.1': ModelCost(
+                model_name='claude-2.1',
+                provider='anthropic',
+                input_cost_per_1k=0.008,
+                output_cost_per_1k=0.024,
+                max_tokens=200000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'claude-instant-1.2': ModelCost(
+                model_name='claude-instant-1.2',
+                provider='anthropic',
+                input_cost_per_1k=0.0008,
+                output_cost_per_1k=0.0024,
+                max_tokens=100000,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.70
+            ),
+            
+            # ===== GOOGLE/GEMINI MODELS =====
+            'gemini-1.5-pro': ModelCost(
+                model_name='gemini-1.5-pro',
+                provider='google',
+                input_cost_per_1k=0.00375,
+                output_cost_per_1k=0.0105,
+                max_tokens=1000000,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.90
+            ),
+            'gemini-1.5-flash': ModelCost(
+                model_name='gemini-1.5-flash',
+                provider='google',
+                input_cost_per_1k=0.000075,
+                output_cost_per_1k=0.0003,
+                max_tokens=1000000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
             'gemini-pro': ModelCost(
                 model_name='gemini-pro',
                 provider='google',
@@ -211,13 +323,484 @@ class CostManager:
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.85
             ),
-            # Local models
+            'gemini-pro-vision': ModelCost(
+                model_name='gemini-pro-vision',
+                provider='google',
+                input_cost_per_1k=0.0025,
+                output_cost_per_1k=0.0075,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.85
+            ),
+            'gemini-flash': ModelCost(
+                model_name='gemini-flash',
+                provider='google',
+                input_cost_per_1k=0.000075,
+                output_cost_per_1k=0.0003,
+                max_tokens=1048576,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.80
+            ),
+            
+            # ===== META/LLAMA MODELS =====
+            'llama-3.1-8b-instruct': ModelCost(
+                model_name='llama-3.1-8b-instruct',
+                provider='meta',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0002,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'llama-3.1-70b-instruct': ModelCost(
+                model_name='llama-3.1-70b-instruct',
+                provider='meta',
+                input_cost_per_1k=0.0007,
+                output_cost_per_1k=0.0008,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'llama-3.1-405b-instruct': ModelCost(
+                model_name='llama-3.1-405b-instruct',
+                provider='meta',
+                input_cost_per_1k=0.0024,
+                output_cost_per_1k=0.0024,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            
+            # ===== MISTRAL MODELS =====
+            'mistral-large': ModelCost(
+                model_name='mistral-large',
+                provider='mistral',
+                input_cost_per_1k=0.007,
+                output_cost_per_1k=0.024,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            'mistral-medium': ModelCost(
+                model_name='mistral-medium',
+                provider='mistral',
+                input_cost_per_1k=0.0027,
+                output_cost_per_1k=0.0084,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'mistral-small': ModelCost(
+                model_name='mistral-small',
+                provider='mistral',
+                input_cost_per_1k=0.002,
+                output_cost_per_1k=0.006,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
+            'mixtral-8x7b': ModelCost(
+                model_name='mixtral-8x7b',
+                provider='mistral',
+                input_cost_per_1k=0.00014,
+                output_cost_per_1k=0.00042,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            
+            # ===== COHERE MODELS =====
+            'command-r-plus': ModelCost(
+                model_name='command-r-plus',
+                provider='cohere',
+                input_cost_per_1k=0.003,
+                output_cost_per_1k=0.015,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            'command-r': ModelCost(
+                model_name='command-r',
+                provider='cohere',
+                input_cost_per_1k=0.0005,
+                output_cost_per_1k=0.0015,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.85
+            ),
+            'command-light': ModelCost(
+                model_name='command-light',
+                provider='cohere',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0006,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            
+            # ===== PERPLEXITY MODELS =====
+            'llama-3.1-sonar-small-128k': ModelCost(
+                model_name='llama-3.1-sonar-small-128k',
+                provider='perplexity',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0002,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
+            'llama-3.1-sonar-small-32k': ModelCost(
+                model_name='llama-3.1-sonar-small-32k',
+                provider='perplexity',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0002,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
+            'llama-3.1-sonar-medium-128k': ModelCost(
+                model_name='llama-3.1-sonar-medium-128k',
+                provider='perplexity',
+                input_cost_per_1k=0.0006,
+                output_cost_per_1k=0.0006,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'llama-3.1-sonar-large-128k': ModelCost(
+                model_name='llama-3.1-sonar-large-128k',
+                provider='perplexity',
+                input_cost_per_1k=0.001,
+                output_cost_per_1k=0.001,
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            
+            # ===== HUGGINGFACE MODELS =====
+            'meta-llama-3-8b-instruct': ModelCost(
+                model_name='meta-llama-3-8b-instruct',
+                provider='huggingface',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0001,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'meta-llama-3-70b-instruct': ModelCost(
+                model_name='meta-llama-3-70b-instruct',
+                provider='huggingface',
+                input_cost_per_1k=0.0005,
+                output_cost_per_1k=0.0005,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'mistralai-mistral-7b-instruct': ModelCost(
+                model_name='mistralai-mistral-7b-instruct',
+                provider='huggingface',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0001,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'microsoft-phi-3-mini': ModelCost(
+                model_name='microsoft-phi-3-mini',
+                provider='huggingface',
+                input_cost_per_1k=0.00005,
+                output_cost_per_1k=0.00005,
+                max_tokens=4096,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.70
+            ),
+            
+            # ===== OLLAMA (LOCAL) MODELS =====
             'llama2': ModelCost(
                 model_name='llama2',
                 provider='ollama',
                 input_cost_per_1k=0.0,
                 output_cost_per_1k=0.0,
                 max_tokens=4096,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.70
+            ),
+            'llama2:13b': ModelCost(
+                model_name='llama2:13b',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=4096,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.75
+            ),
+            'llama2:70b': ModelCost(
+                model_name='llama2:70b',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=4096,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.80
+            ),
+            'codellama': ModelCost(
+                model_name='codellama',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=4096,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.75
+            ),
+            'mistral': ModelCost(
+                model_name='mistral',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'mixtral': ModelCost(
+                model_name='mixtral',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.80
+            ),
+            'phi': ModelCost(
+                model_name='phi',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=2048,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.65
+            ),
+            'neural-chat': ModelCost(
+                model_name='neural-chat',
+                provider='ollama',
+                input_cost_per_1k=0.0,
+                output_cost_per_1k=0.0,
+                max_tokens=4096,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.70
+            ),
+            
+            # ===== GROQ MODELS =====
+            'llama-3.1-8b-instruct': ModelCost(
+                model_name='llama-3.1-8b-instruct',
+                provider='groq',
+                input_cost_per_1k=0.00005,
+                output_cost_per_1k=0.0001,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'llama-3.1-70b-instruct': ModelCost(
+                model_name='llama-3.1-70b-instruct',
+                provider='groq',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0002,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'llama-3.1-405b-instruct': ModelCost(
+                model_name='llama-3.1-405b-instruct',
+                provider='groq',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0004,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            'mixtral-8x7b-32768': ModelCost(
+                model_name='mixtral-8x7b-32768',
+                provider='groq',
+                input_cost_per_1k=0.00005,
+                output_cost_per_1k=0.0001,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'gemma-7b-it': ModelCost(
+                model_name='gemma-7b-it',
+                provider='groq',
+                input_cost_per_1k=0.00005,
+                output_cost_per_1k=0.0001,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            
+            # ===== TOGETHER AI MODELS =====
+            'llama-3.1-8b-instruct': ModelCost(
+                model_name='llama-3.1-8b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0002,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'llama-3.1-70b-instruct': ModelCost(
+                model_name='llama-3.1-70b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0007,
+                output_cost_per_1k=0.0008,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'llama-3.1-405b-instruct': ModelCost(
+                model_name='llama-3.1-405b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0024,
+                output_cost_per_1k=0.0024,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            'mixtral-8x7b-instruct': ModelCost(
+                model_name='mixtral-8x7b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0002,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'qwen2.5-7b-instruct': ModelCost(
+                model_name='qwen2.5-7b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0001,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'qwen2.5-32b-instruct': ModelCost(
+                model_name='qwen2.5-32b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0004,
+                output_cost_per_1k=0.0004,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.80
+            ),
+            'qwen2.5-72b-instruct': ModelCost(
+                model_name='qwen2.5-72b-instruct',
+                provider='together',
+                input_cost_per_1k=0.0008,
+                output_cost_per_1k=0.0008,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            
+            # ===== FIREWORKS AI MODELS =====
+            'llama-3.1-8b-instruct': ModelCost(
+                model_name='llama-3.1-8b-instruct',
+                provider='fireworks',
+                input_cost_per_1k=0.0002,
+                output_cost_per_1k=0.0002,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'llama-3.1-70b-instruct': ModelCost(
+                model_name='llama-3.1-70b-instruct',
+                provider='fireworks',
+                input_cost_per_1k=0.0007,
+                output_cost_per_1k=0.0008,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'llama-3.1-405b-instruct': ModelCost(
+                model_name='llama-3.1-405b-instruct',
+                provider='fireworks',
+                input_cost_per_1k=0.0024,
+                output_cost_per_1k=0.0024,
+                max_tokens=8192,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            'qwen2.5-7b-instruct': ModelCost(
+                model_name='qwen2.5-7b-instruct',
+                provider='fireworks',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0001,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'qwen2.5-32b-instruct': ModelCost(
+                model_name='qwen2.5-32b-instruct',
+                provider='fireworks',
+                input_cost_per_1k=0.0004,
+                output_cost_per_1k=0.0004,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.80
+            ),
+            'qwen2.5-72b-instruct': ModelCost(
+                model_name='qwen2.5-72b-instruct',
+                provider='fireworks',
+                input_cost_per_1k=0.0008,
+                output_cost_per_1k=0.0008,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            
+            # ===== DEEPSEEK MODELS =====
+            'deepseek-coder': ModelCost(
+                model_name='deepseek-coder',
+                provider='deepseek',
+                input_cost_per_1k=0.00014,
+                output_cost_per_1k=0.00028,
+                max_tokens=16384,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'deepseek-chat': ModelCost(
+                model_name='deepseek-chat',
+                provider='deepseek',
+                input_cost_per_1k=0.00014,
+                output_cost_per_1k=0.00028,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
+            'deepseek-llm-7b-chat': ModelCost(
+                model_name='deepseek-llm-7b-chat',
+                provider='deepseek',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0002,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            
+            # ===== ZEPHYR MODELS =====
+            'zephyr-7b-beta': ModelCost(
+                model_name='zephyr-7b-beta',
+                provider='huggingface',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0001,
+                max_tokens=32768,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.75
+            ),
+            'zephyr-7b-alpha': ModelCost(
+                model_name='zephyr-7b-alpha',
+                provider='huggingface',
+                input_cost_per_1k=0.0001,
+                output_cost_per_1k=0.0001,
+                max_tokens=32768,
                 capabilities=['reasoning', 'analysis'],
                 reliability_score=0.70
             )
@@ -349,7 +932,7 @@ class CostManager:
             Optimal model name
         """
         if not self.optimization_enabled:
-            return 'gpt-4.1'  # Default to most capable new model
+            return 'gpt-5'  # Default to most capable new model
         
         # Filter models by required capabilities
         available_models = []
@@ -361,7 +944,7 @@ class CostManager:
         
         if not available_models:
             logger.warning("No models available with required capabilities")
-            return 'gpt-4.1'
+            return 'gpt-5'
         
         # Budget protection: Avoid expensive models when budget is low
         expensive_models = ['gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview', 'gpt-4o']  # Legacy expensive models
@@ -378,7 +961,7 @@ class CostManager:
         
         if not available_models:
             logger.error("No affordable models available")
-            return 'gpt-4.1-nano'  # Fallback to cheapest option
+            return 'gpt-5-nano'  # Fallback to cheapest option
         
         # Score models based on cost efficiency and capability
         model_scores = []
@@ -403,9 +986,11 @@ class CostManager:
             if model_name in expensive_models:
                 cost_score *= 0.1  # 90% penalty for expensive models
             
-            # Bonus for new GPT-4.1 models
-            if model_name.startswith('gpt-4.1'):
-                cost_score *= 1.2  # 20% bonus for new models
+            # Bonus for new GPT-5 models
+            if model_name.startswith('gpt-5'):
+                cost_score *= 1.3  # 30% bonus for latest models
+            elif model_name.startswith('gpt-4.1'):
+                cost_score *= 1.1  # 10% bonus for fine-tuning models
             
             # Combined score
             total_score = cost_score * capability_score * budget_score
@@ -628,15 +1213,18 @@ class CostManager:
                 models_data = models_response.json()
                 available_models = [model['id'] for model in models_data.get('data', [])]
                 
-                # Current OpenAI pricing (as of 2024)
+                # Current OpenAI pricing (as of August 2025)
                 current_pricing = {
-                    'gpt-4.1': {'input': 0.002, 'output': 0.008},  # $2.00/$8.00 per million
-                    'gpt-4.1-mini': {'input': 0.0004, 'output': 0.0016},  # $0.40/$1.60 per million
-                    'gpt-4.1-nano': {'input': 0.0001, 'output': 0.0004},  # $0.10/$0.40 per million
+                    'gpt-5': {'input': 0.00125, 'output': 0.01},  # $1.25/$10.00 per million
+                    'gpt-5-mini': {'input': 0.00025, 'output': 0.002},  # $0.25/$2.00 per million
+                    'gpt-5-nano': {'input': 0.00005, 'output': 0.0004},  # $0.05/$0.40 per million
+                    'gpt-4.1': {'input': 0.003, 'output': 0.012},  # $3.00/$12.00 per million
+                    'gpt-4.1-mini': {'input': 0.0008, 'output': 0.0032},  # $0.80/$3.20 per million
+                    'gpt-4.1-nano': {'input': 0.0002, 'output': 0.0008},  # $0.20/$0.80 per million
                     'o3': {'input': 0.002, 'output': 0.008},  # $2.00/$8.00 per million
-                    'o4-mini': {'input': 0.0011, 'output': 0.0044},  # $1.10/$4.40 per million
-                    'gpt-4o': {'input': 0.005, 'output': 0.015},  # Legacy pricing
-                    'gpt-4o-mini': {'input': 0.00015, 'output': 0.0006},  # Legacy pricing
+                    'o4-mini': {'input': 0.004, 'output': 0.016},  # $4.00/$16.00 per million
+                    'gpt-4o': {'input': 0.005, 'output': 0.02},  # $5.00/$20.00 per million
+                    'gpt-4o-mini': {'input': 0.0006, 'output': 0.0024},  # $0.60/$2.40 per million
                     'gpt-4': {'input': 0.03, 'output': 0.06},  # Legacy expensive
                     'gpt-3.5-turbo': {'input': 0.0005, 'output': 0.0015},  # Legacy
                 }
@@ -651,7 +1239,7 @@ class CostManager:
                     'status': 'success',
                     'available_models': available_models,
                     'current_pricing': available_pricing,
-                    'pricing_source': 'OpenAI official pricing (2024)',
+                    'pricing_source': 'OpenAI official pricing (August 2025)',
                     'note': 'Pricing is per 1K tokens'
                 }
             else:
@@ -664,9 +1252,209 @@ class CostManager:
             logger.error(f"Error checking OpenAI pricing: {e}")
             return {'error': str(e)}
     
+    def check_anthropic_pricing(self, api_key: str = None) -> Dict[str, Any]:
+        """
+        Check Anthropic pricing information.
+        
+        Args:
+            api_key: Anthropic API key (uses config if not provided)
+            
+        Returns:
+            Dictionary with current pricing information
+        """
+        try:
+            import requests
+            
+            # Use provided API key or get from config
+            if api_key is None:
+                api_key = self.config.get('anthropic_api_key') or os.getenv('ANTHROPIC_API_KEY')
+            
+            if not api_key:
+                logger.warning("No Anthropic API key available for pricing check")
+                return {'error': 'No API key available'}
+            
+            headers = {
+                'x-api-key': api_key,
+                'Content-Type': 'application/json'
+            }
+            
+            # Check available models
+            models_response = requests.get(
+                'https://api.anthropic.com/v1/models',
+                headers=headers,
+                timeout=10
+            )
+            
+            if models_response.status_code == 200:
+                models_data = models_response.json()
+                available_models = [model['id'] for model in models_data.get('data', [])]
+                
+                # Current Anthropic pricing (as of 2024)
+                current_pricing = {
+                    'claude-3-5-sonnet': {'input': 0.003, 'output': 0.015},
+                    'claude-3-5-haiku': {'input': 0.00025, 'output': 0.00125},
+                    'claude-3-sonnet': {'input': 0.003, 'output': 0.015},
+                    'claude-3-haiku': {'input': 0.00025, 'output': 0.00125},
+                    'claude-3-opus': {'input': 0.015, 'output': 0.075},
+                    'claude-2.1': {'input': 0.008, 'output': 0.024},
+                    'claude-instant-1.2': {'input': 0.0008, 'output': 0.0024},
+                }
+                
+                # Filter available models
+                available_pricing = {
+                    model: pricing for model, pricing in current_pricing.items()
+                    if any(available_model.startswith(model) for available_model in available_models)
+                }
+                
+                return {
+                    'status': 'success',
+                    'available_models': available_models,
+                    'current_pricing': available_pricing,
+                    'pricing_source': 'Anthropic official pricing (2024)',
+                    'note': 'Pricing is per 1K tokens'
+                }
+            else:
+                return {
+                    'error': f'Failed to fetch models: {models_response.status_code}',
+                    'response': models_response.text
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking Anthropic pricing: {e}")
+            return {'error': str(e)}
+    
+    def check_google_pricing(self, api_key: str = None) -> Dict[str, Any]:
+        """
+        Check Google/Gemini pricing information.
+        
+        Args:
+            api_key: Google API key (uses config if not provided)
+            
+        Returns:
+            Dictionary with current pricing information
+        """
+        try:
+            # Google doesn't have a public models API, but we can provide current pricing
+            # Current Google/Gemini pricing (as of 2024)
+            current_pricing = {
+                'gemini-1.5-pro': {'input': 0.00375, 'output': 0.0105},
+                'gemini-1.5-flash': {'input': 0.000075, 'output': 0.0003},
+                'gemini-pro': {'input': 0.0005, 'output': 0.0015},
+                'gemini-pro-vision': {'input': 0.0025, 'output': 0.0075},
+                'gemini-flash': {'input': 0.000075, 'output': 0.0003},
+            }
+            
+            return {
+                'status': 'success',
+                'available_models': list(current_pricing.keys()),
+                'current_pricing': current_pricing,
+                'pricing_source': 'Google official pricing (2024)',
+                'note': 'Pricing is per 1K tokens. Model availability may vary by region.'
+            }
+                
+        except Exception as e:
+            logger.error(f"Error checking Google pricing: {e}")
+            return {'error': str(e)}
+    
+    def check_mistral_pricing(self, api_key: str = None) -> Dict[str, Any]:
+        """
+        Check Mistral pricing information.
+        
+        Args:
+            api_key: Mistral API key (uses config if not provided)
+            
+        Returns:
+            Dictionary with current pricing information
+        """
+        try:
+            import requests
+            
+            # Use provided API key or get from config
+            if api_key is None:
+                api_key = self.config.get('mistral_api_key') or os.getenv('MISTRAL_API_KEY')
+            
+            if not api_key:
+                logger.warning("No Mistral API key available for pricing check")
+                return {'error': 'No API key available'}
+            
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Check available models
+            models_response = requests.get(
+                'https://api.mistral.ai/v1/models',
+                headers=headers,
+                timeout=10
+            )
+            
+            if models_response.status_code == 200:
+                models_data = models_response.json()
+                available_models = [model['id'] for model in models_data.get('data', [])]
+                
+                # Current Mistral pricing (as of 2024)
+                current_pricing = {
+                    'mistral-large': {'input': 0.007, 'output': 0.024},
+                    'mistral-medium': {'input': 0.0027, 'output': 0.0084},
+                    'mistral-small': {'input': 0.002, 'output': 0.006},
+                    'mixtral-8x7b': {'input': 0.00014, 'output': 0.00042},
+                }
+                
+                # Filter available models
+                available_pricing = {
+                    model: pricing for model, pricing in current_pricing.items()
+                    if any(available_model.startswith(model) for available_model in available_models)
+                }
+                
+                return {
+                    'status': 'success',
+                    'available_models': available_models,
+                    'current_pricing': available_pricing,
+                    'pricing_source': 'Mistral official pricing (2024)',
+                    'note': 'Pricing is per 1K tokens'
+                }
+            else:
+                return {
+                    'error': f'Failed to fetch models: {models_response.status_code}',
+                    'response': models_response.text
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking Mistral pricing: {e}")
+            return {'error': str(e)}
+    
+    def check_all_provider_pricing(self) -> Dict[str, Any]:
+        """
+        Check pricing for all major providers.
+        
+        Returns:
+            Dictionary with pricing information for all providers
+        """
+        results = {
+            'timestamp': time.time(),
+            'providers': {}
+        }
+        
+        # Check each provider
+        providers = {
+            'openai': self.check_openai_pricing,
+            'anthropic': self.check_anthropic_pricing,
+            'google': self.check_google_pricing,
+            'mistral': self.check_mistral_pricing,
+        }
+        
+        for provider_name, check_func in providers.items():
+            try:
+                results['providers'][provider_name] = check_func()
+            except Exception as e:
+                results['providers'][provider_name] = {'error': str(e)}
+        
+        return results
+    
     def validate_cost_estimates(self) -> Dict[str, Any]:
         """
-        Validate our cost estimates against current pricing.
+        Validate our cost estimates against current pricing for all providers.
         
         Returns:
             Dictionary with validation results
@@ -675,50 +1463,64 @@ class CostManager:
             'timestamp': time.time(),
             'models_checked': [],
             'discrepancies': [],
-            'recommendations': []
+            'recommendations': [],
+            'providers_checked': []
         }
         
-        # Check OpenAI pricing
-        openai_pricing = self.check_openai_pricing()
+        # Check all provider pricing
+        all_pricing = self.check_all_provider_pricing()
         
-        if 'current_pricing' in openai_pricing:
-            for model_name, model_cost in self.model_costs.items():
-                if model_cost.provider == 'openai' and model_name in openai_pricing['current_pricing']:
-                    current_pricing = openai_pricing['current_pricing'][model_name]
-                    
-                    # Check for discrepancies
-                    input_diff = abs(model_cost.input_cost_per_1k - current_pricing['input'])
-                    output_diff = abs(model_cost.output_cost_per_1k - current_pricing['output'])
-                    
-                    if input_diff > 0.0001 or output_diff > 0.0001:
-                        validation_results['discrepancies'].append({
-                            'model': model_name,
-                            'our_input_cost': model_cost.input_cost_per_1k,
-                            'current_input_cost': current_pricing['input'],
-                            'our_output_cost': model_cost.output_cost_per_1k,
-                            'current_output_cost': current_pricing['output'],
-                            'input_diff': input_diff,
-                            'output_diff': output_diff
-                        })
-                    
-                    validation_results['models_checked'].append(model_name)
+        for provider_name, pricing_info in all_pricing.get('providers', {}).items():
+            if 'current_pricing' in pricing_info:
+                validation_results['providers_checked'].append(provider_name)
+                
+                for model_name, model_cost in self.model_costs.items():
+                    if model_cost.provider == provider_name and model_name in pricing_info['current_pricing']:
+                        current_pricing = pricing_info['current_pricing'][model_name]
+                        
+                        # Check for discrepancies
+                        input_diff = abs(model_cost.input_cost_per_1k - current_pricing['input'])
+                        output_diff = abs(model_cost.output_cost_per_1k - current_pricing['output'])
+                        
+                        if input_diff > 0.0001 or output_diff > 0.0001:
+                            validation_results['discrepancies'].append({
+                                'provider': provider_name,
+                                'model': model_name,
+                                'our_input_cost': model_cost.input_cost_per_1k,
+                                'current_input_cost': current_pricing['input'],
+                                'our_output_cost': model_cost.output_cost_per_1k,
+                                'current_output_cost': current_pricing['output'],
+                                'input_diff': input_diff,
+                                'output_diff': output_diff
+                            })
+                        
+                        validation_results['models_checked'].append(f"{provider_name}:{model_name}")
         
         # Add recommendations
         if validation_results['discrepancies']:
             validation_results['recommendations'].append(
-                "Update cost estimates to match current OpenAI pricing"
+                "Update cost estimates to match current provider pricing"
             )
         
-        # Check for new models
-        if 'available_models' in openai_pricing:
-            new_models = []
-            for model in openai_pricing['available_models']:
-                if not any(model.startswith(existing) for existing in self.model_costs.keys()):
-                    new_models.append(model)
-            
-            if new_models:
-                validation_results['recommendations'].append(
-                    f"Add pricing for new models: {new_models[:5]}"  # Limit to first 5
-                )
+        # Check for new models across all providers
+        for provider_name, pricing_info in all_pricing.get('providers', {}).items():
+            if 'available_models' in pricing_info:
+                new_models = []
+                for model in pricing_info['available_models']:
+                    if not any(model.startswith(existing) for existing in self.model_costs.keys()):
+                        new_models.append(model)
+                
+                if new_models:
+                    validation_results['recommendations'].append(
+                        f"Add pricing for new {provider_name} models: {new_models[:3]}"  # Limit to first 3
+                    )
+        
+        # Add summary statistics
+        validation_results['summary'] = {
+            'total_models_checked': len(validation_results['models_checked']),
+            'total_discrepancies': len(validation_results['discrepancies']),
+            'providers_with_discrepancies': list(set(d['provider'] for d in validation_results['discrepancies'])),
+            'accuracy_percentage': max(0, 100 - (len(validation_results['discrepancies']) / max(1, len(validation_results['models_checked'])) * 100))
+        }
         
         return validation_results 

@@ -72,16 +72,22 @@ class LLMClient:
         
         # Model configuration
         self.provider = self.config.get('default_llm_provider', 'openai')
-        self.model = self.config.get('default_model', 'gpt-4.1')
+        self.model = self.config.get('default_model', 'gpt-5')
         
         # Cost management integration
         self.cost_manager = None
         self.budget_limit = self.config.get('budget_limit', 30.0)  # Default $30 budget
         self._initialize_cost_manager()
         
-        # Provider pricing for cost optimization
+        # Provider pricing for cost optimization (updated August 2025)
         self.provider_costs = {
-            'openai': {'gpt-4o': 0.03, 'gpt-4o-mini': 0.00015},
+            'openai': {
+                'gpt-5': 0.00125, 'gpt-5-mini': 0.00025, 'gpt-5-nano': 0.00005,
+                'gpt-4.1': 0.003, 'gpt-4.1-mini': 0.0008, 'gpt-4.1-nano': 0.0002,
+                'o3': 0.002, 'o4-mini': 0.004,
+                'gpt-4o': 0.005, 'gpt-4o-mini': 0.0006,
+                'gpt-4': 0.03, 'gpt-4-turbo': 0.01 # Legacy expensive
+            },
             'anthropic': {'claude-3-sonnet': 0.003, 'claude-3-haiku': 0.00025},
             'gemini': {'gemini-pro': 0.0005, 'gemini-pro-vision': 0.002},
             'huggingface': {'default': 0.0001},  # Typically cheaper
