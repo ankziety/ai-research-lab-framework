@@ -415,6 +415,11 @@ def index():
     """Serve the main interface."""
     return render_template('index.html')
 
+@app.route('/chat')
+def chat():
+    """Serve the new chat interface."""
+    return render_template('chat_interface.html')
+
 @app.route('/test-page')
 def test_page():
     """Serve the test page."""
@@ -1761,7 +1766,7 @@ if __name__ == '__main__':
         socketio.run(
             app,
             host='0.0.0.0',
-            port=5000,
+            port=5001,
             debug=debug_mode,
             allow_unsafe_werkzeug=allow_unsafe_werkzeug,
             use_reloader=False
@@ -1769,4 +1774,4 @@ if __name__ == '__main__':
     except Exception as e:
         logger.error(f"Failed to start Socket.IO server: {e}")
         # Fallback to regular Flask run without debug mode to avoid environment issues
-        app.run(host='0.0.0.0', port=5000, debug=False)
+        app.run(host='0.0.0.0', port=5001, debug=False)
