@@ -230,8 +230,9 @@ class TestLLMClientResponseGeneration:
         
         assert isinstance(response, str)
         assert len(response) > 0
-    
+
     @pytest.mark.integration
+    @skip_if_no_api_key('openai')
     def test_generate_response_with_cost_manager(self):
         """Test response generation with cost manager."""
         from data.cost_manager import CostManager
@@ -396,6 +397,8 @@ class TestLLMClientEdgeCases:
         """Reset LLM client state after each test."""
         reset_llm_client()
     
+    @pytest.mark.integration
+    @skip_if_no_api_key('openai')
     def test_empty_prompt(self):
         """Test response generation with empty prompt."""
         config = get_test_config()
@@ -408,7 +411,10 @@ class TestLLMClientEdgeCases:
         )
         
         assert isinstance(response, str)
-    
+        assert len(response) > 0
+
+    @pytest.mark.integration
+    @skip_if_no_api_key('openai')
     def test_empty_context(self):
         """Test response generation with empty context."""
         config = get_test_config()
@@ -421,7 +427,10 @@ class TestLLMClientEdgeCases:
         )
         
         assert isinstance(response, str)
-    
+        assert len(response) > 0
+
+    @pytest.mark.integration
+    @skip_if_no_api_key('openai')
     def test_very_long_prompt(self):
         """Test response generation with very long prompt."""
         config = get_test_config()
@@ -436,7 +445,10 @@ class TestLLMClientEdgeCases:
         )
         
         assert isinstance(response, str)
-    
+        assert len(response) > 0
+
+    @pytest.mark.integration
+    @skip_if_no_api_key('openai')
     def test_special_characters_in_prompt(self):
         """Test response generation with special characters."""
         config = get_test_config()
@@ -451,3 +463,4 @@ class TestLLMClientEdgeCases:
         )
         
         assert isinstance(response, str)
+        assert len(response) > 0
