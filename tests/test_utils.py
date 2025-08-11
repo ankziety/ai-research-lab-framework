@@ -25,7 +25,8 @@ def get_api_key(provider: str) -> Optional[str]:
 
 def has_api_key(provider: str) -> bool:
     """Check if API key is available for a provider."""
-    return get_api_key(provider) is not None
+    key = get_api_key(provider)
+    return key is not None and key.strip() != ""
 
 def skip_if_no_api_key(provider: str, reason: str = None) -> pytest.MarkDecorator:
     """Skip test if API key is not available."""

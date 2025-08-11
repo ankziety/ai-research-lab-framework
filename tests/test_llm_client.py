@@ -10,6 +10,7 @@ import pytest
 import time
 from unittest.mock import Mock
 from typing import Dict, Any
+from pytest import MonkeyPatch
 
 from agents.llm_client import LLMClient, get_llm_client, reset_llm_client
 from .test_utils import skip_if_no_api_key, get_test_config, has_api_key
@@ -250,20 +251,39 @@ class TestLLMClientResponseGeneration:
         assert len(response) > 0
     
     @pytest.mark.integration
+    @skip_if_no_api_key('huggingface')
     def test_generate_response_optimized(self):
         """Test optimized response generation."""
         config = get_test_config()
         client = LLMClient(config)
         
-        response = client.generate_response_optimized(
-            "Test optimized prompt",
-            {'context': 'test'},
-            "Test Agent",
-            "medium"
-        )
-        
-        assert isinstance(response, str)
-        assert len(response) > 0
+        # Mock the HuggingFace API call since this test is about provider selection logic
+        with pytest.MonkeyPatch().context() as m:
+            # Mock requests.post to return a successful response
+            def mock_post(*args, **kwargs):
+                class MockResponse:
+                    def __init__(self):
+                        self.status_code = 200
+                    
+                    def raise_for_status(self):
+                        pass
+                    
+                    def json(self):
+                        return [{"generated_text": "This is a mock response from HuggingFace API for testing purposes."}]
+                
+                return MockResponse()
+            
+            m.setattr("requests.post", mock_post)
+            
+            response = client.generate_response_optimized(
+                "Test optimized prompt",
+                {'context': 'test'},
+                "Test Agent",
+                "medium"
+            )
+            
+            assert isinstance(response, str)
+            assert len(response) > 0
 
 
 class TestLLMClientErrorHandling:
