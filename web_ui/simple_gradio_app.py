@@ -48,19 +48,39 @@ class SimpleAIResearchLabGradio:
         # Initialize components
         self.initialize_framework()
         self.initialize_data_manager()
-        self.load_config()
         
     def initialize_framework(self):
         """Initialize the research framework."""
         try:
-            # Basic config for now - will be enhanced with settings
+            # Load config first to get API keys
+            self.load_config()
+            
+            # Prepare framework config with API keys
             config = {
-                'enable_mock_responses': True,
+                'enable_mock_responses': False,
                 'enable_free_search': True,
                 'max_literature_results': 10,
                 'default_llm_provider': 'openai',
                 'default_model': 'gpt-4'
             }
+            
+            # Add API keys from loaded config
+            api_keys = self.system_config.get('api_keys', {})
+            for key_name, key_value in api_keys.items():
+                if key_value:  # Only add non-empty keys
+                    if key_name == 'openai':
+                        config['openai_api_key'] = key_value
+                    elif key_name == 'anthropic':
+                        config['anthropic_api_key'] = key_value
+                    elif key_name == 'gemini':
+                        config['gemini_api_key'] = key_value
+                    elif key_name == 'huggingface':
+                        config['huggingface_api_key'] = key_value
+                    elif key_name == 'ollama_endpoint':
+                        config['ollama_endpoint'] = key_value
+            
+            # Also add the API keys directly to the config for backward compatibility
+            config.update(api_keys)
             
             self.research_framework = create_framework(config)
             logger.info("Research framework initialized successfully")
@@ -101,7 +121,7 @@ class SimpleAIResearchLabGradio:
                 'notifications': True
             },
             'framework': {
-                'enable_mock_responses': True,
+                'enable_mock_responses': False,
                 'enable_free_search': True,
                 'max_literature_results': 10
             }

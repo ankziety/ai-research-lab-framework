@@ -66,6 +66,9 @@ class AIResearchLabGradio:
     def initialize_framework(self):
         """Initialize the research framework."""
         try:
+            # Load config first to get API keys
+            self.load_config()
+            
             # Create necessary directories
             os.makedirs('experiments', exist_ok=True)
             os.makedirs('output', exist_ok=True)
@@ -75,7 +78,7 @@ class AIResearchLabGradio:
             
             # Enhanced config with all capabilities
             config = {
-                'enable_mock_responses': True,
+                'enable_mock_responses': False,
                 'enable_free_search': True,
                 'max_literature_results': 10,
                 'default_llm_provider': 'openai',
@@ -93,18 +96,32 @@ class AIResearchLabGradio:
                 'enable_virtual_lab': True,
                 'enable_memory_management': True,
                 'store_all_interactions': True,
-                # Mock response configuration
-                'mock_response_quality': 'high',
-                'enable_detailed_mock_responses': True,
+                # Response configuration
+                'response_quality': 'high',
+                'enable_detailed_responses': True,
                 # Research configuration
                 'research_timeout': 300,  # 5 minutes
                 'max_research_phases': 8,
-                'enable_phase_tracking': True,
-                # API configuration (for when not using mock)
-                'openai_api_key': None,
-                'anthropic_api_key': None,
-                'gemini_api_key': None
+                'enable_phase_tracking': True
             }
+            
+            # Add API keys from loaded config
+            api_keys = self.system_config.get('api_keys', {})
+            for key_name, key_value in api_keys.items():
+                if key_value:  # Only add non-empty keys
+                    if key_name == 'openai':
+                        config['openai_api_key'] = key_value
+                    elif key_name == 'anthropic':
+                        config['anthropic_api_key'] = key_value
+                    elif key_name == 'gemini':
+                        config['gemini_api_key'] = key_value
+                    elif key_name == 'huggingface':
+                        config['huggingface_api_key'] = key_value
+                    elif key_name == 'ollama_endpoint':
+                        config['ollama_endpoint'] = key_value
+            
+            # Also add the API keys directly to the config for backward compatibility
+            config.update(api_keys)
             
             # Create framework
             self.framework = create_framework(config)
@@ -196,7 +213,7 @@ class AIResearchLabGradio:
                 'default_llm_provider': 'openai',
                 'default_model': 'gpt-4',
                 'enable_free_search': True,
-                'enable_mock_responses': True
+                'enable_mock_responses': False
             }
         }
         
@@ -848,7 +865,7 @@ class AIResearchLabGradio:
                         
                         enable_mock = gr.Checkbox(
                             label="Enable mock responses",
-                            value=self.system_config.get('framework', {}).get('enable_mock_responses', True)
+                            value=self.system_config.get('framework', {}).get('enable_mock_responses', False)
                         )
                         
                         enable_free_search = gr.Checkbox(

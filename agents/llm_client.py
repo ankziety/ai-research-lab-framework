@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class LLMClient:
-    # Fallback model cost table (USD per 1K tokens)
+    # Model cost table (USD per 1K tokens)
     _MODEL_COSTS = {
         'gpt-4o': (0.005, 0.015),
         'gpt-4o-mini': (0.00015, 0.0006),
@@ -32,9 +32,6 @@ class LLMClient:
             (0.0005, 0.0015)  # sensible default
         )
         return (tokens_input / 1000) * input_cost_per_1k + (tokens_output / 1000) * output_cost_per_1k
-    """
-    Client for interacting with various LLM providers.
-    """
 
     def __init__(self, config: Dict[str, Any]):
         """
@@ -93,24 +90,30 @@ class LLMClient:
         self._validate_configuration()
 
     def _validate_configuration(self):
-        """Validate that required API keys are available."""
+        """Validate configuration and log available providers."""
         available_providers = []
-
-        if self.provider == 'openai' and self.openai_api_key:
+        
+        # Check all available providers, not just the configured one
+        if self.openai_api_key:
             available_providers.append('openai')
-        elif self.provider == 'anthropic' and self.anthropic_api_key:
+        if self.anthropic_api_key:
             available_providers.append('anthropic')
-        elif self.provider == 'gemini' and self.gemini_api_key:
+        if self.gemini_api_key:
             available_providers.append('gemini')
-        elif self.provider == 'huggingface' and self.huggingface_api_key:
+        if self.huggingface_api_key:
             available_providers.append('huggingface')
-        elif self.provider == 'ollama':
+        if self.ollama_endpoint:
             available_providers.append('ollama')
 
         if not available_providers:
-            logger.warning(f"No valid API keys found for {self.provider}. Using mock responses.")
+            raise RuntimeError(f"No valid API keys found. Cannot proceed without real LLM provider.")
         else:
-            logger.info(f"LLM client configured with {len(available_providers)} available providers")
+            logger.info(f"LLM client configured with {len(available_providers)} available providers: {available_providers}")
+            
+            # If the configured provider is not available, use the first available one
+            if self.provider not in available_providers:
+                logger.warning(f"Configured provider '{self.provider}' not available. Using '{available_providers[0]}' instead.")
+                self.provider = available_providers[0]
 
     def generate_response(self, prompt: str, context: Dict[str, Any], 
                          agent_role: str = "AI Assistant", cost_manager=None) -> str:
@@ -125,76 +128,60 @@ class LLMClient:
             
         Returns:
             Generated response string
+            
+        Raises:
+            RuntimeError: If no valid LLM provider is available
+            Exception: If LLM generation fails
         """
         start_time = time.time()
         tokens_input = len(prompt.split())
         agent_id = context.get('agent_id', 'unknown')
         task_type = context.get('task_type', 'general')
         
-        try:
-            # Estimate cost before generation
-            estimated_tokens_output = tokens_input * 2  # Rough estimate
-            if cost_manager:
-                estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
-                # Check if we can afford this request
-                if not cost_manager.can_afford(estimated_cost):
-                    logger.warning(f"Insufficient budget for LLM request: ${estimated_cost:.4f}")
-                    return f"Budget limit reached. Estimated cost: ${estimated_cost:.4f}"
-            else:
-                estimated_cost = self._estimate_cost_local(tokens_input, estimated_tokens_output)
-            
-            # Generate response
-            if self.provider == 'openai' and self.openai_api_key:
-                response = self._generate_openai_response(prompt, context, agent_role)
-            elif self.provider == 'anthropic' and self.anthropic_api_key:
-                response = self._generate_anthropic_response(prompt, context, agent_role)
-            elif self.provider == 'gemini' and self.gemini_api_key:
-                response = self._generate_gemini_response(prompt, context, agent_role)
-            elif self.provider == 'huggingface' and self.huggingface_api_key:
-                response = self._generate_huggingface_response(prompt, context, agent_role)
-            elif self.provider == 'ollama':
-                response = self._generate_ollama_response(prompt, context, agent_role)
-            else:
-                response = self._generate_mock_response(prompt, context, agent_role)
-            
-            # Track actual usage and cost
-            tokens_output = len(response.split())
-            if cost_manager:
-                actual_cost = cost_manager.estimate_cost(self.model, tokens_input, tokens_output)
-                cost_manager.track_usage(
-                    model=self.model,
-                    tokens_input=tokens_input,
-                    tokens_output=tokens_output,
-                    actual_cost=actual_cost,
-                    task_type=task_type,
-                    agent_id=agent_id,
-                    success=True
-                )
-            else:
-                actual_cost = self._estimate_cost_local(tokens_input, tokens_output)
-            
-            execution_time = time.time() - start_time
-            logger.info(f"LLM response generated: {tokens_input + tokens_output} tokens, ${actual_cost:.4f}, {execution_time:.2f}s")
-            
-            return response
-
-        except Exception as e:
-            logger.error(f"LLM generation failed: {str(e)}")
-            
-            # Track failure cost
-            if cost_manager:
-                cost_manager.track_usage(
-                    model=self.model,
-                    tokens_input=tokens_input,
-                    tokens_output=0,
-                    actual_cost=estimated_cost,
-                    task_type=task_type,
-                    agent_id=agent_id,
-                    success=False,
-                    error_message=str(e)
-                )
-            
-            return self._generate_mock_response(prompt, context, agent_role)
+        # Estimate cost before generation
+        estimated_tokens_output = tokens_input * 2  # Rough estimate
+        if cost_manager:
+            estimated_cost = cost_manager.estimate_cost(self.model, tokens_input, estimated_tokens_output)
+            # Check if we can afford this request
+            if not cost_manager.can_afford(estimated_cost):
+                raise RuntimeError(f"Insufficient budget for LLM request: ${estimated_cost:.4f}")
+        else:
+            estimated_cost = self._estimate_cost_local(tokens_input, estimated_tokens_output)
+        
+        # Generate response
+        if self.provider == 'openai' and self.openai_api_key:
+            response = self._generate_openai_response(prompt, context, agent_role)
+        elif self.provider == 'anthropic' and self.anthropic_api_key:
+            response = self._generate_anthropic_response(prompt, context, agent_role)
+        elif self.provider == 'gemini' and self.gemini_api_key:
+            response = self._generate_gemini_response(prompt, context, agent_role)
+        elif self.provider == 'huggingface' and self.huggingface_api_key:
+            response = self._generate_huggingface_response(prompt, context, agent_role)
+        elif self.provider == 'ollama':
+            response = self._generate_ollama_response(prompt, context, agent_role)
+        else:
+            raise RuntimeError(f"No valid LLM provider available for {self.provider}")
+        
+        # Track actual usage and cost
+        tokens_output = len(response.split())
+        if cost_manager:
+            actual_cost = cost_manager.estimate_cost(self.model, tokens_input, tokens_output)
+            cost_manager.track_usage(
+                model=self.model,
+                tokens_input=tokens_input,
+                tokens_output=tokens_output,
+                actual_cost=actual_cost,
+                task_type=task_type,
+                agent_id=agent_id,
+                success=True
+            )
+        else:
+            actual_cost = self._estimate_cost_local(tokens_input, tokens_output)
+        
+        execution_time = time.time() - start_time
+        logger.info(f"LLM response generated: {tokens_input + tokens_output} tokens, ${actual_cost:.4f}, {execution_time:.2f}s")
+        
+        return response
 
     def _generate_openai_response(self, prompt: str, context: Dict[str, Any], 
                                  agent_role: str) -> str:
@@ -217,11 +204,9 @@ class LLMClient:
             return response.choices[0].message.content
 
         except ImportError:
-            logger.warning("OpenAI library not installed. Using mock response.")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError("OpenAI library not installed. Install with: pip install openai")
         except Exception as e:
-            logger.error(f"OpenAI API error: {str(e)}")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError(f"OpenAI API error: {str(e)}")
 
     def _generate_anthropic_response(self, prompt: str, context: Dict[str, Any], 
                                     agent_role: str) -> str:
@@ -243,11 +228,9 @@ class LLMClient:
             return response.content[0].text
 
         except ImportError:
-            logger.warning("Anthropic library not installed. Using mock response.")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError("Anthropic library not installed. Install with: pip install anthropic")
         except Exception as e:
-            logger.error(f"Anthropic API error: {str(e)}")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError(f"Anthropic API error: {str(e)}")
 
     def _generate_gemini_response(self, prompt: str, context: Dict[str, Any], 
                                  agent_role: str) -> str:
@@ -258,18 +241,16 @@ class LLMClient:
             genai.configure(api_key=self.gemini_api_key)
             model = genai.GenerativeModel('gemini-pro')
 
-            system_prompt = f"You are a {agent_role}. Provide expert insights based on your domain knowledge."
-            full_prompt = f"{system_prompt}\n\nUser: {prompt}"
+            system_message = f"You are a {agent_role}. Provide expert insights based on your domain knowledge."
+            full_prompt = f"{system_message}\n\nUser: {prompt}\nAssistant:"
 
             response = model.generate_content(full_prompt)
             return response.text
 
         except ImportError:
-            logger.warning("Google Generative AI library not installed. Using mock response.")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError("Google Generative AI library not installed. Install with: pip install google-generative-ai")
         except Exception as e:
-            logger.error(f"Gemini API error: {str(e)}")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError(f"Gemini API error: {str(e)}")
 
     def _generate_huggingface_response(self, prompt: str, context: Dict[str, Any], 
                                       agent_role: str) -> str:
@@ -299,9 +280,10 @@ class LLMClient:
             else:
                 return str(result)
 
+        except ImportError:
+            raise RuntimeError("HuggingFace Inference API library not installed. Install with: pip install requests")
         except Exception as e:
-            logger.error(f"HuggingFace API error: {str(e)}")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError(f"HuggingFace API error: {str(e)}")
 
     def _generate_ollama_response(self, prompt: str, context: Dict[str, Any], 
                                  agent_role: str) -> str:
@@ -331,9 +313,10 @@ class LLMClient:
             result = response.json()
             return result.get('response', 'No response generated')
 
+        except ImportError:
+            raise RuntimeError("OLLAMA local inference library not installed. Install with: pip install requests")
         except Exception as e:
-            logger.error(f"OLLAMA API error: {str(e)}")
-            return self._generate_mock_response(prompt, context, agent_role)
+            raise RuntimeError(f"OLLAMA API error: {str(e)}")
 
     def select_optimal_provider(self, prompt: str, task_complexity: str = 'medium') -> str:
         """
@@ -395,277 +378,97 @@ class LLMClient:
             # Restore original provider
             self.provider = original_provider
 
-    def _generate_mock_response(self, prompt: str, context: Dict[str, Any], 
-                               agent_role: str) -> str:
-        """Generate a mock response for demonstration purposes."""
-        import time
-        # Simulate API delay
-        time.sleep(0.1)
-
-        # Extract key terms from prompt for context-aware mock responses
-        prompt_lower = prompt.lower()
-
-        # Domain-specific mock responses based on agent role
-        if "principal investigator" in agent_role.lower():
-            # Handle team selection prompts specifically
-            if "team" in prompt_lower or "expertise" in prompt_lower or "analyze" in prompt_lower:
-                return f"""Based on my analysis as a {agent_role}, here is the optimal team composition:
-
-**Analysis Summary:**
-This research question requires interdisciplinary expertise spanning multiple domains. The complexity of the problem necessitates a diverse team with complementary skills.
-
-REQUIRED_EXPERTISE: [biomedical_engineering, neuroscience, materials_science, signal_processing, clinical_research]
-TEAM_SIZE: 5
-PRIORITY_EXPERTS: [biomedical_engineering, neuroscience, materials_science]
-SPECIALIZATION_NOTES: biomedical_engineering: Focus on microneedle design and biocompatibility | neuroscience: EEG signal analysis and brain monitoring | materials_science: Biocompatible materials for long-term implantation | signal_processing: Signal acquisition and noise reduction | clinical_research: Safety protocols and regulatory compliance
-
-**Detailed Justification:**
-- **Biomedical Engineering**: Essential for designing the microneedle array and ensuring biocompatibility
-- **Neuroscience**: Critical for understanding EEG signal patterns and brain monitoring requirements  
-- **Materials Science**: Required for developing biocompatible materials for long-term implantation
-- **Signal Processing**: Necessary for acquiring and processing EEG signals with minimal noise
-- **Clinical Research**: Important for ensuring safety protocols and regulatory compliance
-
-This interdisciplinary team provides the necessary expertise for developing a novel microneedle-based EEG device for long-term ambulatory monitoring."""
-
-            elif "research" in prompt_lower or "coordination" in prompt_lower:
-                return f"""As a {agent_role}, I recommend the following research coordination strategy:
-
-**Research Coordination Plan:**
-
-1. **Phase 1 - Team Assembly (Week 1)**
-   - Hire specialized agents for each required domain
-   - Establish communication protocols
-   - Define roles and responsibilities
-
-2. **Phase 2 - Literature Review (Week 2)**
-   - Conduct comprehensive literature search
-   - Identify key research gaps
-   - Establish baseline knowledge
-
-3. **Phase 3 - Project Specification (Week 3)**
-   - Define detailed project scope
-   - Establish success criteria
-   - Create project timeline
-
-4. **Phase 4 - Implementation (Weeks 4-6)**
-   - Execute research plan
-   - Regular team meetings
-   - Progress monitoring
-
-5. **Phase 5 - Synthesis (Week 7)**
-   - Compile findings
-   - Cross-validate results
-   - Prepare final report
-
-**Key Success Factors:**
-- Regular team coordination meetings
-- Clear communication channels
-- Defined milestones and deliverables
-- Quality control checkpoints
-
-This structured approach ensures comprehensive research coverage and high-quality outcomes."""
-
-        elif "research" in agent_role.lower():
-            if "experiment" in prompt_lower or "study" in prompt_lower:
-                return f"""Based on my analysis as a {agent_role}, I recommend a controlled experimental design with the following considerations:
-
-**Experimental Design:**
-
-1. **Sample Size Calculation**
-   - Power analysis for expected effect size
-   - Minimum sample size: 30 participants per group
-   - Account for potential dropouts (20% buffer)
-
-2. **Randomization and Blinding**
-   - Random assignment to treatment groups
-   - Double-blind protocol where possible
-   - Stratified randomization by key variables
-
-3. **Primary and Secondary Outcomes**
-   - Primary: Signal quality improvement (SNR)
-   - Secondary: Comfort scores, safety metrics
-   - Exploratory: Long-term stability measures
-
-4. **Statistical Analysis Plan**
-   - Mixed-effects models for repeated measures
-   - Bonferroni correction for multiple comparisons
-   - Intention-to-treat analysis
-
-5. **Ethical Considerations**
-   - IRB approval for human subjects research
-   - Informed consent procedures
-   - Data privacy and security protocols
-
-The proposed methodology follows best practices for research integrity and reproducibility."""
-
-            elif "literature" in prompt_lower or "review" in prompt_lower:
-                return f"""As a {agent_role}, I suggest a systematic approach to literature analysis:
-
-**Literature Review Methodology:**
-
-1. **Database Search Strategy**
-   - PubMed, Web of Science, IEEE Xplore
-   - Keywords: "microneedle EEG", "dry electrodes", "brain monitoring"
-   - Date range: 2010-present
-   - Language: English only
-
-2. **Inclusion/Exclusion Criteria**
-   - Include: Peer-reviewed articles, clinical studies
-   - Exclude: Conference abstracts, non-English papers
-   - Focus on human studies and clinical applications
-
-3. **Quality Assessment**
-   - Use PRISMA framework for systematic reviews
-   - GRADE criteria for evidence quality
-   - Risk of bias assessment
-
-4. **Data Extraction and Synthesis**
-   - Standardized data extraction forms
-   - Meta-analysis where appropriate
-   - Narrative synthesis for heterogeneous studies
-
-5. **Gap Analysis**
-   - Identify research gaps
-   - Highlight methodological limitations
-   - Suggest future research directions
-
-This approach ensures comprehensive coverage of the existing evidence base."""
-
-        elif "data" in agent_role.lower() or "statistics" in agent_role.lower():
-            return f"""From a {agent_role} perspective, I recommend:
-
-**Data Analysis Strategy:**
-
-1. **Exploratory Data Analysis**
-   - Distribution analysis for all variables
-   - Outlier detection and handling
-   - Missing data assessment and imputation
-
-2. **Statistical Tests**
-   - Parametric tests for normally distributed data
-   - Non-parametric alternatives when needed
-   - Mixed-effects models for repeated measures
-
-3. **Effect Size Calculations**
-   - Cohen's d for group comparisons
-   - Confidence intervals for all estimates
-   - Practical significance assessment
-
-4. **Multiple Comparison Corrections**
-   - Bonferroni correction for family-wise error
-   - False discovery rate control
-   - Pre-specified primary outcomes
-
-5. **Visualization**
-   - Box plots for group comparisons
-   - Time series plots for longitudinal data
-   - Heat maps for correlation matrices
-
-The analysis prioritizes both statistical significance and practical significance."""
-
-        elif "critic" in agent_role.lower():
-            return f"""As a {agent_role}, I identify several areas for consideration:
-
-**Critical Assessment:**
-
-**Strengths:**
-- Clear research objectives and methodology
-- Appropriate statistical approaches
-- Consideration of ethical implications
-- Comprehensive literature review
-- Well-defined outcome measures
-
-**Areas for Improvement:**
-- Sample size justification could be more detailed
-- Potential confounding variables need addressing
-- Generalizability limitations should be discussed
-- Cost-effectiveness analysis missing
-- Long-term follow-up considerations
-
-**Methodological Concerns:**
-- Risk of selection bias in participant recruitment
-- Potential for measurement bias in self-reported outcomes
-- Limited external validity for diverse populations
-
-**Overall Assessment:**
-The approach is methodologically sound with minor improvements needed. The research design addresses the primary objectives effectively, though additional considerations for external validity and long-term outcomes would strengthen the study."""
-
-        else:
-            # Check if this is a JSON request
-            if "json" in prompt_lower or "format your response" in prompt_lower or "structured json" in prompt_lower:
-                # Generate mock JSON response for coding specialist
-                if "tool_design" in prompt_lower or "tool requirement" in prompt_lower:
-                    return json.dumps({
-                        "tool_design": {
-                            "name": "mock_tool",
-                            "description": "Mock tool for testing",
-                            "parameters": {
-                                "input_data": {"type": "string", "description": "Input data", "required": True}
-                            },
-                            "return_type": "dict"
-                        },
-                        "implementation_approach": "Standard Python implementation with error handling",
-                        "mcp_description": {
-                            "name": "mock_tool",
-                            "description": "Mock tool for testing",
-                            "inputSchema": {"type": "object", "properties": {}},
-                            "outputSchema": {"type": "object", "properties": {}}
-                        },
-                        "integration_plan": "Register with tool registry and provide MCP interface",
-                        "testing_strategy": "Unit tests with comprehensive coverage",
-                        "documentation": "Clear documentation with usage examples"
-                    })
-                else:
-                    # Generic JSON response
-                    return json.dumps({
-                        "status": "success",
-                        "message": "Mock JSON response",
-                        "data": {"key": "value"}
-                    })
-            else:
-                # Generic expert response
-                return f"""As a {agent_role}, I provide the following expert analysis:
-
-**Expert Analysis:**
-
-**Key Considerations:**
-1. The approach aligns with current best practices in the field
-2. Methodology appears appropriate for the research objectives  
-3. Potential limitations should be acknowledged and addressed
-4. Results should be interpreted within the study context
-5. Future research directions could explore related questions
-
-**Methodological Strengths:**
-- Systematic approach to problem-solving
-- Evidence-based decision making
-- Consideration of multiple perspectives
-- Quality control measures in place
-
-**Recommendations:**
-- Continue with proposed methodology
-- Monitor progress and adjust as needed
-- Document all decisions and rationale
-- Prepare for potential challenges
-
-This analysis provides a solid foundation for evidence-based decision making and successful research execution."""
-
 
 # Global client instance
 _llm_client = None
 
 
 def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
-    """Get or create global LLM client instance."""
+    """
+    Get or create LLM client instance.
+    
+    Args:
+        config: Optional configuration dictionary
+        
+    Returns:
+        LLMClient instance
+    """
     global _llm_client
-
-    if _llm_client is None or config:
-        _llm_client = LLMClient(config or {})
-
+    
+    # If no global client exists, create one
+    if _llm_client is None:
+        if config is None:
+            # Try to load configuration from config file
+            try:
+                import json
+                config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'config.json')
+                if os.path.exists(config_path):
+                    with open(config_path, 'r') as f:
+                        file_config = json.load(f)
+                    
+                    # Extract API keys from config file
+                    api_keys = file_config.get('api_keys', {})
+                    framework = file_config.get('framework', {})
+                    
+                    config = {
+                        'default_llm_provider': framework.get('default_llm_provider', 'openai'),
+                        'default_model': framework.get('default_model', 'gpt-4'),
+                        'openai_api_key': (
+                            framework.get('openai_api_key') or 
+                            api_keys.get('openai') or
+                            os.getenv('OPENAI_API_KEY')
+                        ),
+                        'anthropic_api_key': (
+                            framework.get('anthropic_api_key') or 
+                            api_keys.get('anthropic') or
+                            os.getenv('ANTHROPIC_API_KEY')
+                        ),
+                        'gemini_api_key': (
+                            framework.get('gemini_api_key') or 
+                            api_keys.get('gemini') or
+                            os.getenv('GEMINI_API_KEY')
+                        ),
+                        'huggingface_api_key': (
+                            framework.get('huggingface_api_key') or 
+                            api_keys.get('huggingface') or
+                            os.getenv('HUGGINGFACE_API_KEY')
+                        ),
+                        'ollama_endpoint': (
+                            framework.get('ollama_endpoint') or 
+                            api_keys.get('ollama_endpoint') or
+                            os.getenv('OLLAMA_ENDPOINT', 'http://localhost:11434')
+                        )
+                    }
+                else:
+                    # Fallback to environment variables only
+                    config = {
+                        'default_llm_provider': 'openai',
+                        'default_model': 'gpt-4',
+                        'openai_api_key': os.getenv('OPENAI_API_KEY'),
+                        'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
+                        'gemini_api_key': os.getenv('GEMINI_API_KEY'),
+                        'huggingface_api_key': os.getenv('HUGGINGFACE_API_KEY'),
+                        'ollama_endpoint': os.getenv('OLLAMA_ENDPOINT', 'http://localhost:11434')
+                    }
+            except Exception as e:
+                logger.warning(f"Failed to load config file, using environment variables: {e}")
+                # Fallback to environment variables only
+                config = {
+                    'default_llm_provider': 'openai',
+                    'default_model': 'gpt-4',
+                    'openai_api_key': os.getenv('OPENAI_API_KEY'),
+                    'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
+                    'gemini_api_key': os.getenv('GEMINI_API_KEY'),
+                    'huggingface_api_key': os.getenv('HUGGINGFACE_API_KEY'),
+                    'ollama_endpoint': os.getenv('OLLAMA_ENDPOINT', 'http://localhost:11434')
+                }
+        
+        _llm_client = LLMClient(config)
+    
     return _llm_client
 
 
 def reset_llm_client():
-    """Reset the global LLM client instance for testing purposes."""
+    """Reset the global LLM client instance."""
     global _llm_client
     _llm_client = None

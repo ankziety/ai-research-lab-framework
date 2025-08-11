@@ -87,7 +87,7 @@ class AgentMarketplace:
         # Add coding specialist if available
         try:
             from .coding_specialist import CodingSpecialist
-            coding_specialist = CodingSpecialist()
+            coding_specialist = CodingSpecialist(model_config=self.llm_config)
             default_agents.append(coding_specialist)
             logger.info("Coding Specialist added to marketplace")
         except ImportError as e:

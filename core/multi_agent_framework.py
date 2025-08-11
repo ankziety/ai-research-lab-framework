@@ -207,11 +207,35 @@ class MultiAgentResearchFramework:
         
         # Prepare LLM configuration for agents
         llm_config = {
-            'openai_api_key': self.config.get('openai_api_key'),
-            'anthropic_api_key': self.config.get('anthropic_api_key'),
             'default_llm_provider': self.config.get('default_llm_provider', 'openai'),
             'default_model': self.config.get('default_model', 'gpt-4o')
         }
+        
+        # Add API keys from config - check both direct keys and api_keys dictionary
+        api_keys = self.config.get('api_keys', {})
+        llm_config['openai_api_key'] = (
+            self.config.get('openai_api_key') or 
+            api_keys.get('openai')
+        )
+        llm_config['anthropic_api_key'] = (
+            self.config.get('anthropic_api_key') or 
+            api_keys.get('anthropic')
+        )
+        llm_config['gemini_api_key'] = (
+            self.config.get('gemini_api_key') or 
+            api_keys.get('gemini')
+        )
+        llm_config['huggingface_api_key'] = (
+            self.config.get('huggingface_api_key') or 
+            api_keys.get('huggingface')
+        )
+        llm_config['ollama_endpoint'] = (
+            self.config.get('ollama_endpoint') or 
+            api_keys.get('ollama_endpoint', 'http://localhost:11434')
+        )
+        
+        # Also add the API keys directly to the config for backward compatibility
+        llm_config.update(api_keys)
         
         # Initialize cost manager
         self.cost_config = {
