@@ -2945,6 +2945,67 @@ select:focus-visible {
     content: 'No activity recorded';
 }
 
+/* Enhanced empty state styles */
+.empty-state.error {
+    border-color: var(--color-error);
+    color: var(--color-error);
+}
+
+.empty-state.error::before {
+    background: var(--color-error);
+    color: white;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    color: var(--color-text-secondary);
+    margin-bottom: 1rem;
+}
+
+.empty-state h3 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 1.2rem;
+}
+
+.empty-state p {
+    margin: 0;
+    max-width: 300px;
+    line-height: 1.5;
+}
+
+.metrics-error {
+    text-align: center;
+    padding: 2rem;
+    color: var(--color-error);
+    grid-column: 1 / -1;
+}
+
+.metrics-error i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.metrics-error h3 {
+    margin: 0 0 1rem 0;
+    color: var(--color-error);
+}
+
+.progress-info {
+    margin-top: 1rem;
+    padding: 1rem;
+    background: var(--color-bg-secondary);
+    border-radius: var(--radius-lg);
+}
+
+.info-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+}
+
 /* Loading spinner for buttons */
 .btn .fa-spinner {
     animation: spin 1s linear infinite;

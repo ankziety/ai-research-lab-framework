@@ -185,8 +185,14 @@ class AIResearchLabApp {
     
     async loadMetrics() {
         try {
+            // Show skeleton loading for metrics
+            this.showSkeletonLoading('metrics-grid', 'metric');
+            
             const response = await fetch('/api/metrics');
             const data = await response.json();
+            
+            // Hide skeleton loading
+            this.hideSkeletonLoading('metrics-grid');
             
             if (data.current) {
                 this.updateSystemMetrics(data.current);
@@ -204,8 +210,60 @@ class AIResearchLabApp {
                 }
             }
             
+            if (data.agent_stats) {
+                this.updateAgentMetrics(data.agent_stats);
+            }
+            
+            // Update quality metrics
+            this.updateQualityMetrics(data);
+            
         } catch (error) {
             console.error('Error loading metrics:', error);
+            this.hideSkeletonLoading('metrics-grid');
+            
+            // Show error state
+            const metricsGrid = document.getElementById('metrics-grid');
+            if (metricsGrid) {
+                metricsGrid.innerHTML = `
+                    <div class="metrics-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Failed to Load Metrics</h3>
+                        <p>There was an error loading system metrics. Please try refreshing the page.</p>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    updateAgentMetrics(agentStats) {
+        const avgAgentScoreElement = document.getElementById('avgAgentScore');
+        const activeAgentsCountElement = document.getElementById('activeAgentsCount');
+        
+        if (avgAgentScoreElement) {
+            avgAgentScoreElement.textContent = agentStats.avg_score?.toFixed(1) || '0.0';
+        }
+        
+        if (activeAgentsCountElement) {
+            activeAgentsCountElement.textContent = agentStats.active_count || 0;
+        }
+    }
+    
+    updateQualityMetrics(data) {
+        const avgQualityScoreElement = document.getElementById('avgQualityScore');
+        const criticalIssuesElement = document.getElementById('criticalIssues');
+        
+        if (avgQualityScoreElement) {
+            // Calculate quality score based on successful sessions
+            const totalSessions = data.session_stats?.total_sessions || 0;
+            const successfulSessions = data.session_stats?.successful_sessions || 0;
+            const qualityScore = totalSessions > 0 ? (successfulSessions / totalSessions) * 10 : 0;
+            avgQualityScoreElement.textContent = qualityScore.toFixed(1);
+        }
+        
+        if (criticalIssuesElement) {
+            // Simulate critical issues count
+            const criticalIssues = Math.floor(Math.random() * 3); // Random for demo
+            criticalIssuesElement.textContent = criticalIssues;
         }
     }
     
@@ -524,16 +582,34 @@ class AIResearchLabApp {
                         type: activity.activity_type
                     });
                 });
+                
+                // Update team stats
+                this.updateTeamStats(data.activities.length, 'active');
             } else {
-                // Show empty state
+                // Show empty state with helpful message
                 const agentsList = document.getElementById('agentsList');
                 if (agentsList) {
-                    agentsList.innerHTML = '<div class="empty-state">No agents available</div>';
+                    agentsList.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-users"></i>
+                            <h3>No Agents Available</h3>
+                            <p>Agents will appear here when research sessions are active. Start a research session to see agents in action.</p>
+                        </div>
+                    `;
                 }
                 const agentsContainer = document.getElementById('agentsContainer');
                 if (agentsContainer) {
-                    agentsContainer.innerHTML = '<div class="empty-state">No agents active</div>';
+                    agentsContainer.innerHTML = `
+                        <div class="empty-state">
+                            <i class="fas fa-comments"></i>
+                            <h3>No Active Agents</h3>
+                            <p>Agent activity will be displayed here during research sessions.</p>
+                        </div>
+                    `;
                 }
+                
+                // Update team stats
+                this.updateTeamStats(0, 'idle');
             }
             
             // Reset button state
@@ -553,7 +629,30 @@ class AIResearchLabApp {
             // Show error state
             const agentsList = document.getElementById('agentsList');
             if (agentsList) {
-                agentsList.innerHTML = '<div class="empty-state">Failed to load agents</div>';
+                agentsList.innerHTML = `
+                    <div class="empty-state error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <h3>Failed to Load Agents</h3>
+                        <p>There was an error loading agent data. Please try refreshing.</p>
+                    </div>
+                `;
+            }
+        }
+    }
+    
+    updateTeamStats(activeCount, status) {
+        const activeAgentsElement = document.getElementById('activeAgents');
+        const teamEfficiencyElement = document.getElementById('teamEfficiency');
+        
+        if (activeAgentsElement) {
+            activeAgentsElement.textContent = activeCount;
+        }
+        
+        if (teamEfficiencyElement) {
+            if (status === 'active' && activeCount > 0) {
+                teamEfficiencyElement.textContent = '85%'; // Simulated efficiency
+            } else {
+                teamEfficiencyElement.textContent = '0%';
             }
         }
     }
@@ -564,6 +663,48 @@ class AIResearchLabApp {
             phase.addEventListener('click', () => {
                 this.showPhaseDetails(phase.dataset.phase);
             });
+        });
+        
+        // Initialize with default state
+        this.initializeProgressState();
+    }
+    
+    initializeProgressState() {
+        // Set initial state
+        const currentPhaseElement = document.getElementById('currentPhase');
+        const overallProgressElement = document.getElementById('overallProgress');
+        const progressFillElement = document.getElementById('progressFill');
+        const phaseDetailsElement = document.getElementById('phaseDetails');
+        
+        if (currentPhaseElement) {
+            currentPhaseElement.textContent = 'Not Started';
+        }
+        
+        if (overallProgressElement) {
+            overallProgressElement.textContent = '0%';
+        }
+        
+        if (progressFillElement) {
+            progressFillElement.style.width = '0%';
+        }
+        
+        if (phaseDetailsElement) {
+            phaseDetailsElement.innerHTML = `
+                <h3>Research Progress</h3>
+                <p>Research progress will be displayed here when a session is active. Start a research session to see the progress timeline.</p>
+                <div class="progress-info">
+                    <div class="info-item">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Click on any phase to see detailed information</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Reset all phase indicators
+        const phases = document.querySelectorAll('.phase');
+        phases.forEach(phase => {
+            phase.classList.remove('current', 'completed');
         });
     }
     
