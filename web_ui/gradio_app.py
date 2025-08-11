@@ -41,6 +41,8 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
+
 class AIResearchLabGradio:
     """Enhanced Gradio interface for the AI Research Lab framework."""
     
@@ -1147,6 +1149,54 @@ class AIResearchLabGradio:
         
         return results_panel
     
+    def create_debug_panel(self) -> gr.Blocks:
+        """Create the debug panel tab."""
+        with gr.Blocks() as debug_panel:
+            gr.Markdown("# 🔍 Debug Panel")
+            gr.Markdown("System debug information and logs for troubleshooting.")
+            
+            with gr.Row():
+                with gr.Column(scale=2):
+                    # Debug Information
+                    debug_info = gr.Markdown("### Debug Information\n\nNo debug information available.")
+                    
+                    # System Logs
+                    system_logs = gr.Markdown("### System Logs\n\nNo logs available.")
+                
+                with gr.Column(scale=1):
+                    # Debug Controls
+                    gr.Markdown("### Debug Controls")
+                    
+                    refresh_debug_btn = gr.Button("🔄 Refresh Debug Info", variant="primary")
+                    clear_logs_btn = gr.Button("🗑️ Clear Logs", variant="secondary")
+                    export_logs_btn = gr.Button("📥 Export Logs", variant="secondary")
+                    
+                    # Debug Status
+                    debug_status = gr.Markdown("### Debug Status\n\n🟢 Debug panel ready")
+            
+            def update_debug_info():
+                """Update debug information."""
+                debug_content = self.get_debug_panel_content()
+                
+                # Get system logs
+                logs_content = "### System Logs\n\n"
+                if self.debug_logs:
+                    for log in self.debug_logs[-10:]:  # Show last 10 logs
+                        timestamp = log.get('timestamp', 'Unknown')
+                        log_type = log.get('type', 'Unknown')
+                        content = log.get('content', 'No content')
+                        logs_content += f"**{timestamp}** - {log_type}\n"
+                        logs_content += f"{content}\n\n"
+                else:
+                    logs_content += "No logs available."
+                
+                return debug_content, logs_content, "### Debug Status\n\n🟢 Debug information updated"
+            
+            refresh_debug_btn.click(update_debug_info, outputs=[debug_info, system_logs, debug_status])
+            debug_panel.load(update_debug_info, outputs=[debug_info, system_logs, debug_status])
+        
+        return debug_panel
+    
     def get_detailed_chat_history(self, session_id: Optional[str] = None, search_query: str = "",
                                   author_filter: str = "all", log_type_filter: str = "all",
                                   limit: int = 100) -> List[Dict[str, Any]]:
@@ -1222,8 +1272,22 @@ class AIResearchLabGradio:
             export_output = gr.Textbox(label="Export Output", lines=6)
 
             def update_history(search_text, author, log_type):
+                # Get the most recent session if no current session
                 if not self.current_session_id:
-                    return "### Chat History\n\nNo active session."
+                    # Try to get the most recent session from data manager
+                    if self.data_manager:
+                        try:
+                            # Get recent sessions using available method
+                            recent_sessions = self.data_manager.get_all_sessions(limit=1)
+                            if recent_sessions:
+                                self.current_session_id = recent_sessions[0].get('session_id')
+                        except AttributeError:
+                            # Fallback: create a new session if needed
+                            pass
+                
+                if not self.current_session_id:
+                    return "### Chat History\n\n📋 **No Active Session**\n\nStart a chat or research session to see history here."
+                
                 logs = self.get_detailed_chat_history(
                     session_id=self.current_session_id,
                     search_query=search_text or "",
@@ -1231,9 +1295,14 @@ class AIResearchLabGradio:
                     log_type_filter=log_type or "all",
                     limit=200
                 )
+                
                 if not logs:
-                    return "### Chat History\n\nNo messages found."
-                lines = ["### Chat History\n"]
+                    if search_text or author != "all" or log_type != "all":
+                        return "### Chat History\n\n🔍 **No Messages Found**\n\nNo messages match your current search criteria."
+                    else:
+                        return "### Chat History\n\n📋 **No Messages Yet**\n\nStart chatting to see message history here."
+                
+                lines = ["### Chat History\n\n"]
                 for log in reversed(logs):
                     ts = log.get('timestamp', '')
                     au = log.get('author', '')
@@ -1245,12 +1314,24 @@ class AIResearchLabGradio:
                 return "\n".join(lines)
 
             def do_export(fmt):
+                # Get the most recent session if no current session
                 if not self.current_session_id:
-                    return "No active session to export."
+                    if self.data_manager:
+                        try:
+                            # Get recent sessions using available method
+                            recent_sessions = self.data_manager.get_all_sessions(limit=1)
+                            if recent_sessions:
+                                self.current_session_id = recent_sessions[0].get('session_id')
+                        except AttributeError:
+                            # Fallback: create a new session if needed
+                            pass
+                
+                if not self.current_session_id:
+                    return "📋 **No Active Session**\n\nNo session available for export. Start a chat or research session first."
                 try:
                     return self.export_chat_history(session_id=self.current_session_id, fmt=fmt)
                 except Exception as e:
-                    return f"Export failed: {e}"
+                    return f"❌ **Export Failed**\n\nError: {e}"
 
             refresh_btn.click(update_history, inputs=[search_query, author_filter, log_type_filter], outputs=[history_display])
             search_query.submit(update_history, inputs=[search_query, author_filter, log_type_filter], outputs=[history_display])
@@ -1329,10 +1410,7 @@ class AIResearchLabGradio:
                             gr.Markdown("### System Status")
                             system_status = gr.Markdown("🟢 System Online")
                     
-                    # Debug Panel (Collapsible)
-                    with gr.Accordion("🔍 Debug Panel"):
-                        debug_panel = gr.Markdown("No debug information available.")
-                        refresh_debug_btn = gr.Button("🔄 Refresh Debug Info")
+                    # Debug Panel (Collapsible) - REMOVED, now in its own tab
                     
                     # Chat function with proper signature
                     def chat_fn(message, history, research_mode_val):
@@ -1403,10 +1481,17 @@ class AIResearchLabGradio:
                         refresh_chat_history,
                         outputs=[chatbot, status_display]
                     )
+                    
+                    # Debug panel refresh (moved to debug tab)
+                    # refresh_debug_btn.click(
+                    #     get_debug_content,
+                    #     outputs=[debug_panel]
+                    # )
                 
                 # Research Dashboard Tab
                 with gr.TabItem("📊 Dashboard"):
                     self.create_research_dashboard()
+                
                 # History Tab
                 with gr.TabItem("📚 History"):
                     self.create_history_panel()
@@ -1418,6 +1503,10 @@ class AIResearchLabGradio:
                 # Results Tab
                 with gr.TabItem("📊 Results"):
                     self.create_results_panel()
+                
+                # Debug Tab
+                with gr.TabItem("🔍 Debug"):
+                    self.create_debug_panel()
                 
                 # Settings Tab
                 with gr.TabItem("⚙️ Settings"):
@@ -1548,10 +1637,7 @@ def main():
                         gr.Markdown("### System Status")
                         system_status = gr.Markdown("🟢 System Online")
                 
-                # Debug Panel (Collapsible)
-                with gr.Accordion("🔍 Debug Panel", open=False):
-                    debug_panel = gr.Markdown("No debug information available.")
-                    refresh_debug_btn = gr.Button("🔄 Refresh Debug Info")
+                # Debug Panel (Collapsible) - REMOVED, now in its own tab
                 
                 # Connect components
                 submit_btn.click(
@@ -1587,11 +1673,11 @@ def main():
                     outputs=[msg, status_display]
                 )
                 
-                # Debug panel refresh
-                refresh_debug_btn.click(
-                    get_debug_content,
-                    outputs=[debug_panel]
-                )
+                # Debug panel refresh (moved to debug tab)
+                # refresh_debug_btn.click(
+                #     get_debug_content,
+                #     outputs=[debug_panel]
+                # )
             
             # Research Dashboard Tab
             with gr.TabItem("📊 Dashboard"):
@@ -1615,6 +1701,10 @@ def main():
             with gr.TabItem("⚙️ Settings"):
                 gr.Markdown("## Settings")
                 gr.Markdown("Configure API keys and system settings.")
+            
+            # Debug Panel Tab
+            with gr.TabItem("🔍 Debug"):
+                app.create_debug_panel()
         
         # Footer
         gr.Markdown("---")
