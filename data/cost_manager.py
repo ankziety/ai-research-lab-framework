@@ -56,27 +56,15 @@ class CostManager:
     """
     
     def __init__(self, budget_limit: float, config: Dict[str, Any]):
-        """
-        Initialize cost manager.
-        
-        Args:
-            budget_limit: Total budget limit in USD
-            config: Configuration dictionary with model costs and settings
-        """
+        """Initialize the cost manager with budget and configuration."""
         self.budget_limit = budget_limit
+        self.config = config
         self.current_spending = 0.0
-        self.cost_history: List[CostRecord] = []
-        self.usage_stats: Dict[str, Dict[str, Any]] = {}
+        self.cost_history = []
+        self.usage_stats = {}
         
-        # Load model costs from config
+        # Load model costs
         self.model_costs = self._load_model_costs(config)
-        
-        # Budget alerts
-        self.budget_alerts = {
-            0.5: False,  # 50% warning
-            0.8: False,  # 80% warning
-            0.95: False  # 95% warning
-        }
         
         # Cost optimization settings
         self.optimization_enabled = config.get('cost_optimization', True)
@@ -88,9 +76,56 @@ class CostManager:
         logger.info(f"Cost manager initialized with budget: ${budget_limit:.2f}")
     
     def _load_model_costs(self, config: Dict[str, Any]) -> Dict[str, ModelCost]:
-        """Load model cost configurations."""
+        """Load model cost configurations with current OpenAI pricing."""
         default_costs = {
-            # GPT-4o models (recommended - most cost-effective)
+            # GPT-4.1 models (latest - most cost-effective)
+            'gpt-4.1': ModelCost(
+                model_name='gpt-4.1',
+                provider='openai',
+                input_cost_per_1k=0.002,  # $2.00 per million tokens
+                output_cost_per_1k=0.008,  # $8.00 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.95
+            ),
+            'gpt-4.1-mini': ModelCost(
+                model_name='gpt-4.1-mini',
+                provider='openai',
+                input_cost_per_1k=0.0004,  # $0.40 per million tokens
+                output_cost_per_1k=0.0016,  # $1.60 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.85
+            ),
+            'gpt-4.1-nano': ModelCost(
+                model_name='gpt-4.1-nano',
+                provider='openai',
+                input_cost_per_1k=0.0001,  # $0.10 per million tokens
+                output_cost_per_1k=0.0004,  # $0.40 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis'],
+                reliability_score=0.80
+            ),
+            # OpenAI o3/o4 models
+            'o3': ModelCost(
+                model_name='o3',
+                provider='openai',
+                input_cost_per_1k=0.002,  # $2.00 per million tokens
+                output_cost_per_1k=0.008,  # $8.00 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code', 'vision'],
+                reliability_score=0.95
+            ),
+            'o4-mini': ModelCost(
+                model_name='o4-mini',
+                provider='openai',
+                input_cost_per_1k=0.0011,  # $1.10 per million tokens
+                output_cost_per_1k=0.0044,  # $4.40 per million tokens
+                max_tokens=128000,
+                capabilities=['reasoning', 'analysis', 'code'],
+                reliability_score=0.90
+            ),
+            # Legacy GPT-4o models (still available)
             'gpt-4o': ModelCost(
                 model_name='gpt-4o',
                 provider='openai',
@@ -109,7 +144,7 @@ class CostManager:
                 capabilities=['reasoning', 'analysis', 'code'],
                 reliability_score=0.85
             ),
-            # GPT-4 models (expensive - use sparingly)
+            # Legacy GPT-4 models (expensive - use sparingly)
             'gpt-4': ModelCost(
                 model_name='gpt-4',
                 provider='openai',
@@ -314,7 +349,7 @@ class CostManager:
             Optimal model name
         """
         if not self.optimization_enabled:
-            return 'gpt-4o'  # Default to most capable model
+            return 'gpt-4.1'  # Default to most capable new model
         
         # Filter models by required capabilities
         available_models = []
@@ -326,10 +361,10 @@ class CostManager:
         
         if not available_models:
             logger.warning("No models available with required capabilities")
-            return 'gpt-4o'
+            return 'gpt-4.1'
         
         # Budget protection: Avoid expensive models when budget is low
-        expensive_models = ['gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview']
+        expensive_models = ['gpt-4', 'gpt-4-turbo', 'gpt-4-turbo-preview', 'gpt-4o']  # Legacy expensive models
         if budget_remaining < 5.0:  # Less than $5 remaining
             available_models = [(name, cost) for name, cost in available_models 
                               if name not in expensive_models]
@@ -343,7 +378,7 @@ class CostManager:
         
         if not available_models:
             logger.error("No affordable models available")
-            return 'gpt-4o-mini'  # Fallback to cheapest option
+            return 'gpt-4.1-nano'  # Fallback to cheapest option
         
         # Score models based on cost efficiency and capability
         model_scores = []
@@ -367,6 +402,10 @@ class CostManager:
             # Penalize expensive models more heavily
             if model_name in expensive_models:
                 cost_score *= 0.1  # 90% penalty for expensive models
+            
+            # Bonus for new GPT-4.1 models
+            if model_name.startswith('gpt-4.1'):
+                cost_score *= 1.2  # 20% bonus for new models
             
             # Combined score
             total_score = cost_score * capability_score * budget_score
@@ -549,3 +588,137 @@ class CostManager:
             
         except Exception as e:
             logger.error(f"Failed to export cost report: {e}") 
+
+    def check_openai_pricing(self, api_key: str = None) -> Dict[str, Any]:
+        """
+        Check real-time OpenAI pricing using their API.
+        
+        Args:
+            api_key: OpenAI API key (uses config if not provided)
+            
+        Returns:
+            Dictionary with current pricing information
+        """
+        try:
+            import requests
+            
+            # Use provided API key or get from config
+            if api_key is None:
+                api_key = self.config.get('openai_api_key') or os.getenv('OPENAI_API_KEY')
+            
+            if not api_key:
+                logger.warning("No OpenAI API key available for pricing check")
+                return {'error': 'No API key available'}
+            
+            # OpenAI doesn't have a public pricing API, but we can check model availability
+            # and use their published pricing from their website
+            headers = {
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Check available models
+            models_response = requests.get(
+                'https://api.openai.com/v1/models',
+                headers=headers,
+                timeout=10
+            )
+            
+            if models_response.status_code == 200:
+                models_data = models_response.json()
+                available_models = [model['id'] for model in models_data.get('data', [])]
+                
+                # Current OpenAI pricing (as of 2024)
+                current_pricing = {
+                    'gpt-4.1': {'input': 0.002, 'output': 0.008},  # $2.00/$8.00 per million
+                    'gpt-4.1-mini': {'input': 0.0004, 'output': 0.0016},  # $0.40/$1.60 per million
+                    'gpt-4.1-nano': {'input': 0.0001, 'output': 0.0004},  # $0.10/$0.40 per million
+                    'o3': {'input': 0.002, 'output': 0.008},  # $2.00/$8.00 per million
+                    'o4-mini': {'input': 0.0011, 'output': 0.0044},  # $1.10/$4.40 per million
+                    'gpt-4o': {'input': 0.005, 'output': 0.015},  # Legacy pricing
+                    'gpt-4o-mini': {'input': 0.00015, 'output': 0.0006},  # Legacy pricing
+                    'gpt-4': {'input': 0.03, 'output': 0.06},  # Legacy expensive
+                    'gpt-3.5-turbo': {'input': 0.0005, 'output': 0.0015},  # Legacy
+                }
+                
+                # Filter available models
+                available_pricing = {
+                    model: pricing for model, pricing in current_pricing.items()
+                    if any(available_model.startswith(model) for available_model in available_models)
+                }
+                
+                return {
+                    'status': 'success',
+                    'available_models': available_models,
+                    'current_pricing': available_pricing,
+                    'pricing_source': 'OpenAI official pricing (2024)',
+                    'note': 'Pricing is per 1K tokens'
+                }
+            else:
+                return {
+                    'error': f'Failed to fetch models: {models_response.status_code}',
+                    'response': models_response.text
+                }
+                
+        except Exception as e:
+            logger.error(f"Error checking OpenAI pricing: {e}")
+            return {'error': str(e)}
+    
+    def validate_cost_estimates(self) -> Dict[str, Any]:
+        """
+        Validate our cost estimates against current pricing.
+        
+        Returns:
+            Dictionary with validation results
+        """
+        validation_results = {
+            'timestamp': time.time(),
+            'models_checked': [],
+            'discrepancies': [],
+            'recommendations': []
+        }
+        
+        # Check OpenAI pricing
+        openai_pricing = self.check_openai_pricing()
+        
+        if 'current_pricing' in openai_pricing:
+            for model_name, model_cost in self.model_costs.items():
+                if model_cost.provider == 'openai' and model_name in openai_pricing['current_pricing']:
+                    current_pricing = openai_pricing['current_pricing'][model_name]
+                    
+                    # Check for discrepancies
+                    input_diff = abs(model_cost.input_cost_per_1k - current_pricing['input'])
+                    output_diff = abs(model_cost.output_cost_per_1k - current_pricing['output'])
+                    
+                    if input_diff > 0.0001 or output_diff > 0.0001:
+                        validation_results['discrepancies'].append({
+                            'model': model_name,
+                            'our_input_cost': model_cost.input_cost_per_1k,
+                            'current_input_cost': current_pricing['input'],
+                            'our_output_cost': model_cost.output_cost_per_1k,
+                            'current_output_cost': current_pricing['output'],
+                            'input_diff': input_diff,
+                            'output_diff': output_diff
+                        })
+                    
+                    validation_results['models_checked'].append(model_name)
+        
+        # Add recommendations
+        if validation_results['discrepancies']:
+            validation_results['recommendations'].append(
+                "Update cost estimates to match current OpenAI pricing"
+            )
+        
+        # Check for new models
+        if 'available_models' in openai_pricing:
+            new_models = []
+            for model in openai_pricing['available_models']:
+                if not any(model.startswith(existing) for existing in self.model_costs.keys()):
+                    new_models.append(model)
+            
+            if new_models:
+                validation_results['recommendations'].append(
+                    f"Add pricing for new models: {new_models[:5]}"  # Limit to first 5
+                )
+        
+        return validation_results 

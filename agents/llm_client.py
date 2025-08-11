@@ -72,7 +72,7 @@ class LLMClient:
         
         # Model configuration
         self.provider = self.config.get('default_llm_provider', 'openai')
-        self.model = self.config.get('default_model', 'gpt-4o')
+        self.model = self.config.get('default_model', 'gpt-4.1')
         
         # Cost management integration
         self.cost_manager = None
@@ -569,6 +569,20 @@ class LLMClient:
         if self.cost_manager:
             self.cost_manager.reset_budget(budget_limit)
         logger.info(f"Budget limit updated to: ${budget_limit}")
+    
+    def check_pricing(self) -> Dict[str, Any]:
+        """Check current OpenAI pricing and validate our cost estimates."""
+        if self.cost_manager:
+            return self.cost_manager.check_openai_pricing()
+        else:
+            return {'error': 'Cost manager not available'}
+    
+    def validate_cost_estimates(self) -> Dict[str, Any]:
+        """Validate our cost estimates against current pricing."""
+        if self.cost_manager:
+            return self.cost_manager.validate_cost_estimates()
+        else:
+            return {'error': 'Cost manager not available'}
 
 
 # Global client instance
@@ -604,7 +618,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                     
                     config = {
                         'default_llm_provider': framework.get('default_llm_provider', 'openai'),
-                        'default_model': framework.get('default_model', 'gpt-4o'),
+                        'default_model': framework.get('default_model', 'gpt-4.1'),
                         'budget_limit': framework.get('budget_limit', 30.0),  # Default $30 budget
                         'openai_api_key': (
                             framework.get('openai_api_key') or 
@@ -636,7 +650,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                     # Fallback to environment variables only
                     config = {
                         'default_llm_provider': 'openai',
-                        'default_model': 'gpt-4o',
+                        'default_model': 'gpt-4.1',
                         'budget_limit': 30.0, # Default budget
                         'openai_api_key': os.getenv('OPENAI_API_KEY'),
                         'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
@@ -649,7 +663,7 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
                 # Fallback to environment variables only
                 config = {
                     'default_llm_provider': 'openai',
-                    'default_model': 'gpt-4o',
+                    'default_model': 'gpt-4.1',
                     'budget_limit': 30.0, # Default budget
                     'openai_api_key': os.getenv('OPENAI_API_KEY'),
                     'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
