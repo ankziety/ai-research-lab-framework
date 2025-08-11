@@ -463,7 +463,10 @@ class MultiAgentResearchFramework:
                     metadata=make_json_serializable(vlab_results)
                 )
             
-            logger.info(f"Virtual Lab research completed: {vlab_results.get('session_id', 'unknown')}")
+            # Get session_id from the session_summary or use a fallback
+            session_id = (vlab_results.get('session_summary', {}).get('session_id') or 
+                         vlab_results.get('status', 'completed'))
+            logger.info(f"Virtual Lab research completed: {session_id}")
             return vlab_results
             
         except Exception as e:

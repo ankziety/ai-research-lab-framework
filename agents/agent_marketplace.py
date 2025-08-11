@@ -41,9 +41,9 @@ class AgentMarketplace:
         return GeneralExpertAgent(agent_id, role, expertise, self.llm_config, self.cost_manager)
     
     def _initialize_default_agents(self):
-        """Initialize a general set of versatile expert agents."""
+        """Initialize a comprehensive set of expert agents for research."""
         default_agents = [
-            # General research agents 
+            # Core research agents 
             self._create_expert_agent("research_methodology_1", "Research Methodology Expert", 
                                     ["Research Design", "Statistical Analysis", "Study Methodology", "Data Collection"]),
             self._create_expert_agent("literature_researcher_1", "Literature Research Expert",
@@ -52,15 +52,51 @@ class AgentMarketplace:
                                     ["Data Analysis", "Machine Learning", "Statistical Modeling", "Data Visualization"]),
             self._create_expert_agent("critical_analyst_1", "Critical Analysis Expert",
                                     ["Critical Thinking", "Bias Detection", "Logical Analysis", "Quality Assessment"]),
-            # Add backup agents for high demand scenarios
+            
+            # Specialized domain experts (matching mock response domains)
+            self._create_expert_agent("biomedical_engineering_1", "Biomedical Engineering Expert",
+                                    ["Biomedical Engineering", "Medical Devices", "Biocompatibility", "Signal Processing", "Biomechanics"]),
+            self._create_expert_agent("neuroscience_1", "Neuroscience Expert",
+                                    ["Neuroscience", "Brain Monitoring", "EEG Analysis", "Cognitive Science", "Neuroimaging"]),
+            self._create_expert_agent("materials_science_1", "Materials Science Expert",
+                                    ["Materials Science", "Biomaterials", "Nanotechnology", "Surface Chemistry", "Polymer Science"]),
+            self._create_expert_agent("signal_processing_1", "Signal Processing Expert",
+                                    ["Signal Processing", "Data Acquisition", "Noise Reduction", "Filtering", "Digital Signal Processing"]),
+            self._create_expert_agent("clinical_research_1", "Clinical Research Expert",
+                                    ["Clinical Research", "Regulatory Compliance", "Safety Protocols", "Human Subjects", "Clinical Trials"]),
+            
+            # Additional specialized agents
+            self._create_expert_agent("computer_science_1", "Computer Science Expert",
+                                    ["Computer Science", "Software Engineering", "Algorithms", "Programming", "System Design"]),
+            self._create_expert_agent("physics_1", "Physics Expert",
+                                    ["Physics", "Quantum Mechanics", "Classical Mechanics", "Electromagnetism", "Optics"]),
+            self._create_expert_agent("chemistry_1", "Chemistry Expert",
+                                    ["Chemistry", "Organic Chemistry", "Inorganic Chemistry", "Biochemistry", "Analytical Chemistry"]),
+            self._create_expert_agent("biology_1", "Biology Expert",
+                                    ["Biology", "Molecular Biology", "Cell Biology", "Genetics", "Microbiology"]),
+            self._create_expert_agent("mathematics_1", "Mathematics Expert",
+                                    ["Mathematics", "Applied Mathematics", "Statistics", "Mathematical Modeling", "Numerical Analysis"]),
+            
+            # General research agents for flexibility
             self._create_expert_agent("general_researcher_1", "General Research Expert",
-                                    ["Interdisciplinary Research", "Problem Solving", "Knowledge Synthesis"]),
+                                    ["Interdisciplinary Research", "Problem Solving", "Knowledge Synthesis", "Research Coordination"]),
+            self._create_expert_agent("interdisciplinary_1", "Interdisciplinary Expert",
+                                    ["Cross-Domain Research", "Integration", "Synthesis", "Collaborative Research"]),
         ]
+        
+        # Add coding specialist if available
+        try:
+            from .coding_specialist import CodingSpecialist
+            coding_specialist = CodingSpecialist()
+            default_agents.append(coding_specialist)
+            logger.info("Coding Specialist added to marketplace")
+        except ImportError as e:
+            logger.warning(f"Could not import CodingSpecialist: {e}")
         
         for agent in default_agents:
             self.register_agent(agent)
             
-        logger.info(f"Initialized {len(default_agents)} general-purpose default agents")
+        logger.info(f"Initialized {len(default_agents)} expert agents in marketplace")
     
     def register_agent(self, agent: BaseAgent):
         """
@@ -106,33 +142,45 @@ class AgentMarketplace:
         """
         matching_agents = []
         
-        # Map expertise domains to agent types (more general)
+        # Enhanced domain mapping with more comprehensive coverage
         domain_mapping = {
+            # Core research domains
             'research_methodology': ['Research Methodology Expert'],
             'literature': ['Literature Research Expert', 'Literature Researcher'],
             'data_science': ['Data Science Expert', 'Data Scientist'],
             'critical_analysis': ['Critical Analysis Expert', 'Scientific Critic'],
-            'general_research': ['General Research Expert'],
+            'general_research': ['General Research Expert', 'Interdisciplinary Expert'],
+            
+            # Specialized domains (matching mock responses)
+            'biomedical_engineering': ['Biomedical Engineering Expert'],
+            'neuroscience': ['Neuroscience Expert'],
+            'materials_science': ['Materials Science Expert'],
+            'signal_processing': ['Signal Processing Expert'],
+            'clinical_research': ['Clinical Research Expert'],
+            
+            # Additional domains
+            'computer_science': ['Computer Science Expert', 'Coding Specialist'],
+            'physics': ['Physics Expert'],
+            'chemistry': ['Chemistry Expert'],
+            'biology': ['Biology Expert'],
+            'mathematics': ['Mathematics Expert'],
+            
             # Legacy mappings for backward compatibility
-            'psychology': ['Psychology Expert'],
-            'neuroscience': ['Neuroscience Expert'], 
-            'ophthalmology': ['Ophthalmology Expert'],
+            'psychology': ['Psychology Expert', 'Neuroscience Expert'],
+            'ophthalmology': ['Ophthalmology Expert', 'Biomedical Engineering Expert'],
             'critic': ['Scientific Critic', 'Critical Analysis Expert'],
-            # Additional domain mappings for common research areas
-            'biomedical_engineering': ['Biomedical Engineering Expert', 'General Research Expert'],
-            'materials_science': ['Materials Science Expert', 'General Research Expert'],
-            'signal_processing': ['Signal Processing Expert', 'Data Science Expert'],
-            'clinical_research': ['Clinical Research Expert', 'General Research Expert'],
-            'engineering': ['Engineering Expert', 'General Research Expert'],
-            'biology': ['Biology Expert', 'General Research Expert'],
-            'chemistry': ['Chemistry Expert', 'General Research Expert'],
-            'physics': ['Physics Expert', 'General Research Expert'],
-            'computer_science': ['Computer Science Expert', 'Data Science Expert'],
-            'mathematics': ['Mathematics Expert', 'Data Science Expert']
+            'engineering': ['Engineering Expert', 'Biomedical Engineering Expert', 'Computer Science Expert'],
+            
+            # Broad category mappings
+            'medical': ['Clinical Research Expert', 'Biomedical Engineering Expert'],
+            'technology': ['Computer Science Expert', 'Signal Processing Expert'],
+            'science': ['Physics Expert', 'Chemistry Expert', 'Biology Expert'],
+            'analysis': ['Data Science Expert', 'Critical Analysis Expert', 'Mathematics Expert']
         }
         
-        target_roles = domain_mapping.get(expertise_domain, [])
+        target_roles = domain_mapping.get(expertise_domain.lower(), [])
         
+        # First, try exact role matches
         for agent in self.available_agents.values():
             if agent.role in target_roles:
                 matching_agents.append(agent)
@@ -140,12 +188,24 @@ class AgentMarketplace:
         # If no agents found, try to find agents with similar expertise in their expertise list
         if not matching_agents:
             for agent in self.available_agents.values():
-                for expertise in agent.expertise:
-                    if expertise_domain.lower() in expertise.lower() or expertise.lower() in expertise_domain.lower():
-                        matching_agents.append(agent)
-                        break
+                agent_expertise = [exp.lower() for exp in agent.expertise]
+                if expertise_domain.lower() in agent_expertise:
+                    matching_agents.append(agent)
         
-        logger.info(f"Found {len(matching_agents)} agents for expertise: {expertise_domain}")
+        # If still no agents found, try partial matches
+        if not matching_agents:
+            for agent in self.available_agents.values():
+                agent_expertise_str = ' '.join(agent.expertise).lower()
+                if expertise_domain.lower() in agent_expertise_str:
+                    matching_agents.append(agent)
+        
+        # If still no agents, return general research experts
+        if not matching_agents:
+            for agent in self.available_agents.values():
+                if 'General Research' in agent.role or 'Interdisciplinary' in agent.role:
+                    matching_agents.append(agent)
+        
+        logger.info(f"Found {len(matching_agents)} agents for expertise domain: {expertise_domain}")
         return matching_agents
     
     def get_agent_by_id(self, agent_id: str) -> Optional[BaseAgent]:

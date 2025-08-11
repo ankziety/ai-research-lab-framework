@@ -292,6 +292,7 @@ class VirtualLabMeetingSystem:
         
         # Initialize session data
         self.session_data[session_id] = {
+            'session_id': session_id,  # Add session_id to the session data
             'research_question': research_question,
             'constraints': constraints or {},
             'context': context or {},
@@ -333,9 +334,21 @@ class VirtualLabMeetingSystem:
                 self.log_chat_message('system', 'System', f'Starting phase {i+1}: {phase_name}', session_id)
                 self.log_agent_activity('system', 'phase_start', f'Phase {i+1}: {phase_name} started', session_id)
                 
-                # Execute phase with minimum time requirement
+                            # Execute phase with minimum time requirement
                 phase_start = time.time()
-                phase_result = self._execute_research_phase(phase, session_id, research_question, constraints or {})
+                try:
+                    phase_result = self._execute_research_phase(phase, session_id, research_question, constraints or {})
+                except Exception as e:
+                    logger.error(f"Phase {phase.value} failed with exception: {e}")
+                    phase_result = {
+                        'success': False,
+                        'error': str(e),
+                        'phase': phase.value,
+                        'fallback_data': {
+                            'message': f'Phase {phase.value} failed, using fallback data',
+                            'timestamp': time.time()
+                        }
+                    }
                 
                 # Calculate phase duration
                 phase_duration = time.time() - phase_start
@@ -368,8 +381,11 @@ class VirtualLabMeetingSystem:
             
         except Exception as e:
             logger.error(f"Error in research session {session_id}: {e}")
-            self.session_data[session_id]['status'] = 'error'
-            self.session_data[session_id]['error'] = str(e)
+            
+            # Safely update session data if it exists
+            if session_id in self.session_data:
+                self.session_data[session_id]['status'] = 'error'
+                self.session_data[session_id]['error'] = str(e)
             
             # Log error
             self.log_chat_message('system', 'System', f'Research session error: {str(e)}', session_id)
@@ -693,7 +709,19 @@ class VirtualLabMeetingSystem:
         formatted_papers = []
         for i, paper in enumerate(search_results[:10], 1):  # Limit to top 10 papers
             title = paper.get('title', 'Unknown Title')
-            authors = ', '.join(paper.get('authors', ['Unknown Authors']))
+            
+            # Handle authors field properly - could be list of strings or list of dicts
+            authors_raw = paper.get('authors', ['Unknown Authors'])
+            if isinstance(authors_raw, list):
+                if authors_raw and isinstance(authors_raw[0], dict):
+                    # Authors is list of dicts, extract names
+                    authors = ', '.join([author.get('name', 'Unknown') for author in authors_raw])
+                else:
+                    # Authors is list of strings
+                    authors = ', '.join(authors_raw)
+            else:
+                authors = str(authors_raw)
+            
             year = paper.get('year', 'Unknown Year')
             abstract = paper.get('abstract', 'No abstract available')
             
@@ -971,7 +999,7 @@ class VirtualLabMeetingSystem:
                     
                     tool_test_results[expertise].append({
                         'tool_id': tool_id,
-                        'tool_name': tool_data['name'],
+                        'tool_name': tool_data.get('name', tool_id),  # Use tool_id as fallback if name not available
                         'test_result': test_result,
                         'success': test_result.get('success', False)
                     })
@@ -3188,13 +3216,31 @@ class VirtualLabMeetingSystem:
     
     def _compile_final_results(self, session_data: Dict[str, Any]) -> Dict[str, Any]:
         """Compile final results from all phases."""
+        # Calculate overall success rate
+        phases = session_data.get('phases', {})
+        successful_phases = sum(1 for phase in phases.values() if phase.get('success', False))
+        total_phases = len(phases)
+        success_rate = successful_phases / total_phases if total_phases > 0 else 0.0
+        
+        # Determine overall status
+        if success_rate >= 0.7:  # 70% success rate threshold
+            overall_status = 'success'
+        elif success_rate >= 0.5:  # 50% success rate threshold
+            overall_status = 'partial_success'
+        else:
+            overall_status = 'failed'
+        
         final_results = {
+            'status': overall_status,
+            'success_rate': success_rate,
+            'successful_phases': successful_phases,
+            'total_phases': total_phases,
             'session_summary': {
                 'session_id': session_data['session_id'],
                 'research_question': session_data['research_question'],
                 'duration': session_data.get('duration', 0),
-                'phases_completed': len(session_data.get('phases', {})),
-                'total_meetings': len([phase for phase in session_data.get('phases', {}).values() 
+                'phases_completed': total_phases,
+                'total_meetings': len([phase for phase in phases.values() 
                                     if phase.get('meeting_record')])
             },
             'key_outcomes': {},

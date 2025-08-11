@@ -6,6 +6,7 @@ Provides a unified interface for different LLM providers (OpenAI, Anthropic, etc
 
 import os
 import logging
+import json
 from typing import Dict, Any, Optional
 import time
 
@@ -47,20 +48,32 @@ class LLMClient:
         self.model = config.get('default_model', 'gpt-4')
 
         # API keys from config or environment
+        # Check both top-level and nested locations
+        api_keys = config.get('api_keys', {})
+        framework = config.get('framework', {})
+        
         self.openai_api_key = (
             config.get('openai_api_key') or 
+            framework.get('openai_api_key') or
+            api_keys.get('openai') or
             os.getenv('OPENAI_API_KEY')
         )
         self.anthropic_api_key = (
             config.get('anthropic_api_key') or 
+            framework.get('anthropic_api_key') or
+            api_keys.get('anthropic') or
             os.getenv('ANTHROPIC_API_KEY')
         )
         self.gemini_api_key = (
             config.get('gemini_api_key') or
+            framework.get('gemini_api_key') or
+            api_keys.get('gemini') or
             os.getenv('GEMINI_API_KEY')
         )
         self.huggingface_api_key = (
             config.get('huggingface_api_key') or
+            framework.get('huggingface_api_key') or
+            api_keys.get('huggingface') or
             os.getenv('HUGGINGFACE_API_KEY')
         )
 
@@ -393,78 +406,249 @@ class LLMClient:
         prompt_lower = prompt.lower()
 
         # Domain-specific mock responses based on agent role
-        if "principal investigator" in agent_role.lower() and ("team" in prompt_lower or "expertise" in prompt_lower):
+        if "principal investigator" in agent_role.lower():
             # Handle team selection prompts specifically
-            return f"""Based on my analysis as a {agent_role}, here is the optimal team composition:
+            if "team" in prompt_lower or "expertise" in prompt_lower or "analyze" in prompt_lower:
+                return f"""Based on my analysis as a {agent_role}, here is the optimal team composition:
+
+**Analysis Summary:**
+This research question requires interdisciplinary expertise spanning multiple domains. The complexity of the problem necessitates a diverse team with complementary skills.
 
 REQUIRED_EXPERTISE: [biomedical_engineering, neuroscience, materials_science, signal_processing, clinical_research]
 TEAM_SIZE: 5
 PRIORITY_EXPERTS: [biomedical_engineering, neuroscience, materials_science]
 SPECIALIZATION_NOTES: biomedical_engineering: Focus on microneedle design and biocompatibility | neuroscience: EEG signal analysis and brain monitoring | materials_science: Biocompatible materials for long-term implantation | signal_processing: Signal acquisition and noise reduction | clinical_research: Safety protocols and regulatory compliance
 
+**Detailed Justification:**
+- **Biomedical Engineering**: Essential for designing the microneedle array and ensuring biocompatibility
+- **Neuroscience**: Critical for understanding EEG signal patterns and brain monitoring requirements  
+- **Materials Science**: Required for developing biocompatible materials for long-term implantation
+- **Signal Processing**: Necessary for acquiring and processing EEG signals with minimal noise
+- **Clinical Research**: Important for ensuring safety protocols and regulatory compliance
+
 This interdisciplinary team provides the necessary expertise for developing a novel microneedle-based EEG device for long-term ambulatory monitoring."""
+
+            elif "research" in prompt_lower or "coordination" in prompt_lower:
+                return f"""As a {agent_role}, I recommend the following research coordination strategy:
+
+**Research Coordination Plan:**
+
+1. **Phase 1 - Team Assembly (Week 1)**
+   - Hire specialized agents for each required domain
+   - Establish communication protocols
+   - Define roles and responsibilities
+
+2. **Phase 2 - Literature Review (Week 2)**
+   - Conduct comprehensive literature search
+   - Identify key research gaps
+   - Establish baseline knowledge
+
+3. **Phase 3 - Project Specification (Week 3)**
+   - Define detailed project scope
+   - Establish success criteria
+   - Create project timeline
+
+4. **Phase 4 - Implementation (Weeks 4-6)**
+   - Execute research plan
+   - Regular team meetings
+   - Progress monitoring
+
+5. **Phase 5 - Synthesis (Week 7)**
+   - Compile findings
+   - Cross-validate results
+   - Prepare final report
+
+**Key Success Factors:**
+- Regular team coordination meetings
+- Clear communication channels
+- Defined milestones and deliverables
+- Quality control checkpoints
+
+This structured approach ensures comprehensive research coverage and high-quality outcomes."""
 
         elif "research" in agent_role.lower():
             if "experiment" in prompt_lower or "study" in prompt_lower:
                 return f"""Based on my analysis as a {agent_role}, I recommend a controlled experimental design with the following considerations:
 
-1. Sample size calculation based on expected effect size
-2. Randomization and blinding protocols  
-3. Primary and secondary outcome measures
-4. Statistical analysis plan with appropriate controls
-5. Ethical considerations and participant safety
+**Experimental Design:**
 
-The proposed methodology should follow best practices for research integrity and reproducibility."""
+1. **Sample Size Calculation**
+   - Power analysis for expected effect size
+   - Minimum sample size: 30 participants per group
+   - Account for potential dropouts (20% buffer)
+
+2. **Randomization and Blinding**
+   - Random assignment to treatment groups
+   - Double-blind protocol where possible
+   - Stratified randomization by key variables
+
+3. **Primary and Secondary Outcomes**
+   - Primary: Signal quality improvement (SNR)
+   - Secondary: Comfort scores, safety metrics
+   - Exploratory: Long-term stability measures
+
+4. **Statistical Analysis Plan**
+   - Mixed-effects models for repeated measures
+   - Bonferroni correction for multiple comparisons
+   - Intention-to-treat analysis
+
+5. **Ethical Considerations**
+   - IRB approval for human subjects research
+   - Informed consent procedures
+   - Data privacy and security protocols
+
+The proposed methodology follows best practices for research integrity and reproducibility."""
 
             elif "literature" in prompt_lower or "review" in prompt_lower:
                 return f"""As a {agent_role}, I suggest a systematic approach to literature analysis:
 
-1. Comprehensive database search across PubMed, Web of Science, and relevant repositories
-2. Inclusion/exclusion criteria based on research objectives
-3. Quality assessment using established frameworks
-4. Data extraction and synthesis methodology
-5. Meta-analysis where appropriate
+**Literature Review Methodology:**
 
-This approach will ensure comprehensive coverage of the existing evidence base."""
+1. **Database Search Strategy**
+   - PubMed, Web of Science, IEEE Xplore
+   - Keywords: "microneedle EEG", "dry electrodes", "brain monitoring"
+   - Date range: 2010-present
+   - Language: English only
+
+2. **Inclusion/Exclusion Criteria**
+   - Include: Peer-reviewed articles, clinical studies
+   - Exclude: Conference abstracts, non-English papers
+   - Focus on human studies and clinical applications
+
+3. **Quality Assessment**
+   - Use PRISMA framework for systematic reviews
+   - GRADE criteria for evidence quality
+   - Risk of bias assessment
+
+4. **Data Extraction and Synthesis**
+   - Standardized data extraction forms
+   - Meta-analysis where appropriate
+   - Narrative synthesis for heterogeneous studies
+
+5. **Gap Analysis**
+   - Identify research gaps
+   - Highlight methodological limitations
+   - Suggest future research directions
+
+This approach ensures comprehensive coverage of the existing evidence base."""
 
         elif "data" in agent_role.lower() or "statistics" in agent_role.lower():
             return f"""From a {agent_role} perspective, I recommend:
 
-1. Exploratory data analysis to understand distributions and patterns
-2. Appropriate statistical tests based on data characteristics
-3. Effect size calculations and confidence intervals
-4. Multiple comparison corrections where necessary
-5. Visualization of key findings
+**Data Analysis Strategy:**
 
-The analysis should prioritize both statistical significance and practical significance."""
+1. **Exploratory Data Analysis**
+   - Distribution analysis for all variables
+   - Outlier detection and handling
+   - Missing data assessment and imputation
+
+2. **Statistical Tests**
+   - Parametric tests for normally distributed data
+   - Non-parametric alternatives when needed
+   - Mixed-effects models for repeated measures
+
+3. **Effect Size Calculations**
+   - Cohen's d for group comparisons
+   - Confidence intervals for all estimates
+   - Practical significance assessment
+
+4. **Multiple Comparison Corrections**
+   - Bonferroni correction for family-wise error
+   - False discovery rate control
+   - Pre-specified primary outcomes
+
+5. **Visualization**
+   - Box plots for group comparisons
+   - Time series plots for longitudinal data
+   - Heat maps for correlation matrices
+
+The analysis prioritizes both statistical significance and practical significance."""
 
         elif "critic" in agent_role.lower():
             return f"""As a {agent_role}, I identify several areas for consideration:
 
-Strengths:
+**Critical Assessment:**
+
+**Strengths:**
 - Clear research objectives and methodology
 - Appropriate statistical approaches
 - Consideration of ethical implications
+- Comprehensive literature review
+- Well-defined outcome measures
 
-Areas for improvement:
+**Areas for Improvement:**
 - Sample size justification could be more detailed
 - Potential confounding variables need addressing
 - Generalizability limitations should be discussed
+- Cost-effectiveness analysis missing
+- Long-term follow-up considerations
 
-Overall assessment: The approach is methodologically sound with minor improvements needed."""
+**Methodological Concerns:**
+- Risk of selection bias in participant recruitment
+- Potential for measurement bias in self-reported outcomes
+- Limited external validity for diverse populations
+
+**Overall Assessment:**
+The approach is methodologically sound with minor improvements needed. The research design addresses the primary objectives effectively, though additional considerations for external validity and long-term outcomes would strengthen the study."""
 
         else:
-            # Generic expert response
-            return f"""As a {agent_role}, I provide the following expert analysis:
+            # Check if this is a JSON request
+            if "json" in prompt_lower or "format your response" in prompt_lower or "structured json" in prompt_lower:
+                # Generate mock JSON response for coding specialist
+                if "tool_design" in prompt_lower or "tool requirement" in prompt_lower:
+                    return json.dumps({
+                        "tool_design": {
+                            "name": "mock_tool",
+                            "description": "Mock tool for testing",
+                            "parameters": {
+                                "input_data": {"type": "string", "description": "Input data", "required": True}
+                            },
+                            "return_type": "dict"
+                        },
+                        "implementation_approach": "Standard Python implementation with error handling",
+                        "mcp_description": {
+                            "name": "mock_tool",
+                            "description": "Mock tool for testing",
+                            "inputSchema": {"type": "object", "properties": {}},
+                            "outputSchema": {"type": "object", "properties": {}}
+                        },
+                        "integration_plan": "Register with tool registry and provide MCP interface",
+                        "testing_strategy": "Unit tests with comprehensive coverage",
+                        "documentation": "Clear documentation with usage examples"
+                    })
+                else:
+                    # Generic JSON response
+                    return json.dumps({
+                        "status": "success",
+                        "message": "Mock JSON response",
+                        "data": {"key": "value"}
+                    })
+            else:
+                # Generic expert response
+                return f"""As a {agent_role}, I provide the following expert analysis:
 
-Key considerations:
+**Expert Analysis:**
+
+**Key Considerations:**
 1. The approach aligns with current best practices in the field
 2. Methodology appears appropriate for the research objectives  
-3. Potential limitations should be acknowledged
+3. Potential limitations should be acknowledged and addressed
 4. Results should be interpreted within the study context
 5. Future research directions could explore related questions
 
-This analysis provides a solid foundation for evidence-based decision making."""
+**Methodological Strengths:**
+- Systematic approach to problem-solving
+- Evidence-based decision making
+- Consideration of multiple perspectives
+- Quality control measures in place
+
+**Recommendations:**
+- Continue with proposed methodology
+- Monitor progress and adjust as needed
+- Document all decisions and rationale
+- Prepare for potential challenges
+
+This analysis provides a solid foundation for evidence-based decision making and successful research execution."""
 
 
 # Global client instance
@@ -479,3 +663,9 @@ def get_llm_client(config: Optional[Dict[str, Any]] = None) -> LLMClient:
         _llm_client = LLMClient(config or {})
 
     return _llm_client
+
+
+def reset_llm_client():
+    """Reset the global LLM client instance for testing purposes."""
+    global _llm_client
+    _llm_client = None
