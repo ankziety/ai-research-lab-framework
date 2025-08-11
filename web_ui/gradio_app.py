@@ -784,7 +784,7 @@ class AIResearchLabGradio:
             with gr.Row():
                 with gr.Column(scale=2):
                     # Research Status
-                    status_card = gr.Markdown("### Research Status\n\nNo active research session")
+                    status_card = gr.Markdown("### Research Status\n\n🟢 **System Ready**\n\nNo active research session. Start a research session to see real-time updates here.")
                     
                     # Progress Bar
                     progress_bar = gr.Slider(
@@ -793,17 +793,17 @@ class AIResearchLabGradio:
                     )
                     
                     # Current Phase
-                    phase_display = gr.Markdown("### Current Phase\n\nNone")
+                    phase_display = gr.Markdown("### Current Phase\n\n**Ready to Start**\n\nResearch phases will be displayed here when a session is active.")
                     
                     # Agent Activities
-                    activities_display = gr.Markdown("### Recent Agent Activities\n\nNo activities")
+                    activities_display = gr.Markdown("### Recent Agent Activities\n\n📋 **No Activities Yet**\n\nAgent activities will appear here during research sessions. Start a research session to see agents in action.")
                 
                 with gr.Column(scale=1):
                     # Quick Stats
-                    stats_card = gr.Markdown("### Quick Stats\n\n- **Active Agents:** 0\n- **Quality Score:** 0.0\n- **Critical Issues:** 0")
+                    stats_card = gr.Markdown("### Quick Stats\n\n📊 **System Overview**\n\n- **Active Agents:** 0\n- **Quality Score:** N/A\n- **Critical Issues:** 0\n- **Total Sessions:** 0")
                     
                     # Meeting Transcripts
-                    meetings_display = gr.Markdown("### Recent Meetings\n\nNo meetings")
+                    meetings_display = gr.Markdown("### Recent Meetings\n\n🤝 **No Meetings Yet**\n\nMeeting transcripts will appear here when research sessions include team meetings.")
             
             # Research Controls
             with gr.Row():
@@ -812,7 +812,7 @@ class AIResearchLabGradio:
                 refresh_btn = gr.Button("🔄 Refresh")
             
             # Research Results
-            results_display = gr.Markdown("### Research Results\n\nNo results available")
+            results_display = gr.Markdown("### Research Results\n\n📋 **No Results Yet**\n\nResearch results will appear here when sessions are completed. Start a research session to generate results.")
             
             # Update function
             def update_dashboard():
@@ -830,7 +830,7 @@ class AIResearchLabGradio:
                     status_text += f"**Phase:** {status['current_phase']}\n"
                     status_text += f"**Session ID:** {status['session_id']}"
                 else:
-                    status_text += "**Status:** ⏸️ Idle\n\nNo active research session"
+                    status_text += "🟢 **System Ready**\n\nNo active research session. Start a research session to see real-time updates here."
                 
                 # Stats text
                 stats_text = f"### Quick Stats\n\n"
@@ -850,7 +850,7 @@ class AIResearchLabGradio:
                         activities_text += f"**{timestamp}** - {agent_id} ({activity_type})\n"
                         activities_text += f"{message}\n\n"
                 else:
-                    activities_text += "No activities recorded"
+                    activities_text += "📋 **No Activities Yet**\n\nAgent activities will appear here during research sessions. Start a research session to see agents in action."
                 
                 # Meetings text
                 meetings_text = "### Recent Meetings\n\n"
@@ -863,7 +863,7 @@ class AIResearchLabGradio:
                         meetings_text += f"**{timestamp}** - {topic}\n"
                         meetings_text += f"Participants: {', '.join(participants)}\n\n"
                 else:
-                    meetings_text += "No meetings recorded"
+                    meetings_text += "🤝 **No Meetings Yet**\n\nMeeting transcripts will appear here when research sessions include team meetings."
                 
                 return status_text, status['progress'], f"### Current Phase\n\n{status['current_phase']}", stats_text, activities_text, meetings_text
             
@@ -882,17 +882,17 @@ class AIResearchLabGradio:
             with gr.Row():
                 with gr.Column(scale=2):
                     # Agent List
-                    agent_list = gr.Markdown("### Available Agents\n\nNo agents available")
+                    agent_list = gr.Markdown("### Available Agents\n\n🤖 **Agent Marketplace**\n\nNo agents available. The agent marketplace will be populated when the framework is initialized.")
                     
                     # Agent Details
-                    agent_details = gr.Markdown("### Agent Details\n\nSelect an agent to view details")
+                    agent_details = gr.Markdown("### Agent Details\n\n📋 **Select an Agent**\n\nChoose an agent from the list above to view detailed information about their capabilities and expertise.")
                 
                 with gr.Column(scale=1):
                     # Agent Statistics
-                    agent_stats = gr.Markdown("### Agent Statistics\n\n- **Total Agents:** 0\n- **Active Agents:** 0\n- **Average Quality:** 0.0")
+                    agent_stats = gr.Markdown("### Agent Statistics\n\n📊 **System Overview**\n\n- **Total Agents:** 0\n- **Active Agents:** 0\n- **Average Quality:** N/A\n- **Available Roles:** 0")
                     
                     # Agent Activities
-                    agent_activities = gr.Markdown("### Recent Agent Activities\n\nNo activities")
+                    agent_activities = gr.Markdown("### Recent Agent Activities\n\n📋 **No Activities Yet**\n\nAgent activities will appear here when agents are active during research sessions.")
             
             # Agent Controls
             with gr.Row():
@@ -903,7 +903,7 @@ class AIResearchLabGradio:
             
             def update_agents():
                 if not self.framework:
-                    return "### Available Agents\n\nFramework not initialized", "### Agent Details\n\nNo framework available", "### Agent Statistics\n\n- **Total Agents:** 0\n- **Active Agents:** 0\n- **Average Quality:** 0.0", "### Recent Agent Activities\n\nNo activities"
+                    return "### Available Agents\n\n🤖 **Agent Marketplace**\n\nFramework not initialized. Start a research session to initialize the agent marketplace.", "### Agent Details\n\n📋 **Framework Required**\n\nThe research framework needs to be initialized to access agent information.", "### Agent Statistics\n\n📊 **System Overview**\n\n- **Total Agents:** 0\n- **Active Agents:** 0\n- **Average Quality:** N/A\n- **Available Roles:** 0", "### Recent Agent Activities\n\n📋 **No Activities Yet**\n\nAgent activities will appear here when agents are active during research sessions."
                 
                 try:
                     marketplace = self.framework.agent_marketplace
@@ -935,12 +935,12 @@ class AIResearchLabGradio:
                             activities_text += f"**{timestamp}** - {agent_id} ({activity_type})\n"
                             activities_text += f"{message}\n\n"
                     else:
-                        activities_text += "No activities recorded"
+                        activities_text += "📋 **No Activities Yet**\n\nAgent activities will appear here when agents are active during research sessions."
                     
-                    return agents_text, "### Agent Details\n\nSelect an agent above to view detailed information", stats_text, activities_text
+                    return agents_text, "### Agent Details\n\n📋 **Select an Agent**\n\nChoose an agent from the list above to view detailed information about their capabilities and expertise.", stats_text, activities_text
                     
                 except Exception as e:
-                    return f"### Available Agents\n\nError loading agents: {str(e)}", "### Agent Details\n\nError occurred", "### Agent Statistics\n\n- **Total Agents:** 0\n- **Active Agents:** 0\n- **Average Quality:** 0.0", "### Recent Agent Activities\n\nError loading activities"
+                    return f"### Available Agents\n\n❌ **Error Loading Agents**\n\nError: {str(e)}\n\nPlease try refreshing or restart the application.", "### Agent Details\n\n❌ **Error Occurred**\n\nUnable to load agent details due to an error.", "### Agent Statistics\n\n📊 **System Overview**\n\n- **Total Agents:** 0\n- **Active Agents:** 0\n- **Average Quality:** N/A\n- **Available Roles:** 0", "### Recent Agent Activities\n\n❌ **Error Loading Activities**\n\nUnable to load agent activities due to an error."
             
             refresh_agents_btn.click(update_agents, outputs=[agent_list, agent_details, agent_stats, agent_activities])
             view_activities_btn.click(update_agents, outputs=[agent_list, agent_details, agent_stats, agent_activities])
@@ -1076,7 +1076,7 @@ class AIResearchLabGradio:
             with gr.Row():
                 with gr.Column(scale=2):
                     # Results Display
-                    results_display = gr.Markdown("### Research Results\n\nNo results available")
+                    results_display = gr.Markdown("### Research Results\n\n📋 **No Results Yet**\n\nResearch results will appear here when sessions are completed. Start a research session to generate results.")
                     
                     # Export Options
                     with gr.Row():
@@ -1086,14 +1086,14 @@ class AIResearchLabGradio:
                 
                 with gr.Column(scale=1):
                     # Results Summary
-                    results_summary = gr.Markdown("### Results Summary\n\n- **Status:** No results\n- **Quality Score:** N/A\n- **Key Findings:** None")
+                    results_summary = gr.Markdown("### Results Summary\n\n📊 **No Results Available**\n\n- **Status:** No results\n- **Quality Score:** N/A\n- **Key Findings:** None\n- **Export Options:** Disabled")
                     
                     # Session Info
-                    session_info = gr.Markdown("### Session Information\n\n- **Session ID:** None\n- **Created:** N/A\n- **Duration:** N/A")
+                    session_info = gr.Markdown("### Session Information\n\n📋 **No Active Session**\n\n- **Session ID:** None\n- **Created:** N/A\n- **Duration:** N/A\n- **Status:** Ready")
             
             def update_results():
                 if not self.current_session:
-                    return "### Research Results\n\nNo research session completed", "### Results Summary\n\n- **Status:** No results\n- **Quality Score:** N/A\n- **Key Findings:** None", f"### Session Information\n\n- **Session ID:** None\n- **Created:** N/A\n- **Duration:** N/A"
+                    return "### Research Results\n\n📋 **No Results Yet**\n\nResearch results will appear here when sessions are completed. Start a research session to generate results.", "### Results Summary\n\n📊 **No Results Available**\n\n- **Status:** No results\n- **Quality Score:** N/A\n- **Key Findings:** None\n- **Export Options:** Disabled", f"### Session Information\n\n📋 **No Active Session**\n\n- **Session ID:** None\n- **Created:** N/A\n- **Duration:** N/A\n- **Status:** Ready"
                 
                 results = self.current_session.get('results', {})
                 session_id = self.current_session.get('session_id', 'Unknown')
@@ -1109,7 +1109,7 @@ class AIResearchLabGradio:
                         duration = "N/A"
                 
                 if not results:
-                    return "### Research Results\n\nResearch completed but no results available", "### Results Summary\n\n- **Status:** Completed\n- **Quality Score:** N/A\n- **Key Findings:** None", f"### Session Information\n\n- **Session ID:** {session_id}\n- **Created:** {created_at}\n- **Duration:** {duration}"
+                    return "### Research Results\n\n📋 **Research Completed**\n\nResearch session completed but no results are available. Check the chat history for detailed outputs.", "### Results Summary\n\n📊 **Session Completed**\n\n- **Status:** Completed\n- **Quality Score:** N/A\n- **Key Findings:** None\n- **Export Options:** Available", f"### Session Information\n\n📋 **Session Details**\n\n- **Session ID:** {session_id}\n- **Created:** {created_at}\n- **Duration:** {duration}\n- **Status:** Completed"
                 
                 # Format results
                 results_text = "### Research Results\n\n"
