@@ -168,10 +168,11 @@ def run_meeting(
                             team_lead=team_lead,
                             round_num=round_num - 1,
                             num_rounds=num_rounds,
+                            agenda=agenda
                         )
                 else:
                     prompt = team_meeting_team_member_prompt(
-                        team_member=agent, round_num=round_num, num_rounds=num_rounds
+                        team_member=agent, round_num=round_num, num_rounds=num_rounds, agenda=agenda
                     )
             else:
                 # Individual meeting prompts

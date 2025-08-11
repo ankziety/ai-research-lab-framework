@@ -330,7 +330,7 @@ class LLMClient:
             system_message = f"You are a {agent_role}. Provide expert insights based on your domain knowledge."
 
             response = client.messages.create(
-                model="claude-3-sonnet-20240229",
+                model="claude-3-5-sonnet-20240620",
                 max_tokens=1000,
                 system=system_message,
                 messages=[{"role": "user", "content": prompt}]

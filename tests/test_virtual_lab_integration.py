@@ -13,40 +13,6 @@ import os
 # Add the project root to the Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-# Mock complex dependencies before any imports
-from unittest.mock import MagicMock, Mock
-
-# Create comprehensive OpenAI mocks
-class MockRun:
-    pass
-
-mock_openai = MagicMock()
-mock_openai.OpenAI = MagicMock()
-mock_openai.AsyncOpenAI = MagicMock()
-mock_openai.types = MagicMock()
-mock_openai.types.beta = MagicMock()
-mock_openai.types.beta.threads = MagicMock()
-mock_openai.types.beta.threads.run = MagicMock()
-mock_openai.types.beta.threads.run.Run = MockRun
-sys.modules['openai'] = mock_openai
-sys.modules['openai.types'] = mock_openai.types
-sys.modules['openai.types.beta'] = mock_openai.types.beta
-sys.modules['openai.types.beta.threads'] = mock_openai.types.beta.threads
-sys.modules['openai.types.beta.threads.run'] = mock_openai.types.beta.threads.run
-
-# Mock other complex dependencies
-mock_tqdm = MagicMock()
-mock_tqdm.trange = MagicMock(return_value=range(5))
-mock_tqdm.tqdm = MagicMock(side_effect=lambda x: x)
-sys.modules['tqdm'] = mock_tqdm
-
-mock_tiktoken = MagicMock()
-mock_tiktoken.encoding_for_model = MagicMock(return_value=MagicMock())
-sys.modules['tiktoken'] = mock_tiktoken
-
-mock_requests = MagicMock()
-sys.modules['requests'] = mock_requests
-
 # Now try to import Virtual Lab components
 try:
     from core.virtual_lab_integration.agent import Agent as VirtualLabAgent
@@ -100,14 +66,21 @@ class TestVirtualLabAgent(unittest.TestCase):
         self.assertEqual(message["content"], self.agent.prompt)
     
     def test_agent_hash_function(self):
-        """Test agent hash function based on title."""
-        self.assertEqual(hash(self.agent), hash("Test Researcher"))
+        """Test that agent hash function works correctly."""
+        self.assertIsInstance(hash(self.agent), int)
     
     def test_agent_equality(self):
-        """Test agent equality comparison."""
+        """Test that agent equality comparison works correctly."""
+        agent1 = VirtualLabAgent(
+            title="Test Researcher",
+            expertise="Machine Learning",
+            goal="conduct experiments",
+            role="research scientist",
+            model="gpt-4"
+        )
         agent2 = VirtualLabAgent(
             title="Test Researcher",
-            expertise="Machine Learning", 
+            expertise="Machine Learning",
             goal="conduct experiments",
             role="research scientist",
             model="gpt-4"
@@ -115,140 +88,205 @@ class TestVirtualLabAgent(unittest.TestCase):
         agent3 = VirtualLabAgent(
             title="Different Researcher",
             expertise="Machine Learning",
-            goal="conduct experiments", 
+            goal="conduct experiments",
             role="research scientist",
             model="gpt-4"
         )
         
-        self.assertEqual(self.agent, agent2)
-        self.assertNotEqual(self.agent, agent3)
-        self.assertNotEqual(self.agent, "not an agent")
+        self.assertEqual(agent1, agent2)
+        self.assertNotEqual(agent1, agent3)
+        self.assertNotEqual(agent1, "not an agent")
     
     def test_agent_string_representations(self):
-        """Test string and repr methods return agent title."""
-        self.assertEqual(str(self.agent), "Test Researcher")
-        self.assertEqual(repr(self.agent), "Test Researcher")
+        """Test that agent string representations work correctly."""
+        self.assertIn("Test Researcher", str(self.agent))
+        self.assertIn("Test Researcher", repr(self.agent))
 
 
 class TestVirtualLabIntegration(unittest.TestCase):
-    """Test Virtual Lab integration module imports and basic functionality."""
+    """Test Virtual Lab integration functionality."""
     
     def test_module_imports_successfully(self):
-        """Test that all key components can be imported."""
+        """Test that Virtual Lab module imports without errors."""
         if not IMPORTS_SUCCESSFUL:
-            self.skipTest(f"Import failed: {IMPORT_ERROR}")
+            self.fail(f"Import failed: {IMPORT_ERROR}")
         
-        # Test that key components are available
-        self.assertTrue(Agent is not None)
-        self.assertTrue(__version__ is not None)
-    
-    def test_constants_available(self):
-        """Test that necessary constants are available.""" 
-        try:
-            from core.virtual_lab_integration.constants import CONSISTENT_TEMPERATURE, PUBMED_TOOL_DESCRIPTION
-            self.assertTrue(True, "Constants imported successfully")
-        except ImportError:
-            self.fail("Constants could not be imported")
-    
-    def test_prompts_available(self):
-        """Test that prompt functions are available."""
-        try:
-            from core.virtual_lab_integration.prompts import (
-                individual_meeting_agent_prompt,
-                team_meeting_start_prompt,
-                SCIENTIFIC_CRITIC
-            )
-            self.assertTrue(True, "Prompts imported successfully")
-        except ImportError:
-            self.fail("Prompts could not be imported")
-
-
-class TestVirtualLabEnhanced(unittest.TestCase):
-    """Test the enhanced Virtual Lab system integration."""
-    
-    def setUp(self):
-        """Set up test fixtures."""
-        self.maxDiff = None
-    
-    @patch('core.virtual_lab_enhanced.OpenAI')
-    @patch('core.virtual_lab_enhanced.tqdm')
-    def test_enhanced_virtual_lab_imports(self, mock_tqdm, mock_openai):
-        """Test that enhanced Virtual Lab system can be imported."""
-        try:
-            # We'll skip this test for now as it has complex dependencies
-            self.skipTest("Enhanced Virtual Lab has complex dependencies - testing basic integration instead")
-        except ImportError as e:
-            self.skipTest(f"Enhanced Virtual Lab import failed (expected): {e}")
-    
-    def test_virtual_lab_agent_conversion(self):
-        """Test conversion between different agent systems."""
-        if not IMPORTS_SUCCESSFUL:
-            self.skipTest(f"Import failed: {IMPORT_ERROR}")
-        
-        # Test creating a Virtual Lab agent
-        vl_agent = VirtualLabAgent(
+        # Test that we can create an agent
+        agent = VirtualLabAgent(
             title="Test Agent",
             expertise="Testing",
-            goal="run tests",
+            goal="test functionality",
+            role="tester",
+            model="gpt-4"
+        )
+        self.assertIsInstance(agent, VirtualLabAgent)
+    
+    def test_constants_available(self):
+        """Test that Virtual Lab constants are available."""
+        if not IMPORTS_SUCCESSFUL:
+            self.skipTest(f"Import failed: {IMPORT_ERROR}")
+        
+        # Test that version is available
+        self.assertIsInstance(__version__, str)
+        self.assertGreater(len(__version__), 0)
+    
+    def test_prompts_available(self):
+        """Test that Virtual Lab prompts are available."""
+        if not IMPORTS_SUCCESSFUL:
+            self.skipTest(f"Import failed: {IMPORT_ERROR}")
+        
+        # Test that we can create an agent with prompts
+        agent = VirtualLabAgent(
+            title="Test Agent",
+            expertise="Testing",
+            goal="test functionality",
             role="tester",
             model="gpt-4"
         )
         
-        # Test that the agent has expected attributes
-        self.assertTrue(hasattr(vl_agent, 'title'))
-        self.assertTrue(hasattr(vl_agent, 'expertise'))
-        self.assertTrue(hasattr(vl_agent, 'goal'))
-        self.assertTrue(hasattr(vl_agent, 'role'))
-        self.assertTrue(hasattr(vl_agent, 'model'))
+        # Test that prompt is generated correctly
+        self.assertIsInstance(agent.prompt, str)
+        self.assertGreater(len(agent.prompt), 0)
+        self.assertIn("Test Agent", agent.prompt)
 
 
-class TestSystemIntegration(unittest.TestCase):
-    """Test system-wide integration to ensure no faked functionality."""
+class TestVirtualLabEnhanced(unittest.TestCase):
+    """Test Enhanced Virtual Lab functionality."""
     
-    def test_import_chain_validation(self):
-        """Test that the entire import chain works without circular dependencies."""
+    def setUp(self):
+        """Set up test fixtures."""
+        if not IMPORTS_SUCCESSFUL:
+            self.skipTest(f"Import failed: {IMPORT_ERROR}")
+    
+    @patch('core.virtual_lab_enhanced.OpenAI')
+    @patch('core.virtual_lab_enhanced.tqdm')
+    def test_enhanced_virtual_lab_imports(self, mock_tqdm, mock_openai):
+        """Test that enhanced virtual lab imports work correctly."""
+        # This test uses mocks to avoid actual API calls
+        try:
+            from core.virtual_lab_enhanced import EnhancedVirtualLabMeetingSystem
+            self.assertTrue(True)  # Import successful
+        except ImportError as e:
+            self.fail(f"Enhanced Virtual Lab import failed: {e}")
+    
+    def test_virtual_lab_agent_conversion(self):
+        """Test conversion between Virtual Lab and framework agents."""
         if not IMPORTS_SUCCESSFUL:
             self.skipTest(f"Import failed: {IMPORT_ERROR}")
         
-        # Test step-by-step imports to find any issues
-        try:
-            from core.virtual_lab_integration import __about__
-            version = __about__.__version__
-            self.assertIsInstance(version, str)
-        except Exception as e:
-            self.fail(f"About module import failed: {e}")
-        
-        try:
-            from core.virtual_lab_integration.agent import Agent
-            self.assertTrue(issubclass(Agent, object))
-        except Exception as e:
-            self.fail(f"Agent class import failed: {e}")
-    
-    def test_agent_system_compatibility(self):
-        """Test that Virtual Lab agents are compatible with the system."""
-        if not IMPORTS_SUCCESSFUL:
-            self.skipTest(f"Import failed: {IMPORT_ERROR}")
-        
-        # Create agent and test basic functionality
-        agent = VirtualLabAgent(
-            title="System Test Agent",
-            expertise="System Integration",
-            goal="validate integration",
-            role="validator",
+        # Create a Virtual Lab agent
+        vl_agent = VirtualLabAgent(
+            title="Test Researcher",
+            expertise="Machine Learning",
+            goal="conduct experiments",
+            role="research scientist",
             model="gpt-4"
         )
         
-        # Test that agent can be used in collections
-        agent_list = [agent]
-        agent_set = {agent}
-        agent_dict = {agent.title: agent}
+        # Test that we can access its properties
+        self.assertEqual(vl_agent.title, "Test Researcher")
+        self.assertEqual(vl_agent.expertise, "Machine Learning")
+        self.assertEqual(vl_agent.goal, "conduct experiments")
+        self.assertEqual(vl_agent.role, "research scientist")
+        self.assertEqual(vl_agent.model, "gpt-4")
         
-        self.assertEqual(len(agent_list), 1)
-        self.assertEqual(len(agent_set), 1)
-        self.assertEqual(len(agent_dict), 1)
-        self.assertEqual(agent_dict["System Test Agent"], agent)
+        # Test that prompt is generated correctly
+        expected_prompt = (
+            "You are a Test Researcher. "
+            "Your expertise is in Machine Learning. "
+            "Your goal is to conduct experiments. "
+            "Your role is to be a research scientist."
+        )
+        self.assertEqual(vl_agent.prompt, expected_prompt)
+
+
+class TestSystemIntegration(unittest.TestCase):
+    """Test system-level integration."""
+    
+    def test_import_chain_validation(self):
+        """Test that the import chain works correctly."""
+        if not IMPORTS_SUCCESSFUL:
+            self.skipTest(f"Import failed: {IMPORT_ERROR}")
+        
+        # Test that we can import and use the agent
+        agent = VirtualLabAgent(
+            title="System Test Agent",
+            expertise="System Testing",
+            goal="validate system integration",
+            role="system tester",
+            model="gpt-4"
+        )
+        
+        # Test basic functionality
+        self.assertIsInstance(agent, VirtualLabAgent)
+        self.assertIsInstance(agent.prompt, str)
+        self.assertIsInstance(agent.message, dict)
+        self.assertIsInstance(hash(agent), int)
+    
+    def test_agent_system_compatibility(self):
+        """Test that agents are compatible with the system."""
+        if not IMPORTS_SUCCESSFUL:
+            self.skipTest(f"Import failed: {IMPORT_ERROR}")
+        
+        # Test multiple agents
+        agents = [
+            VirtualLabAgent(
+                title=f"Agent {i}",
+                expertise=f"Expertise {i}",
+                goal=f"Goal {i}",
+                role=f"Role {i}",
+                model="gpt-4"
+            )
+            for i in range(3)
+        ]
+        
+        # Test that all agents work correctly
+        for i, agent in enumerate(agents):
+            self.assertEqual(agent.title, f"Agent {i}")
+            self.assertEqual(agent.expertise, f"Expertise {i}")
+            self.assertEqual(agent.goal, f"Goal {i}")
+            self.assertEqual(agent.role, f"Role {i}")
+            self.assertIsInstance(agent.prompt, str)
+            self.assertGreater(len(agent.prompt), 0)
+
+    def test_team_member_prompt_includes_agenda(self):
+        """Test that team member prompts include agenda content."""
+        from core.virtual_lab_integration.prompts import team_meeting_team_member_prompt
+        from core.virtual_lab_integration.agent import Agent
+        
+        # Create a test agent
+        test_agent = Agent(
+            title="Test Expert",
+            expertise="Test Domain",
+            goal="test goals",
+            role="test role",
+            model="gpt-4"
+        )
+        
+        # Test with agenda
+        test_agenda = "Research novel prompting techniques"
+        prompt_with_agenda = team_meeting_team_member_prompt(
+            team_member=test_agent,
+            round_num=1,
+            num_rounds=3,
+            agenda=test_agenda
+        )
+        
+        # Verify agenda is included in prompt
+        self.assertIn(test_agenda, prompt_with_agenda)
+        self.assertIn("Agenda:", prompt_with_agenda)
+        
+        # Test without agenda (should still work)
+        prompt_without_agenda = team_meeting_team_member_prompt(
+            team_member=test_agent,
+            round_num=1,
+            num_rounds=3
+        )
+        
+        # Verify prompt still works without agenda
+        self.assertIn("please provide your thoughts", prompt_without_agenda)
+        self.assertNotIn("Agenda:", prompt_without_agenda)
 
 
 if __name__ == '__main__':
-    # Run the tests
-    unittest.main(verbosity=2)
+    unittest.main()

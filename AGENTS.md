@@ -18,6 +18,8 @@ This file defines the non-negotiable standards and the minimum context required 
 - **MCP Tool System**: Dynamic tool creation and discovery operational
 - **Error Recovery**: LLM retry mechanisms tested with real failures
 - **Performance**: 22.7s for 4 integration tests (reasonable for API calls)
+- **LLM Client Test Fixes**: ✅ Global mock interference resolved, Anthropic API working perfectly
+- **Test Isolation**: ✅ Removed global mocks, tests now make real API calls
 
 ### Core Standards
 - **Tests must be 100% passing for every PR**: run `pytest` locally before submitting. Do not skip tests or disable checks.
@@ -104,6 +106,7 @@ pytest --cov=agents --cov=core --cov=tools --cov=ai_research_lab --cov-report=te
 - ✅ **LeReT Retrieval Optimization**: Multi-hop retrieval with preference-based RL
 - ✅ **Enhanced Meeting Agents**: Retriever, Hypothesis Generator, Toolsmith, Tester agents
 - ✅ **Persistent Context Management**: Cross-agent context with process_thought integration
+- ✅ **Enhanced Chat Functionality**: Comprehensive chat system with debug tab and history panel
 
 ### Areas for Improvement
 - ⚠️ **Test Coverage**: Overall 14% (core modules well-tested, physics modules untested)
@@ -113,6 +116,9 @@ pytest --cov=agents --cov=core --cov=tools --cov=ai_research_lab --cov-report=te
 ### Known Issues
 - 🔧 1 skipped test: Domain agent tool discovery (minor integration issue)
 - 🔧 Physics simulation modules: 0% coverage (not in current scope)
+- ✅ **RESOLVED**: LLM client test failures due to global mock interference
+- ✅ **RESOLVED**: Deprecated Anthropic model updated to current version
+- ✅ **RESOLVED**: Missing Google Generative AI dependency installed
 
 ### Handoff Notes
 - Virtual Lab integration is import-stable; corrected for Python 3.9 typing.
@@ -122,12 +128,13 @@ pytest --cov=agents --cov=core --cov=tools --cov=ai_research_lab --cov-report=te
 - **MCP Tool System**: Fully operational with real LLM integration.
 
 ### Next Steps for Future Agents
-1. **Integration Testing**: Create comprehensive tests for new LeReT, meeting agents, and context systems
-2. **Performance Optimization**: Profile and optimize the new systems for production use
+1. **Physics Engine Integration**: Begin Phase 3 of plan.md (physics simulation engines)
+2. **Performance Optimization**: Profile and optimize the enhanced chat system for production use
 3. **Coverage Improvement**: Focus on `agents/base_agent.py` (30%) and `agents/llm_client.py` (37%)
 4. **Fix Domain Agent Integration**: Resolve the 1 skipped test in domain agent tool discovery
-5. **Physics Engine Integration**: Begin Phase 3 of plan.md (physics simulation engines)
-6. **Production Deployment**: Prepare new systems for production deployment
+5. **User Experience Testing**: Conduct user testing of the enhanced chat interface and debug functionality
+6. **Production Deployment**: Prepare enhanced chat system for production deployment
+7. **API Key Management**: Consider implementing API key rotation and quota management for production use
 
 If any standard conflicts with your task requirements, raise it explicitly and propose a compliant alternative.
 

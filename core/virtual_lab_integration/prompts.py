@@ -208,33 +208,39 @@ def team_meeting_team_lead_initial_prompt(team_lead: Agent) -> str:
 
 
 def team_meeting_team_member_prompt(
-    team_member: Agent, round_num: int, num_rounds: int
+    team_member: Agent, round_num: int, num_rounds: int, agenda: str = ""
 ) -> str:
     """Generates the prompt for a team member in a team meeting.
 
     :param team_member: The team member.
     :param round_num: The current round number.
     :param num_rounds: The total number of rounds.
+    :param agenda: The agenda for the meeting.
     :return: The prompt for the team member.
     """
+    agenda_section = f"\n\nAgenda: {agenda}" if agenda else ""
+    
     return (
-        f"{team_member}, please provide your thoughts on the discussion (round {round_num} of {num_rounds}). "
+        f"{team_member}, please provide your thoughts on the discussion (round {round_num} of {num_rounds}).{agenda_section}\n\n"
         f'If you do not have anything new or relevant to add, you may say "pass". '
         f"Remember that you can and should (politely) disagree with other team members if you have a different perspective."
     )
 
 
 def team_meeting_team_lead_intermediate_prompt(
-    team_lead: Agent, round_num: int, num_rounds: int
+    team_lead: Agent, round_num: int, num_rounds: int, agenda: str = ""
 ) -> str:
     """Generates the intermediate prompt for the team lead in a team meeting at the end of a round of discussion.
 
     :param team_lead: The team lead.
     :param round_num: The current round number.
     :param num_rounds: The total number of rounds.
+    :param agenda: The agenda for the meeting.
     :return: The intermediate prompt for the team lead.
     """
-    return f"This concludes round {round_num} of {num_rounds} of discussion. {team_lead}, please {SYNTHESIS_PROMPT}."
+    agenda_section = f"\n\nAgenda: {agenda}" if agenda else ""
+    
+    return f"This concludes round {round_num} of {num_rounds} of discussion.{agenda_section} {team_lead}, please {SYNTHESIS_PROMPT}."
 
 
 def team_meeting_team_lead_final_prompt(
