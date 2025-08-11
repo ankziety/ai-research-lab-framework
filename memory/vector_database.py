@@ -118,7 +118,7 @@ class VectorDatabase:
                 self.embedding_model = None
         else:
             self.embedding_model = None
-            logger.warning("SentenceTransformers not available - using mock embeddings")
+            raise RuntimeError("SentenceTransformers not available. Install with: pip install sentence-transformers")
     
     def _init_faiss_index(self):
         """Initialize FAISS vector index."""
@@ -128,8 +128,7 @@ class VectorDatabase:
             logger.info(f"FAISS index initialized with dimension: {self.embedding_dim}")
         else:
             self.index = None
-            self.mock_vectors = []  # Fallback storage
-            logger.warning("Using mock vector storage - install faiss for better performance")
+            raise RuntimeError("FAISS not available. Install with: pip install faiss-cpu")
     
     def _get_db_connection(self):
         """Get thread-local database connection."""
@@ -187,11 +186,7 @@ class VectorDatabase:
         if self.embedding_model:
             return self.embedding_model.encode(text, convert_to_numpy=True)
         else:
-            # Mock embedding for testing without dependencies
-            import hashlib
-            hash_value = int(hashlib.md5(text.encode()).hexdigest()[:8], 16)
-            np.random.seed(hash_value)
-            return np.random.normal(0, 1, self.embedding_dim).astype(np.float32)
+            raise RuntimeError("No embedding model available. Cannot generate embeddings.")
     
     def store_content(self, content: str, content_type: str = "conversation",
                      agent_id: Optional[str] = None, session_id: Optional[str] = None,
@@ -302,8 +297,7 @@ class VectorDatabase:
                         if len(results) >= limit:
                             break
         else:
-            # Fallback to mock search
-            results = self._mock_search(query, limit, content_type, session_id, min_importance)
+            raise RuntimeError("FAISS index not available. Cannot perform vector search.")
         
         return results
     
@@ -318,47 +312,7 @@ class VectorDatabase:
             return False
         return True
     
-    def _mock_search(self, query: str, limit: int, content_type: Optional[str],
-                    session_id: Optional[str], min_importance: float) -> List[Dict[str, Any]]:
-        """Mock search for testing without FAISS."""
-        conn = self._get_db_connection()
-        cursor = conn.cursor()
-        
-        # Build query with filters
-        sql = '''
-        SELECT id, content, content_type, agent_id, session_id, task_id, 
-               timestamp, importance_score, metadata
-        FROM vector_metadata
-        WHERE importance_score >= ?
-        '''
-        params = [min_importance]
-        
-        if content_type:
-            sql += ' AND content_type = ?'
-            params.append(content_type)
-        if session_id:
-            sql += ' AND session_id = ?'
-            params.append(session_id)
-        
-        sql += ' ORDER BY importance_score DESC LIMIT ?'
-        params.append(limit)
-        
-        cursor.execute(sql, params)
-        results = []
-        for row in cursor.fetchall():
-            results.append({
-                'id': row[0],
-                'content': row[1],
-                'content_type': row[2],
-                'agent_id': row[3],
-                'session_id': row[4],
-                'task_id': row[5],
-                'timestamp': row[6],
-                'importance_score': row[7],
-                'metadata': json.loads(row[8]) if row[8] else {}
-            })
-        
-        return results
+
     
     def _get_content_metadata(self, content_id: int) -> Optional[Dict[str, Any]]:
         """Get metadata for a specific content ID."""
@@ -502,7 +456,7 @@ class VectorDatabase:
         total_summaries = cursor.fetchone()[0]
         
         # Vector index stats
-        vector_count = self.index.ntotal if self.index else len(self.mock_vectors)
+        vector_count = self.index.ntotal if self.index else 0
         
         return {
             'total_content': total_content,

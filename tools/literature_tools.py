@@ -96,10 +96,9 @@ class LiteratureSearchTool(BaseTool):
             results['papers'].extend(arxiv_results['papers'])
             results['sources'].append('ArXiv')
         
-        # If no API access, generate mock results
+        # If no API access, raise error
         if not results['papers']:
-            results['papers'] = self._generate_mock_literature_results(query, max_results)
-            results['sources'] = ['Mock Database']
+            raise RuntimeError("No literature search APIs available. Cannot perform literature search.")
         
         # Rank by relevance
         results['papers'] = self._rank_papers_by_relevance(results['papers'], query)[:max_results]
@@ -228,30 +227,7 @@ class LiteratureSearchTool(BaseTool):
         
         return papers
     
-    def _generate_mock_literature_results(self, query: str, max_results: int) -> List[Dict[str, Any]]:
-        """Generate mock literature results when APIs are not available."""
-        papers = []
-        
-        # Generate realistic mock papers based on query
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 10)):
-            paper = {
-                'id': f"mock_{i+1}",
-                'title': f"A Comprehensive Study on {query_words[0].title()} and Related Methodologies",
-                'authors': [f"Dr. {chr(65+i)} Smith", f"Prof. {chr(66+i)} Johnson"],
-                'journal': "International Journal of Research Sciences",
-                'publication_year': 2023 - (i % 3),
-                'abstract': f"This study investigates {' '.join(query_words)} using novel methodologies. The research provides insights into {query_words[0]} applications and presents evidence-based findings. Sample size: {100 + i*20} participants.",
-                'doi': f"10.1000/mockjournal.2023.{i+1:03d}",
-                'source': 'Mock Database',
-                'relevance_score': 0.9 - (i * 0.08),
-                'citations': 50 - (i * 5),
-                'open_access': i % 2 == 0
-            }
-            papers.append(paper)
-        
-        return papers
+
     
     def _rank_papers_by_relevance(self, papers: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
         """Rank papers by relevance to the query."""

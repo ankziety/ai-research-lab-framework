@@ -64,11 +64,7 @@ class WebSearchTool(BaseTool):
             
         except Exception as e:
             logger.error(f"Web search failed: {e}")
-            return {
-                'success': False,
-                'error': str(e),
-                'fallback_results': self._generate_mock_search_results(query, max_results)
-            }
+            raise RuntimeError(f"Web search failed: {e}")
     
     def can_handle(self, task_type: str, requirements: Dict[str, Any]) -> float:
         """Assess capability to handle web search tasks."""
@@ -131,30 +127,9 @@ class WebSearchTool(BaseTool):
             
         except Exception as e:
             logger.warning(f"DuckDuckGo search failed: {e}")
-            return self._generate_mock_search_results(query, max_results)
+            raise RuntimeError(f"DuckDuckGo search failed: {e}")
     
-    def _generate_mock_search_results(self, query: str, max_results: int) -> List[Dict[str, Any]]:
-        """Generate mock search results for testing."""
-        return [
-            {
-                'title': f"Research on {query} - Academic Paper",
-                'url': f"https://example.com/research/{query.replace(' ', '-')}",
-                'snippet': f"Comprehensive study on {query} with detailed analysis and findings...",
-                'source': 'Mock Academic Database'
-            },
-            {
-                'title': f"{query} - Wikipedia",
-                'url': f"https://en.wikipedia.org/wiki/{query.replace(' ', '_')}",
-                'snippet': f"Wikipedia article providing background information on {query}...",
-                'source': 'Wikipedia'
-            },
-            {
-                'title': f"Latest News on {query}",
-                'url': f"https://news.example.com/{query.replace(' ', '-')}",
-                'snippet': f"Recent developments and news related to {query}...",
-                'source': 'News Source'
-            }
-        ][:max_results]
+
 
 
 class CodeInterpreterTool(BaseTool):

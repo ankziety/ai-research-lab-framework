@@ -967,7 +967,7 @@ class VirtualLabMeetingSystem:
                     'constraints': constraints,
                     'available_memory': 1024,  # Assume 1GB available memory
                     'available_packages': ['pandas', 'numpy', 'scipy', 'statsmodels', 'requests'],  # Common packages + requests
-                    'api_keys': {'literature_api_key': os.getenv('LITERATURE_API_KEY', 'dummy_key')}  # Provide placeholder API key
+                    'api_keys': {'literature_api_key': os.getenv('LITERATURE_API_KEY')}  # API key required
                 })
                 
                 if tool:

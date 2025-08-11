@@ -59,6 +59,8 @@ class LiteratureRetriever:
         # Request timeout settings
         self.session_timeout = 30
         self.rate_limit_delay = 2 # Seconds between requests
+        self.max_retries = 3
+        self.retry_delay = 5 # Seconds between retries
         
         # Citation tracking
         self.search_history = []
@@ -113,6 +115,8 @@ class LiteratureRetriever:
                     papers = self._search_base(query, max_results // len(sources))
                 elif source.lower() == 'semantic_scholar':
                     papers = self._search_semantic_scholar(query, max_results // len(sources))
+                elif source.lower() == 'google_scholar':
+                    papers = self._search_google_scholar(query, max_results // len(sources))
                 elif source.lower() == 'openalex':
                     papers = self._search_openalex(query, max_results // len(sources))
                 elif source.lower() == 'core':
@@ -157,7 +161,7 @@ class LiteratureRetriever:
                 validation_results['warnings'].append('OpenAI API key is invalid or expired')
         else:
             validation_results['missing_keys'].append('openai')
-            validation_results['warnings'].append('OpenAI API key missing - AI features will use mock responses')
+            validation_results['warnings'].append('OpenAI API key missing - AI features will not be available')
         
         # Check Google Search API key
         if self.config.get('google_search_api_key') or os.getenv('GOOGLE_SEARCH_API_KEY'):
@@ -168,7 +172,7 @@ class LiteratureRetriever:
                 validation_results['warnings'].append('Google Search API key is invalid')
         else:
             validation_results['missing_keys'].append('google_search')
-            validation_results['warnings'].append('Google Search API key missing - web search will use mock data')
+            validation_results['warnings'].append('Google Search API key missing - web search will not be available')
         
         # Check other API keys
         api_keys_to_check = [
@@ -294,8 +298,17 @@ class LiteratureRetriever:
                 'sort': 'relevance'
             }
             
-            response = requests.get(search_url, params=search_params, timeout=self.session_timeout)
-            response.raise_for_status()
+            # Retry logic for network resilience
+            for attempt in range(self.max_retries):
+                try:
+                    response = requests.get(search_url, params=search_params, timeout=self.session_timeout)
+                    response.raise_for_status()
+                    break
+                except requests.exceptions.RequestException as e:
+                    if attempt == self.max_retries - 1:
+                        raise e
+                    logger.warning(f"PubMed search attempt {attempt + 1} failed, retrying in {self.retry_delay} seconds: {e}")
+                    time.sleep(self.retry_delay)
             search_data = response.json()
             
             if 'esearchresult' not in search_data:
@@ -316,8 +329,17 @@ class LiteratureRetriever:
                 'retmode': 'xml'
             }
             
-            fetch_response = requests.get(fetch_url, params=fetch_params, timeout=self.session_timeout)
-            fetch_response.raise_for_status()
+            # Retry logic for network resilience
+            for attempt in range(self.max_retries):
+                try:
+                    fetch_response = requests.get(fetch_url, params=fetch_params, timeout=self.session_timeout)
+                    fetch_response.raise_for_status()
+                    break
+                except requests.exceptions.RequestException as e:
+                    if attempt == self.max_retries - 1:
+                        raise e
+                    logger.warning(f"PubMed fetch attempt {attempt + 1} failed, retrying in {self.retry_delay} seconds: {e}")
+                    time.sleep(self.retry_delay)
             
             # Parse XML response
             papers = self._parse_pubmed_xml(fetch_response.text, paper_ids)
@@ -327,8 +349,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"PubMed search failed: {str(e)}")
-            # Return mock data for demonstration
-            return self._generate_mock_pubmed_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_arxiv(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -361,8 +383,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"ArXiv search failed: {str(e)}")
-            # Return mock data for demonstration
-            return self._generate_mock_arxiv_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_crossref(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -399,7 +421,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"CrossRef search failed: {str(e)}")
-            return []
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_google_scholar(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -418,13 +441,14 @@ class LiteratureRetriever:
             if serpapi_key:
                 return self._search_google_scholar_serpapi(query, max_results, serpapi_key)
             
-            # Fall back to mock data if no API key available
-            logger.warning("No SerpAPI key found, using mock Google Scholar results")
-            return self._generate_mock_google_scholar_results(query, max_results)
+            # No API key available
+            logger.warning("No SerpAPI key found for Google Scholar search")
+            return []
             
         except Exception as e:
             logger.error(f"Google Scholar search failed: {str(e)}")
-            return self._generate_mock_google_scholar_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_google_scholar_serpapi(self, query: str, max_results: int, api_key: str) -> List[Dict]:
         """Search Google Scholar using SerpAPI service."""
@@ -467,8 +491,8 @@ class LiteratureRetriever:
             search_engine_id = self.config.get('google_search_engine_id')
             
             if not api_key or not search_engine_id:
-                logger.warning("No Google Search API credentials found, using mock results")
-                return self._generate_mock_google_search_results(query, max_results)
+                logger.warning("No Google Search API credentials found")
+                return []
             
             # Academic-focused search query
             academic_query = f'{query} filetype:pdf OR site:edu OR site:org "research" OR "study"'
@@ -493,7 +517,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"Google Search failed: {str(e)}")
-            return self._generate_mock_google_search_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_semantic_scholar(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -542,7 +567,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"Semantic Scholar search failed: {str(e)}")
-            return self._generate_mock_semantic_scholar_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_openalex(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -576,7 +602,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"OpenAlex search failed: {str(e)}")
-            return self._generate_mock_openalex_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_core(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -617,7 +644,8 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"CORE search failed: {str(e)}")
-            return self._generate_mock_core_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _search_base(self, query: str, max_results: int) -> List[Dict]:
         """
@@ -653,69 +681,192 @@ class LiteratureRetriever:
             
         except Exception as e:
             logger.error(f"Base-search.net search failed: {str(e)}")
-            return self._generate_mock_base_results(query, max_results)
+            # Don't fall back to mock data - let the error propagate
+            raise e
     
     def _parse_pubmed_xml(self, xml_content: str, paper_ids: List[str]) -> List[Dict]:
         """
         Parse PubMed XML response to extract paper information.
-        
-        Note: This is a simplified parser. In production, would use proper XML parsing.
         """
         papers = []
         
-        # Simplified XML parsing - in production would use xml.etree.ElementTree
-        for i, paper_id in enumerate(paper_ids):
-            # Extract title, authors, journal, etc. from XML
-            # For now, generate realistic mock data
-            paper = {
-                'id': paper_id,
-                'pmid': paper_id,
-                'title': f"Clinical Research Study on Advanced Treatment Methods ({i+1})",
-                'authors': [f"Dr. Smith {chr(65+i)}", f"Prof. Johnson {chr(66+i)}", f"Dr. Brown {chr(67+i)}"],
-                'journal': f"Journal of Medical Research",
-                'publication_year': 2023 - (i % 4),
-                'abstract': f"This study investigates novel approaches to medical treatment with a focus on patient outcomes and safety. The research involved {100 + i*25} participants across multiple clinical sites. Results demonstrate significant improvements in treatment efficacy with minimal adverse effects.",
-                'doi': f"10.1234/jmr.2023.{paper_id}",
-                'source': 'PubMed',
-                'publication_date': f"2023-{str(i%12+1).zfill(2)}-01",
-                'mesh_terms': ['Clinical Research', 'Treatment', 'Medical Outcomes'],
-                'citation_count': max(0, 50 - i*5),
-                'impact_factor': round(3.5 - i*0.2, 2),
-                'open_access': i % 3 == 0,
-                'relevance_score': 0.9 - (i * 0.1)
-            }
-            papers.append(paper)
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(xml_content)
+            
+            # Find all PubmedArticle elements
+            for article in root.findall('.//PubmedArticle'):
+                # Extract PMID
+                pmid_elem = article.find('.//PMID')
+                if pmid_elem is None:
+                    continue
+                pmid = pmid_elem.text
+                
+                # Only process articles we searched for
+                if pmid not in paper_ids:
+                    continue
+                
+                # Extract title
+                title_elem = article.find('.//ArticleTitle')
+                title = title_elem.text if title_elem is not None else 'No title available'
+                
+                # Extract abstract
+                abstract_elem = article.find('.//AbstractText')
+                abstract = abstract_elem.text if abstract_elem is not None else 'No abstract available'
+                
+                # Extract authors
+                authors = []
+                author_list = article.find('.//AuthorList')
+                if author_list is not None:
+                    for author in author_list.findall('.//Author'):
+                        lastname = author.find('.//LastName')
+                        firstname = author.find('.//ForeName')
+                        if lastname is not None and firstname is not None:
+                            authors.append(f"{firstname.text} {lastname.text}")
+                
+                # Extract journal information
+                journal_elem = article.find('.//Journal')
+                journal_title = ''
+                if journal_elem is not None:
+                    journal_title_elem = journal_elem.find('.//Title')
+                    if journal_title_elem is not None:
+                        journal_title = journal_title_elem.text
+                
+                # Extract publication date
+                pub_date_elem = article.find('.//PubDate')
+                pub_year = None
+                if pub_date_elem is not None:
+                    year_elem = pub_date_elem.find('.//Year')
+                    if year_elem is not None:
+                        pub_year = int(year_elem.text)
+                
+                # Extract MeSH terms
+                mesh_terms = []
+                mesh_list = article.find('.//MeshHeadingList')
+                if mesh_list is not None:
+                    for mesh in mesh_list.findall('.//MeshHeading'):
+                        descriptor = mesh.find('.//DescriptorName')
+                        if descriptor is not None:
+                            mesh_terms.append(descriptor.text)
+                
+                # Extract DOI
+                doi = ''
+                article_id_list = article.find('.//ArticleIdList')
+                if article_id_list is not None:
+                    for article_id in article_id_list.findall('.//ArticleId'):
+                        if article_id.get('IdType') == 'doi':
+                            doi = article_id.text
+                            break
+                
+                paper = {
+                    'id': pmid,
+                    'pmid': pmid,
+                    'title': title,
+                    'authors': authors,
+                    'journal': journal_title,
+                    'publication_year': pub_year,
+                    'abstract': abstract,
+                    'doi': doi,
+                    'source': 'PubMed',
+                    'mesh_terms': mesh_terms,
+                    'url': f'https://pubmed.ncbi.nlm.nih.gov/{pmid}/',
+                    'relevance_score': 0.9
+                }
+                papers.append(paper)
+                
+        except Exception as e:
+            logger.error(f"Error parsing PubMed XML: {str(e)}")
+            # If parsing fails, return empty list instead of mock data
+            return []
         
         return papers
     
     def _parse_arxiv_xml(self, xml_content: str) -> List[Dict]:
         """
         Parse ArXiv XML response to extract paper information.
-        
-        Note: This is a simplified parser. In production, would use proper XML parsing.
         """
         papers = []
         
-        # Simplified XML parsing - would use feedparser or xml.etree.ElementTree
-        for i in range(5):  # Mock 5 ArXiv papers
-            paper = {
-                'id': f"arxiv:{2023 + i}.{1000 + i}",
-                'arxiv_id': f"{2023 + i}.{1000 + i}",
-                'title': f"Advanced Machine Learning Approaches for Scientific Discovery ({i+1})",
-                'authors': [f"Dr. AI Researcher {chr(65+i)}", f"Prof. ML Expert {chr(66+i)}"],
-                'categories': ['cs.AI', 'stat.ML'][i % 2],
-                'publication_year': 2023,
-                'abstract': f"This paper presents novel machine learning methodologies for scientific research applications. The proposed approach demonstrates superior performance on benchmark datasets and provides new insights into automated discovery processes.",
-                'source': 'ArXiv',
-                'publication_date': f"2023-{str(i%12+1).zfill(2)}-15",
-                'subject_class': 'Computer Science - Artificial Intelligence',
-                'updated': f"2023-{str(i%12+1).zfill(2)}-20",
-                'pdf_url': f"https://arxiv.org/pdf/{2023 + i}.{1000 + i}.pdf",
-                'citation_count': max(0, 25 - i*3),
-                'open_access': True,
-                'relevance_score': 0.8 - (i * 0.1)
-            }
-            papers.append(paper)
+        try:
+            import xml.etree.ElementTree as ET
+            root = ET.fromstring(xml_content)
+            
+            # Find all entry elements (ArXiv papers)
+            for entry in root.findall('.//{http://www.w3.org/2005/Atom}entry'):
+                # Extract ArXiv ID
+                id_elem = entry.find('.//{http://www.w3.org/2005/Atom}id')
+                if id_elem is None:
+                    continue
+                
+                arxiv_id = id_elem.text.split('/')[-1]  # Extract ID from URL
+                
+                # Extract title
+                title_elem = entry.find('.//{http://www.w3.org/2005/Atom}title')
+                title = title_elem.text.strip() if title_elem is not None else 'No title available'
+                
+                # Extract summary (abstract)
+                summary_elem = entry.find('.//{http://www.w3.org/2005/Atom}summary')
+                summary = summary_elem.text.strip() if summary_elem is not None else 'No abstract available'
+                
+                # Extract authors
+                authors = []
+                for author in entry.findall('.//{http://www.w3.org/2005/Atom}author'):
+                    name_elem = author.find('.//{http://www.w3.org/2005/Atom}name')
+                    if name_elem is not None:
+                        authors.append(name_elem.text)
+                
+                # Extract categories
+                categories = []
+                for category in entry.findall('.//{http://www.w3.org/2005/Atom}category'):
+                    term = category.get('term')
+                    if term:
+                        categories.append(term)
+                
+                # Extract published date
+                published_elem = entry.find('.//{http://www.w3.org/2005/Atom}published')
+                published_date = published_elem.text[:10] if published_elem is not None else ''
+                
+                # Extract updated date
+                updated_elem = entry.find('.//{http://www.w3.org/2005/Atom}updated')
+                updated_date = updated_elem.text[:10] if updated_elem is not None else ''
+                
+                # Extract PDF link
+                pdf_url = None
+                for link in entry.findall('.//{http://www.w3.org/2005/Atom}link'):
+                    if link.get('type') == 'application/pdf':
+                        pdf_url = link.get('href')
+                        break
+                
+                # Extract year from published date
+                pub_year = None
+                if published_date:
+                    try:
+                        pub_year = int(published_date.split('-')[0])
+                    except (ValueError, IndexError):
+                        pass
+                
+                paper = {
+                    'id': f"arxiv:{arxiv_id}",
+                    'arxiv_id': arxiv_id,
+                    'title': title,
+                    'authors': authors,
+                    'categories': categories,
+                    'publication_year': pub_year,
+                    'abstract': summary,
+                    'source': 'ArXiv',
+                    'publication_date': published_date,
+                    'updated': updated_date,
+                    'pdf_url': pdf_url or f'https://arxiv.org/pdf/{arxiv_id}.pdf',
+                    'url': f'https://arxiv.org/abs/{arxiv_id}',
+                    'open_access': True,
+                    'relevance_score': 0.8
+                }
+                papers.append(paper)
+                
+        except Exception as e:
+            logger.error(f"Error parsing ArXiv XML: {str(e)}")
+            # If parsing fails, return empty list instead of mock data
+            return []
         
         return papers
     
@@ -801,59 +952,7 @@ class LiteratureRetriever:
         
         return papers
     
-    def _generate_mock_pubmed_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock PubMed results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 8)):
-            paper = {
-                'id': f'pubmed_mock_{i+1}',
-                'pmid': f'3456789{i}',
-                'title': f'A Comprehensive Study on {query_words[0].title()} and Clinical Applications',
-                'authors': [f'Dr. {chr(65+i)} Martinez', f'Prof. {chr(66+i)} Thompson', f'Dr. {chr(67+i)} Lee'],
-                'journal': 'New England Journal of Medicine' if i % 3 == 0 else 'The Lancet' if i % 3 == 1 else 'Nature Medicine',
-                'publication_year': 2023 - (i % 3),
-                'abstract': f'This clinical study examines {" ".join(query_words)} in a randomized controlled trial with {200 + i*50} participants. The methodology involved double-blind placebo-controlled design. Results show statistically significant improvements (p<0.001) with effect size of 0.{8-i}. Implications for clinical practice are discussed.',
-                'doi': f'10.1056/NEJMoa202{i+1}000',
-                'source': 'PubMed',
-                'publication_date': f'2023-{str(i%12+1).zfill(2)}-{str((i*3+1)%28+1).zfill(2)}',
-                'mesh_terms': [query_words[0].title(), 'Clinical Trial', 'Treatment Outcome'],
-                'citation_count': max(0, 75 - i*8),
-                'impact_factor': round(4.5 - i*0.3, 2),
-                'open_access': i % 2 == 0,
-                'relevance_score': 0.95 - (i * 0.08)
-            }
-            papers.append(paper)
-        
-        return papers
-    
-    def _generate_mock_arxiv_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock ArXiv results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 6)):
-            paper = {
-                'id': f'arxiv_mock_{i+1}',
-                'arxiv_id': f'2311.{str(10000 + i*100).zfill(5)}',
-                'title': f'Novel {query_words[0].title()} Methods Using Deep Learning and Statistical Analysis',
-                'authors': [f'Dr. AI {chr(65+i)} Researcher', f'Prof. ML {chr(66+i)} Scientist'],
-                'categories': ['cs.AI', 'stat.ML', 'cs.LG'][i % 3],
-                'publication_year': 2023,
-                'abstract': f'We present innovative approaches to {" ".join(query_words)} using state-of-the-art machine learning techniques. Our methodology combines deep neural networks with advanced statistical methods. Experimental validation demonstrates superior performance with 9{5-i}% accuracy on benchmark datasets.',
-                'source': 'ArXiv',
-                'publication_date': f'2023-11-{str(i*2+1).zfill(2)}',
-                'subject_class': 'Computer Science - Artificial Intelligence',
-                'updated': f'2023-11-{str(i*2+3).zfill(2)}',
-                'pdf_url': f'https://arxiv.org/pdf/2311.{str(10000 + i*100).zfill(5)}.pdf',
-                'citation_count': max(0, 35 - i*4),
-                'open_access': True,
-                'relevance_score': 0.88 - (i * 0.07)
-            }
-            papers.append(paper)
-        
-        return papers
+
     
     def _parse_google_scholar_serpapi_response(self, data: Dict) -> List[Dict]:
         """Parse SerpAPI Google Scholar response."""
@@ -1052,106 +1151,9 @@ class LiteratureRetriever:
         
         return papers
     
-    def _generate_mock_base_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock Base-search.net results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 8)):
-            paper = {
-                'id': f'base_mock_{i+1}',
-                'doi': f'10.1000/base.{i+1}.{query_words[0]}',
-                'title': f'Open Access Research on {query_words[0].title()}: Methods and Outcomes',
-                'authors': [f'Dr. Base {chr(65+i)} Repository', f'Prof. Open {chr(66+i)} Research'],
-                'abstract': f'This open access research investigates {" ".join(query_words)} through comprehensive data analysis. The study provides valuable insights for researchers and practitioners in the field.',
-                'publication_year': 2023 - (i % 4),
-                'citation_count': max(0, 65 - i*6),
-                'journal': f'Base Journal of {query_words[0].title()}',
-                'url': f'https://base-search.net/works/mock_{i}',
-                'pdf_url': f'https://base-search.net/download/pdf/mock_{i}.pdf',
-                'open_access': True,
-                'source': 'Base-search.net',
-                'relevance_score': 0.78 - (i * 0.04)
-            }
-            papers.append(paper)
-        
-        return papers
+
     
-    def _generate_mock_semantic_scholar_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock Semantic Scholar results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 10)):
-            paper = {
-                'id': f'semantic_mock_{i+1}',
-                'title': f'Computational Analysis of {query_words[0].title()}: A Machine Learning Approach',
-                'authors': [f'Dr. Semantic {chr(65+i)} Researcher', f'Prof. AI {chr(66+i)} Scholar'],
-                'abstract': f'We present a novel computational framework for analyzing {" ".join(query_words)}. Our approach leverages state-of-the-art machine learning techniques to extract meaningful patterns and insights from large-scale datasets.',
-                'publication_year': 2023 - (i % 3),
-                'citation_count': max(0, 85 - i*7),
-                'journal': f'Journal of Computational {query_words[0].title()}',
-                'url': f'https://www.semanticscholar.org/paper/mock_{i}',
-                'pdf_url': f'https://arxiv.org/pdf/2023.{10000+i}.pdf',
-                'open_access': True,
-                'source': 'Semantic Scholar',
-                'tldr': f'This paper introduces new methods for {query_words[0]} analysis using ML.',
-                'relevance_score': 0.88 - (i * 0.04)
-            }
-            papers.append(paper)
-        
-        return papers
-    
-    def _generate_mock_openalex_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock OpenAlex results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 12)):
-            paper = {
-                'id': f'openalex_mock_{i+1}',
-                'doi': f'10.1000/mock.{i+1}.{query_words[0]}',
-                'title': f'Systematic Review of {query_words[0].title()} Research Methods and Applications',
-                'authors': [f'Dr. Open {chr(65+i)} Access', f'Prof. Research {chr(66+i)} Methods'],
-                'abstract': f'This systematic review examines current research trends in {" ".join(query_words)}. We analyzed over 500 papers to identify key methodologies, findings, and future research directions.',
-                'publication_year': 2023 - (i % 5),
-                'citation_count': max(0, 150 - i*8),
-                'journal': f'Open Science Journal of {query_words[0].title()}',
-                'url': f'https://openalex.org/works/mock_{i}',
-                'pdf_url': f'https://repository.example.org/papers/mock_{i}.pdf',
-                'open_access': True,
-                'source': 'OpenAlex',
-                'type': 'journal-article',
-                'relevance_score': 0.85 - (i * 0.03)
-            }
-            papers.append(paper)
-        
-        return papers
-    
-    def _generate_mock_core_results(self, query: str, max_results: int) -> List[Dict]:
-        """Generate mock CORE results when API is unavailable."""
-        papers = []
-        query_words = query.lower().split()
-        
-        for i in range(min(max_results, 8)):
-            paper = {
-                'id': f'core_mock_{i+1}',
-                'doi': f'10.5555/core.{i+1}.{query_words[0]}',
-                'title': f'Open Access Research on {query_words[0].title()}: Methods and Outcomes',
-                'authors': [f'Dr. Core {chr(65+i)} Repository', f'Prof. Open {chr(66+i)} Research'],
-                'abstract': f'This open access research investigates {" ".join(query_words)} through comprehensive data analysis. The study provides valuable insights for researchers and practitioners in the field.',
-                'publication_year': 2023 - (i % 4),
-                'citation_count': max(0, 65 - i*6),
-                'journal': f'CORE Journal of {query_words[0].title()}',
-                'url': f'https://core.ac.uk/works/mock_{i}',
-                'pdf_url': f'https://core.ac.uk/download/pdf/mock_{i}.pdf',
-                'open_access': True,
-                'source': 'CORE',
-                'relevance_score': 0.78 - (i * 0.04)
-            }
-            papers.append(paper)
-        
-        return papers
+
     
     def _remove_duplicates(self, papers: List[Dict]) -> List[Dict]:
         """Remove duplicate papers based on title similarity and DOI."""
@@ -1227,10 +1229,12 @@ class LiteratureRetriever:
             score += title_overlap * 0.4
             
             # Abstract relevance
-            abstract = paper.get('abstract', '').lower()
-            abstract_terms = set(abstract.split())
-            abstract_overlap = len(query_terms.intersection(abstract_terms))
-            score += abstract_overlap * 0.2
+            abstract = paper.get('abstract', '')
+            if abstract:
+                abstract = abstract.lower()
+                abstract_terms = set(abstract.split())
+                abstract_overlap = len(query_terms.intersection(abstract_terms))
+                score += abstract_overlap * 0.2
             
             # Publication year (recent papers get higher scores)
             year = paper.get('publication_year')
@@ -1610,6 +1614,60 @@ class LiteratureRetriever:
             'most_used_sources': sorted(common_sources.items(), key=lambda x: x[1], reverse=True),
             'search_frequency': f"{len(recent_searches)} searches in last 7 days"
         }
+    
+    def health_check(self) -> Dict[str, Any]:
+        """
+        Perform a comprehensive health check of all APIs.
+        This helps detect API changes or failures proactively.
+        """
+        health_status = {
+            'overall_status': 'healthy',
+            'api_status': {},
+            'warnings': [],
+            'recommendations': []
+        }
+        
+        # Test PubMed API
+        try:
+            test_results = self.search('test', 1, sources=['pubmed'])
+            health_status['api_status']['pubmed'] = {
+                'status': 'healthy',
+                'response_time': 'tested',
+                'results_count': len(test_results)
+            }
+        except Exception as e:
+            health_status['api_status']['pubmed'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health_status['warnings'].append(f'PubMed API issue: {e}')
+            health_status['overall_status'] = 'degraded'
+        
+        # Test ArXiv API
+        try:
+            test_results = self.search('test', 1, sources=['arxiv'])
+            health_status['api_status']['arxiv'] = {
+                'status': 'healthy',
+                'response_time': 'tested',
+                'results_count': len(test_results)
+            }
+        except Exception as e:
+            health_status['api_status']['arxiv'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+            health_status['warnings'].append(f'ArXiv API issue: {e}')
+            health_status['overall_status'] = 'degraded'
+        
+        # Check API key status
+        api_status = self.get_api_key_status()
+        if api_status['invalid_keys']:
+            health_status['warnings'].append(f'Invalid API keys: {api_status["invalid_keys"]}')
+        
+        if api_status['missing_keys']:
+            health_status['recommendations'].append(f'Consider adding API keys for: {api_status["missing_keys"]}')
+        
+        return health_status
 
 
 # Helper functions for backward compatibility
