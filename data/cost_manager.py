@@ -1138,7 +1138,14 @@ class CostManager:
                 
                 self.current_spending = data.get('current_spending', 0.0)
                 self.usage_stats = data.get('usage_stats', {})
-                self.budget_alerts = data.get('budget_alerts', {0.5: False, 0.8: False, 0.95: False})
+                
+                # Fix budget_alerts: ensure keys are floats (JSON loads them as strings)
+                budget_alerts_data = data.get('budget_alerts', {0.5: False, 0.8: False, 0.95: False})
+                self.budget_alerts = {}
+                for key, value in budget_alerts_data.items():
+                    # Convert string keys back to floats
+                    float_key = float(key) if isinstance(key, str) else key
+                    self.budget_alerts[float_key] = value
                 
                 # Load cost history
                 cost_history_data = data.get('cost_history', [])
