@@ -33,30 +33,34 @@ class TestVirtualLabAgent(unittest.TestCase):
             self.skipTest(f"Import failed: {IMPORT_ERROR}")
             
         self.agent = VirtualLabAgent(
-            name="Test Agent",
+            title="Test Agent",
+            expertise="Test Expertise",
+            goal="test functionality",
             role="Test Role",
             model="gpt-4o"
         )
         
-        self.assertEqual(self.agent.name, "Test Agent")
+        self.assertEqual(self.agent.title, "Test Agent")
+        self.assertEqual(self.agent.expertise, "Test Expertise")
+        self.assertEqual(self.agent.goal, "test functionality")
         self.assertEqual(self.agent.role, "Test Role")
         self.assertEqual(self.agent.model, "gpt-4o")
     
     def test_agent_initialization(self):
         """Test agent initialization with all required parameters."""
-        self.assertEqual(self.agent.title, "Test Researcher")
-        self.assertEqual(self.agent.expertise, "Machine Learning")
-        self.assertEqual(self.agent.goal, "conduct experiments")
-        self.assertEqual(self.agent.role, "research scientist")
+        self.assertEqual(self.agent.title, "Test Agent")
+        self.assertEqual(self.agent.expertise, "Test Expertise")
+        self.assertEqual(self.agent.goal, "test functionality")
+        self.assertEqual(self.agent.role, "Test Role")
         self.assertEqual(self.agent.model, "gpt-4o")
     
     def test_agent_prompt_generation(self):
         """Test that agent generates proper prompt string."""
         expected_prompt = (
-            "You are a Test Researcher. "
-            "Your expertise is in Machine Learning. "
-            "Your goal is to conduct experiments. "
-            "Your role is to be a research scientist."
+            "You are a Test Agent. "
+            "Your expertise is in Test Expertise. "
+            "Your goal is to test functionality. "
+            "Your role is to be a Test Role."
         )
         self.assertEqual(self.agent.prompt, expected_prompt)
     
@@ -101,8 +105,8 @@ class TestVirtualLabAgent(unittest.TestCase):
     
     def test_agent_string_representations(self):
         """Test that agent string representations work correctly."""
-        self.assertIn("Test Researcher", str(self.agent))
-        self.assertIn("Test Researcher", repr(self.agent))
+        self.assertIn("Test Agent", str(self.agent))
+        self.assertIn("Test Agent", repr(self.agent))
 
 
 class TestVirtualLabIntegration(unittest.TestCase):

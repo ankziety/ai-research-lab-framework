@@ -37,7 +37,21 @@ def get_api_key(provider: str) -> Optional[str]:
 
 def has_api_key(provider: str) -> bool:
     """Check if API key is available for a provider."""
-    return get_api_key(provider) is not None
+    api_key = get_api_key(provider)
+    if not api_key:
+        return False
+    
+    # Check for placeholder values
+    placeholder_values = [
+        'your-openai-api-key',
+        'your-anthropic-api-key', 
+        'your-gemini-api-key',
+        'your-huggingface-api-key',
+        'test-key',
+        ''
+    ]
+    
+    return api_key not in placeholder_values
 
 def skip_if_no_api_key(provider: str, reason: str = None) -> pytest.MarkDecorator:
     """Skip test if API key is not available."""
@@ -57,11 +71,11 @@ def get_test_config() -> Dict[str, Any]:
         'api_keys': {}
     }
     
-    # Add available API keys
+    # Add available API keys (only valid ones)
     providers = ['openai', 'anthropic', 'gemini', 'huggingface']
     for provider in providers:
-        key = get_api_key(provider)
-        if key:
+        if has_api_key(provider):  # Only add if it's a valid API key
+            key = get_api_key(provider)
             config['api_keys'][provider] = key
     
     # Set default provider to first available one

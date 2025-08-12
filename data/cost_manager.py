@@ -63,6 +63,9 @@ class CostManager:
         self.cost_history = []
         self.usage_stats = {}
         
+        # Initialize budget alerts
+        self.budget_alerts = {0.5: False, 0.8: False, 0.95: False}
+        
         # Load model costs
         self.model_costs = self._load_model_costs(config)
         
