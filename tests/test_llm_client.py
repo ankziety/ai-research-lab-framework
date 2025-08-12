@@ -254,37 +254,189 @@ class TestLLMClientResponseGeneration:
     @pytest.mark.integration
     @skip_if_no_api_key('huggingface')
     def test_generate_response_optimized(self):
-        """Test optimized response generation."""
+        """Test optimized response generation with cost optimization."""
+        from unittest.mock import patch, Mock
+        from data.cost_manager import CostManager
+        
         config = get_test_config()
         client = LLMClient(config)
         
-        # Mock the HuggingFace API call since this test is about provider selection logic
-        with pytest.MonkeyPatch().context() as m:
-            # Mock requests.post to return a successful response
-            def mock_post(*args, **kwargs):
-                class MockResponse:
-                    def __init__(self):
-                        self.status_code = 200
-                    
-                    def raise_for_status(self):
-                        pass
-                    
-                    def json(self):
-                        return [{"generated_text": "This is a mock response from HuggingFace API for testing purposes."}]
+        # Create a mock cost manager
+        mock_cost_manager = Mock(spec=CostManager)
+        mock_cost_manager.optimization_enabled = True
+        
+        # Test scenario 1: Cost optimization with model switching
+        with patch.object(client, 'cost_manager', mock_cost_manager):
+            # Mock the cost manager to return an optimized model
+            mock_cost_manager.get_budget_status.return_value = {
+                'budget_remaining': 50.0,
+                'budget_limit': 100.0,
+                'current_spending': 50.0
+            }
+            mock_cost_manager.optimize_model_selection.return_value = 'gpt-5-mini'
+            
+            # Mock the generate_response method to track which model was used
+            with patch.object(client, 'generate_response') as mock_generate:
+                mock_generate.return_value = "Optimized response"
                 
-                return MockResponse()
+                # Call the optimized method
+                response = client.generate_response_optimized(
+                    "Test prompt",
+                    {'context': 'test'},
+                    "Test Agent",
+                    "medium"
+                )
+                
+                # Verify the cost manager was used for optimization
+                mock_cost_manager.get_budget_status.assert_called_once()
+                mock_cost_manager.optimize_model_selection.assert_called_once_with(
+                    task_complexity='medium',
+                    budget_remaining=50.0,
+                    required_capabilities=['reasoning', 'analysis']
+                )
+                
+                # Verify the optimized model was used
+                mock_generate.assert_called_once()
+                call_args = mock_generate.call_args
+                assert call_args is not None
+                
+                # Verify the response was returned
+                assert response == "Optimized response"
+                
+                # Verify the original model was restored
+                assert client.model == config.get('default_model', 'gpt-5')
+    
+    @pytest.mark.integration
+    def test_generate_response_optimized_fallback(self):
+        """Test optimized response generation fallback when cost manager is unavailable."""
+        from unittest.mock import patch, Mock
+        
+        config = get_test_config()
+        client = LLMClient(config)
+        
+        # Test scenario 2: Fallback to provider-based selection when cost manager is None
+        with patch.object(client, 'cost_manager', None):
+            # Mock the select_optimal_provider method
+            with patch.object(client, 'select_optimal_provider') as mock_select_provider:
+                mock_select_provider.return_value = 'anthropic'
+                
+                # Mock the generate_response method
+                with patch.object(client, 'generate_response') as mock_generate:
+                    mock_generate.return_value = "Fallback response"
+                    
+                    # Call the optimized method
+                    response = client.generate_response_optimized(
+                        "Test prompt",
+                        {'context': 'test'},
+                        "Test Agent",
+                        "simple"
+                    )
+                    
+                    # Verify provider selection was used
+                    mock_select_provider.assert_called_once_with("Test prompt", "simple")
+                    
+                    # Verify the fallback provider was used
+                    mock_generate.assert_called_once()
+                    
+                    # Verify the response was returned
+                    assert response == "Fallback response"
+                    
+                    # Verify the original provider was restored
+                    assert client.provider == config.get('default_llm_provider', 'openai')
+    
+    @pytest.mark.integration
+    def test_generate_response_optimized_budget_protection(self):
+        """Test optimized response generation with budget protection."""
+        from unittest.mock import patch, Mock
+        from data.cost_manager import CostManager
+        
+        config = get_test_config()
+        client = LLMClient(config)
+        
+        # Create a mock cost manager
+        mock_cost_manager = Mock(spec=CostManager)
+        mock_cost_manager.optimization_enabled = True
+        
+        # Test scenario 3: Budget protection with low budget
+        with patch.object(client, 'cost_manager', mock_cost_manager):
+            # Mock low budget scenario
+            mock_cost_manager.get_budget_status.return_value = {
+                'budget_remaining': 0.5,  # Very low budget
+                'budget_limit': 100.0,
+                'current_spending': 99.5
+            }
+            # Mock cost manager to return a cheap model for low budget
+            mock_cost_manager.optimize_model_selection.return_value = 'gpt-5-nano'
             
-            m.setattr("requests.post", mock_post)
+            # Mock the generate_response method
+            with patch.object(client, 'generate_response') as mock_generate:
+                mock_generate.return_value = "Budget-protected response"
+                
+                # Call the optimized method
+                response = client.generate_response_optimized(
+                    "Test prompt",
+                    {'context': 'test'},
+                    "Test Agent",
+                    "complex"
+                )
+                
+                # Verify budget-aware optimization was used
+                mock_cost_manager.get_budget_status.assert_called_once()
+                mock_cost_manager.optimize_model_selection.assert_called_once_with(
+                    task_complexity='complex',
+                    budget_remaining=0.5,
+                    required_capabilities=['reasoning', 'analysis']
+                )
+                
+                # Verify the cheap model was selected for low budget
+                assert mock_cost_manager.optimize_model_selection.return_value == 'gpt-5-nano'
+                
+                # Verify the response was returned
+                assert response == "Budget-protected response"
+    
+    @pytest.mark.integration
+    def test_generate_response_optimized_state_restoration(self):
+        """Test that original state is properly restored after optimization."""
+        from unittest.mock import patch, Mock
+        from data.cost_manager import CostManager
+        
+        config = get_test_config()
+        client = LLMClient(config)
+        
+        # Store original state
+        original_model = client.model
+        original_provider = client.provider
+        
+        # Create a mock cost manager
+        mock_cost_manager = Mock(spec=CostManager)
+        mock_cost_manager.optimization_enabled = True
+        
+        # Test scenario 4: State restoration after optimization
+        with patch.object(client, 'cost_manager', mock_cost_manager):
+            # Mock the cost manager
+            mock_cost_manager.get_budget_status.return_value = {
+                'budget_remaining': 50.0,
+                'budget_limit': 100.0,
+                'current_spending': 50.0
+            }
+            mock_cost_manager.optimize_model_selection.return_value = 'gpt-4o-mini'
             
-            response = client.generate_response_optimized(
-                "Test optimized prompt",
-                {'context': 'test'},
-                "Test Agent",
-                "medium"
-            )
-            
-            assert isinstance(response, str)
-            assert len(response) > 0
+            # Mock the generate_response method to simulate an exception
+            with patch.object(client, 'generate_response') as mock_generate:
+                mock_generate.side_effect = Exception("API Error")
+                
+                # Call the optimized method and expect an exception
+                with pytest.raises(Exception, match="API Error"):
+                    client.generate_response_optimized(
+                        "Test prompt",
+                        {'context': 'test'},
+                        "Test Agent",
+                        "medium"
+                    )
+                
+                # Verify state was restored even after exception
+                assert client.model == original_model
+                assert client.provider == original_provider
 
 
 class TestLLMClientErrorHandling:
